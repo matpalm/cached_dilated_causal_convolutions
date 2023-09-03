@@ -9,6 +9,10 @@ trades off compute for heavy SDRAM caching of intermediate results.
 
 is the dumping ground for prototyping notebooks
 
+uses https://pypi.org/project/cmsisdsp/
+
+`conda activate cdcc`
+
 ## cmsis lib
 
 `cmsis_lib/` contains the library code for running on the daisy
