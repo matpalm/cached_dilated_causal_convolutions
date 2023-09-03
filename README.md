@@ -18,8 +18,16 @@ uses https://pypi.org/project/cmsisdsp/
 `cmsis_lib/` contains the library code for running on the daisy
 
 ```
+$ arm-none-eabi-g++ \
+ --specs=nosys.specs cdcc_main.cpp \
+  -I../libDaisy/Drivers/CMSIS/Include/ \
+  -I../libDaisy/Drivers/CMSIS/DSP/Include \
+  -DARM_MATH_CM7
+```
+
+```
 cd cmsis_lib
-cmake -Bbuild -DCMAKE_BUILD_TYPE=Release
+cmake -Bbuild -D CMAKE_BUILD_TYPE=Release
 cd build
 make
 ./cdcc
