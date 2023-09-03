@@ -1,6 +1,6 @@
 # cached dilated causal convolutions
 
-1D dilate causal convolutions with extreme caching. intended for fast inference on the daisy platform.
+1D dilated causal convolutions with extreme caching. intended for fast inference on the daisy platform.
 trades off compute for heavy SDRAM caching of intermediate results.
 
 `libdaisy` included as a submodule and contains the CMSIS lib intended to run on the daisy
