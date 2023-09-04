@@ -1,19 +1,36 @@
 from typing import List
 import numpy as np
+import cmsisdsp as dsp
 
 from .block import Block
 from .rolling_cache import RollingCache
 
+class Classifier(object):
+
+    def __init__(self, weights, biases):
+        assert len(weights.shape) == 2
+        self.input_dim = weights.shape[0]
+        assert biases.shape == (weights.shape[1],)
+        self.weights = weights
+        self.biases = biases
+
+    def apply(self, x):
+        assert x.shape == (self.input_dim,)
+        x_mi = x.reshape((1, self.input_dim))
+        weights_mi = self.weights
+        _status, result = dsp.arm_mat_mult_f32(x_mi, weights_mi)
+        return dsp.arm_add_f32(result, self.biases)
+
+
 class CachedBlockModel(object):
+
     def __init__(self,
                  blocks: List[Block],
                  input_feature_depth: int,
-                 classifier_kernel,
-                 classifier_bias):
+                 classifier: Classifier):
 
         self.blocks = blocks
-        self.classifier_kernel = classifier_kernel
-        self.classifier_bias = classifier_bias
+        self.classifier = classifier
 
         self.kernel_size = blocks[0].kernel_size
         self.input_feature_depth = input_feature_depth
@@ -52,6 +69,5 @@ class CachedBlockModel(object):
         final_block_out = self.blocks[-1].apply(feature_map)
 
         # run y_pred
-        # TODO: port to arm math too
-        y_pred = np.dot(final_block_out, self.classifier_kernel.squeeze()) + self.classifier_bias
+        y_pred = self.classifier.apply(final_block_out)
         return y_pred

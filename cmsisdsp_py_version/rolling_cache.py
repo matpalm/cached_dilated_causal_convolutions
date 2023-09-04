@@ -2,6 +2,7 @@ import math
 import numpy as np
 
 class RollingCache(object):
+
     def __init__(self, depth, dilation, kernel_size):
 
         # hacky check that dilation is a power of k
