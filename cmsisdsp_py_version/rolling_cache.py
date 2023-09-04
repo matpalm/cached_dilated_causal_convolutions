@@ -4,6 +4,7 @@ import numpy as np
 class RollingCache(object):
 
     def __init__(self, depth, dilation, kernel_size):
+        print(f">RollingCache depth={depth} dilation={dilation} kernel_size={kernel_size}")
 
         # hacky check that dilation is a power of k
         # otherwise this whole thing doesn't make sense

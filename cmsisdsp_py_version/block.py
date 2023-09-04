@@ -16,6 +16,7 @@ class Block(object):
         assert c2_kernel.shape[1] == self.c1_out_d
         self.c2_out_d = c2_kernel.shape[2]
         assert c2_bias.shape[0] == self.c2_out_d
+        self.out_d = self.c2_out_d
         self.c1_kernel = c1_kernel
         self.c1_bias = c1_bias
         self.c2_kernel = c2_kernel
@@ -25,7 +26,6 @@ class Block(object):
         # apply first Kx1 convolution
         c1_result = np.empty((1, self.c1_out_d), dtype=np.float32)
         c1_result = dsp.arm_fill_f32(0, self.c1_out_d)
-        #return c1_result
         for k in range(self.kernel_size):
             x_mi = x[k:k+1,:]
             assert x_mi.shape == (1, self.in_d), f"x_mi={x_mi.shape} in_d={self.in_d}"

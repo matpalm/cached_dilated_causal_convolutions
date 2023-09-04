@@ -19,7 +19,6 @@ def create_dilated_model(seq_len: int,
     collected_outputs = []
     for i, filter_size in enumerate(filter_sizes):
 
-        # first layer will be the one processing the windowed input
         conv_a_output = Conv1D(name=f"c{i}a", filters=filter_size,
                                kernel_size=kernel_size, dilation_rate=kernel_size**i,
                                padding='causal', activation='relu')(last_layer)
@@ -27,7 +26,6 @@ def create_dilated_model(seq_len: int,
                                kernel_size=1, strides=1,
                                activation='relu')(conv_a_output)
 
-        # collect conv_b
         collected_outputs.append(conv_b_output)
         last_layer = conv_b_output
 

@@ -10,6 +10,7 @@ class Classifier(object):
     def __init__(self, weights, biases):
         assert len(weights.shape) == 2
         self.input_dim = weights.shape[0]
+        self.output_dim = weights.shape[1]
         assert biases.shape == (weights.shape[1],)
         self.weights = weights
         self.biases = biases
@@ -52,7 +53,7 @@ class CachedBlockModel(object):
     def apply(self, x):
         assert x.shape == (self.input_feature_depth,), x.shape
 
-        # clumsy shift input, will do something better in firmware
+        # shift input values left, and add new entry to idx -1
         for i in range(self.kernel_size-1):
             self.input[i] = self.input[i+1]
         self.input[self.kernel_size-1] = x
