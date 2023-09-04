@@ -48,3 +48,6 @@ class Block(object):
         c2_result = dsp.arm_add_f32(c2_result, self.c2_bias)
         c2_result = np.maximum(c2_result, 0)
         return c2_result
+
+    def output_feature_depth(self):
+        return self.c2_out_d
