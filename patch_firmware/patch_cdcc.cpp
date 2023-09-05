@@ -129,12 +129,20 @@ Classifier classifier(
 
 void UpdateDisplay() {
 
-  float inp[8] = {0.3, 0.1, -0.4, -0.1, 0.5, 0.9, -0.2, 0.6};
-  float result[2];
+  //Block block0(4, // kernel_size
+  //          2, 4, // in_d, out_d
 
-  classifier.Apply(inp, result);
-  WriteArray("result", result, 2);
+  float x[4*2] = {0.3, 0.1, -0.4, -0.1, 0.5, 0.9, -0.2, 0.6};
+  float result[4];
 
+  block0.Apply(x, result);
+  WriteArray("result", result, 4);
+
+
+  // float inp[8] = {0.3, 0.1, -0.4, -0.1, 0.5, 0.9, -0.2, 0.6};
+  // float result[2];
+  // classifier.Apply(inp, result);
+  // WriteArray("result", result, 2);
 }
 
 int main(void) {

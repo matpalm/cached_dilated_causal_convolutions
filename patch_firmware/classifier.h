@@ -7,7 +7,10 @@ class Classifier {
                float* weights,     // (in_d_, out_d_)
                float* biases) :    // (out_d_,)
                 in_d_(in_d), out_d_(out_d),
-                weights_(weights), biases_(biases) {
+                biases_(biases) {
+
+      // this matrix instance never changes, so build once
+      arm_mat_init_f32(&weights_mi_, in_d, out_d, weights);
     }
 
   void Apply(float* features,   // (in_d_, )
@@ -16,8 +19,6 @@ class Classifier {
       // mat mul features and weights
       arm_matrix_instance_f32 feature_mi;
       arm_mat_init_f32(&feature_mi, 1, in_d_, features);
-      arm_matrix_instance_f32 weights_mi_;
-      arm_mat_init_f32(&weights_mi_, in_d_, out_d_, weights_);
       arm_matrix_instance_f32 result_mi;
       arm_mat_init_f32(&result_mi, 1, out_d_, result);
       arm_mat_mult_f32(&feature_mi, &weights_mi_, &result_mi);
@@ -29,6 +30,6 @@ class Classifier {
   private:
     const size_t in_d_;
     const size_t out_d_;
-    float* weights_;
     float* biases_;
+    arm_matrix_instance_f32 weights_mi_;
 };
