@@ -28,7 +28,7 @@ class RollingCache {
     }
 
     void Lookup(float* lookup) {
-      // assume lookup is float[kernel_size][depth]
+      // assume lookup is float[kernel_size * depth]
       // write from last to first element.
       // note: int for lookup_idx, not size_t, because we're going backwards
       // and don't want weird 0-1 stuff
