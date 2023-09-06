@@ -41,20 +41,20 @@ Block block2(4, // kernel_size
              8, 8, // in_d, out_d
              b2_c1_kernel, b2_c1_bias, b2_c2_kernel, b2_c2_bias);
 
-float layer_0_cache_buffer[4*4*4];
-RollingCache layer_0_cache(
+float layer0_cache_buffer[4*4*4];
+RollingCache layer0_cache(
   4, // depth
   4, // dilation
   4, // kernel size
-  layer_0_cache_buffer
+  layer0_cache_buffer
 );
 
-float layer_1_cache_buffer[8*16*4];
-RollingCache layer_1_cache(
+float layer1_cache_buffer[8*16*4];
+RollingCache layer1_cache(
   8, // depth
   16, // dilation
   4, // kernel size
-  layer_1_cache_buffer
+  layer1_cache_buffer
 );
 
 float classifier_weights[8*2] = {0.26889148354530334, 0.024264369159936905, -0.10870025306940079, 0.3449588716030121, -0.5258246660232544, -0.23211383819580078, -0.7355398535728455, 0.434769868850708, 0.564256489276886, -0.5344828367233276, -0.5154579281806946, 0.5851086378097534, 0.8087823987007141, -0.5134549736976624, -0.7756032347679138, -0.09559721499681473};
@@ -152,40 +152,39 @@ void RunInference() {
   // run block0, writing into input buffer for layer0 cache
   AssertSame("b0->l0",
     block0.GetOutputBufferSize(),
-    layer_0_cache.GetInputBufferSize()
+    layer0_cache.GetInputBufferSize()
   );
-  block0.Apply(layer_0_cache.GetInputBuffer());
+  block0.Apply(layer0_cache.GetInputBuffer());
 
   // run layer0 cache propogation
   // lookup cached values, into block1 input buffer
   AssertSame("l0->b1",
-    layer_0_cache.GetOutputBufferSize(),
+    layer0_cache.GetOutputBufferSize(),
     block1.GetInputBufferSize()
   );
-  layer_0_cache.Apply(block1.GetInputBuffer());
+  layer0_cache.Apply(block1.GetInputBuffer());
 
-  // // run block1, writing into input buffer for layer1 cache
-  // AssertSame("b1->l2",
-  //   block1.GetOutputBufferSize(),
-  //   layer_1_cache.GetInputBufferSize()
-  // );
-  // block1.Apply(layer_1_cache.GetInputBuffer());
+  // run block1, writing into input buffer for layer1 cache
+  AssertSame("b1->l2",
+    block1.GetOutputBufferSize(),
+    layer1_cache.GetInputBufferSize()
+  );
+  block1.Apply(layer1_cache.GetInputBuffer());
 
-  // // run layer0 cache propogation
-  // // lookup cached values, into block1 input buffer
-  // AssertSame("l1->b2",
-  //   layer_1_cache.GetOutputBufferSize(),
-  //   block2.GetInputBufferSize()
-  // );
-  // layer_1_cache.Add();
-  // layer_1_cache.Lookup(block2.GetInputBuffer());
+  // run layer0 cache propogation
+  // lookup cached values, into block1 input buffer
+  AssertSame("l1->b2",
+    layer1_cache.GetOutputBufferSize(),
+    block2.GetInputBufferSize()
+  );
+  layer1_cache.Apply(block2.GetInputBuffer());
 
-  // // run block2 writing into classifier
-  // AssertSame("b2->c",
-  //   block2.GetOutputBufferSize(),
-  //   classifier.GetInputBufferSize()
-  // );
-  // block2.Apply(classifier.GetInputBuffer());
+  // run block2 writing into classifier
+  AssertSame("b2->c",
+    block2.GetOutputBufferSize(),
+    classifier.GetInputBufferSize()
+  );
+  block2.Apply(classifier.GetInputBuffer());
 
   // // allocate final buffer output
   // float* classifier_out = new float[classifier.GetOutputBufferSize()];
@@ -227,8 +226,7 @@ void UpdateDisplay() {
   }
 
   RunInference();
-  Write2DArray(
-    "block1", block1.GetInputBuffer(), 4, 4);
+  Write2DArray("classifier", classifier.GetInputBuffer(), 1, 8);
 
   hw.seed.DelayMs(10);  // ms
 }
