@@ -168,24 +168,43 @@ void AudioCallback(AudioHandle::InputBuffer in,
   cpu_load_meter.OnBlockEnd();
 }
 
+void DisplayLines(const vector<string> &strs) {
+  int line_num = 0;
+  for (string str : strs) {
+    char* cstr = &str[0];
+    hw.display.SetCursor(0, line_num*10);
+    hw.display.WriteString(cstr, Font_7x10, true);
+    line_num++;
+  }
+}
+
 void UpdateDisplay() {
 
-  FixedCapStr<100> str("cpu ");
+  hw.display.Fill(false);
+  vector<string> strs;
+
+  FixedCapStr<12> str("cpu ");
   const float cpu = cpu_load_meter.GetAvgCpuLoad();
   str.AppendFloat(cpu, 5);
-  hw.seed.PrintLine(str);
+  strs.push_back(string(str));
+  //hw.seed.PrintLine(str);
+
+  str.Clear();
+  str.AppendInt(inference_calls);
+  strs.push_back(string(str));
 
   if (assert_failed) {
     hw.seed.PrintLine(assert_failed_msg);
-  } else {
-    hw.seed.PrintLine("LGTM 3");
   }
+
+  DisplayLines(strs);
+  hw.display.Update();
 
   //RunInference();
   //Write2DArray("classifier.in", classifier.GetInputBuffer(), 1, 8);
   //Write2DArray("classifier.out", classifier.GetOutputBuffer(), 1, 2);
 
-  hw.seed.DelayMs(10);  // ms
+  //hw.seed.DelayMs(10);  // ms
 }
 
 int main(void) {
