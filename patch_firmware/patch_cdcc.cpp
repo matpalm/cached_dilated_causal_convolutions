@@ -68,7 +68,6 @@ Classifier classifier(
 
 
 
-
 void WriteArray(string msg, float* a, size_t n) {
   FixedCapStr<100> str;
   str.Append(">>>>>>> [");
@@ -157,9 +156,6 @@ void RunInference() {
   layer1_cache.Run();
   block2.Run();
 
-  // // allocate final buffer output
-  // float* classifier_out = new float[classifier.GetOutputBufferSize()];
-
   // classifier.Apply(inp, result);
 
   // WriteArray("classifier_out",
@@ -197,7 +193,8 @@ void UpdateDisplay() {
   }
 
   RunInference();
-  Write2DArray("classifier", classifier.GetInputBuffer(), 1, 8);
+  Write2DArray("classifier.in", classifier.GetInputBuffer(), 1, 8);
+  //Write2DArray("classifier", classifier.GetOutputBuffer(), 1, 2);
 
   hw.seed.DelayMs(10);  // ms
 }
