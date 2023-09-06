@@ -41,8 +41,10 @@ class Block {
 
     float* GetInputBuffer() { return input_buffer_; }
     const size_t GetInputBufferSize() { return kernel_size_ * in_d_; }
+    const size_t GetOutputBufferSize() { return out_d_; }
 
     void Apply(float* result) { // ( out_dim, )
+      // expects value to be ready in input_buffer_
 
       // zero results
       arm_fill_f32(0, result, out_d_);
