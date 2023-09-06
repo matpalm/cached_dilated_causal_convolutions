@@ -72,3 +72,52 @@ class CachedBlockModel(object):
         # run y_pred
         y_pred = self.classifier.apply(final_block_out)
         return y_pred
+
+
+    def write_model_defn_h(self, f):
+      # may god have mercy on my soul for this method :/
+
+      def ca(a):
+        shapes_as_product = "*".join(map(str, a.shape))
+        return "[" + shapes_as_product + "] = {" + ", ".join(map(str, a.flatten().tolist())) + "};"
+
+      print('#pragma once', file=f)
+      print('#include "left_shift_buffer.h"', file=f)
+      print('#include "block.h"', file=f)
+      print('#include "rolling_cache.h"', file=f)
+      print('#include "classifier.h"', file=f)
+      print("", file=f)
+
+      print("LeftShiftBuffer left_shift_input_buffer(", file=f)
+      print(f"    {self.kernel_size},   // kernel size", file=f)
+      print(f"    {self.input_feature_depth});  // feature depth", file=f)
+      print("", file=f)
+
+      for n, block in enumerate(self.blocks):
+        print(f"float b{n}_c1_kernel{ca(block.c1_kernel)}", file=f)
+        print(f"float b{n}_c1_bias{ca(block.c1_bias)}", file=f)
+        print(f"float b{n}_c2_kernel{ca(block.c2_kernel)}", file=f)
+        print(f"float b{n}_c2_bias{ca(block.c2_bias)}", file=f)
+        print(f"Block block{n}({block.kernel_size}, // kernel_size", file=f)
+        print(f"             {block.in_d}, {block.c2_out_d}, // in_d, out_d", file=f)
+        print(f"             b{n}_c1_kernel, b{n}_c1_bias, b{n}_c2_kernel, b{n}_c2_bias);", file=f)
+        print("", file=f)
+
+      for n, lc in enumerate(self.layer_caches):
+        print(f"float layer{n}_cache_buffer[{lc.depth}*{lc.dilation}*{lc.kernel_size}];", file=f)
+        print(f"RollingCache layer{n}_cache(", file=f)
+        print(f"  {lc.depth}, // depth", file=f)
+        print(f"  {lc.dilation}, // dilation", file=f)
+        print(f"  {lc.kernel_size}, // kernel size", file=f)
+        print(f"  layer{n}_cache_buffer", file=f)
+        print(f");", file=f)
+        print("", file=f)
+
+      print(f"float classifier_weights{ca(self.classifier.weights)}", file=f)
+      print(f"float classifier_biases{ca(self.classifier.biases)}", file=f)
+      print(f"Classifier classifier(", file=f)
+      print(f"  {self.classifier.input_dim}, // input_dim", file=f)
+      print(f"  {self.classifier.output_dim}, // output_dim", file=f)
+      print(f"  classifier_weights,", file=f)
+      print(f"  classifier_biases", file=f)
+      print(f");", file=f)
