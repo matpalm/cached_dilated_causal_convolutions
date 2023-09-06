@@ -34,10 +34,15 @@ class Block {
       // against instance variable
       matmul_result_ = new float[out_d];
       arm_mat_init_f32(&matmul_result_mi_, 1, out_d, matmul_result_);
+
+      // allocate buffer for input
+      input_buffer_ = new float[kernel_size * in_d];
     }
 
-    void Apply(float* x,         // ( kernel_size_, in_dim)
-               float* result) {  // ( out_dim, )
+    float* GetInputBuffer() { return input_buffer_; }
+    const size_t GetInputBufferSize() { return kernel_size_ * in_d_; }
+
+    void Apply(float* result) { // ( out_dim, )
 
       // zero results
       arm_fill_f32(0, result, out_d_);
@@ -49,7 +54,7 @@ class Block {
       // been setup, then just need their pData shifted along for each kernel
       for (size_t k=0; k < kernel_size_; k++) {
         // point matrix instances at next kernel
-        x_mi_.pData = (float *)x + (k * in_d_);
+        x_mi_.pData = (float *)input_buffer_ + (k * in_d_);
         c1_kernel_mi_.pData = (float *)c1_kernel_ + (k * in_d_ * out_d_);
         // do the mat mul
         arm_mat_mult_f32(&x_mi_, &c1_kernel_mi_, &matmul_result_mi_);
@@ -74,9 +79,11 @@ class Block {
       relu(result, out_d_);
     }
 
+  private:
     const size_t kernel_size_;
     const size_t in_d_;
     const size_t out_d_;
+    float* input_buffer_;
     float* c1_kernel_;  // (kernel_size_, in_d, out_d)
     float* c1_bias_;    // (out_d,)
     float* c2_bias_;    // (out_d,)
