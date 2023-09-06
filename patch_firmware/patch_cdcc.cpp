@@ -4,6 +4,7 @@
 #include "daisy_patch.h"
 #include "daisysp.h"
 
+#include "left_shift_buffer.h"
 #include "block.h"
 #include "rolling_cache.h"
 #include "classifier.h"
@@ -14,6 +15,10 @@ using namespace std;
 
 DaisyPatch hw;
 CpuLoadMeter cpu_load_meter;
+
+LeftShiftBuffer left_shift_input_buffer(
+  4,   // kernel size
+  2);  // feature depth
 
 // statically defined blocks, layer caches and classifier
 
@@ -65,8 +70,6 @@ Classifier classifier(
   classifier_weights,
   classifier_biases
 );
-
-
 
 void WriteArray(string msg, float* a, size_t n) {
   FixedCapStr<100> str;
@@ -130,26 +133,11 @@ void AssertSame(string msg, size_t a, size_t b) {
 }
 
 bool foo = true;
+long inference_calls = 0;
 
-void RunInference() {
+void RunInference(float* next_inputs) {
 
-  // prepare input buffer for block0
-  float* b0_input_buffer = block0.GetInputBuffer();
-
-  if (foo) {
-    float x[4*2] = {0.3,0.1,0.4,0.1,0.5,0.9,0.2,0.6};
-    for (size_t i=0; i<4*2; i++) {
-      b0_input_buffer[i] = x[i];
-    }
-  }
-  else {
-    float x[4*2] = {0.1,0.5,0.9,0.2,0.6,0.3,0.1,0.4};
-    for (size_t i=0; i<4*2; i++) {
-      b0_input_buffer[i] = x[i];
-    }
-  }
-  foo = !foo;
-
+  left_shift_input_buffer.Add(next_inputs);
   block0.Run();
   layer0_cache.Run();
   block1.Run();
@@ -157,9 +145,8 @@ void RunInference() {
   block2.Run();
   classifier.Run();
 
-  // WriteArray("classifier_out",
-  //   classifier_out,
-  //   classifier.GetOutputBufferSize());
+  inference_calls++;
+
 }
 
 void AudioCallback(AudioHandle::InputBuffer in,
@@ -168,15 +155,18 @@ void AudioCallback(AudioHandle::InputBuffer in,
 
   cpu_load_meter.OnBlockStart();
 
-  //RunInference();
+  float next_inputs[2];
+  next_inputs[0] = 0.4572155;  // one of the common values from training
+  float* classifier_out = classifier.GetOutputBuffer();
+  for (size_t b = 0; b < size; b++) {
+    next_inputs[1] = in[0][b];
+    RunInference(next_inputs);
+    out[0][b] = classifier_out[0];
+    out[1][b] = classifier_out[1];
+  }
 
   cpu_load_meter.OnBlockEnd();
 }
-
-
-
-
-
 
 void UpdateDisplay() {
 
@@ -188,12 +178,12 @@ void UpdateDisplay() {
   if (assert_failed) {
     hw.seed.PrintLine(assert_failed_msg);
   } else {
-    hw.seed.PrintLine("LGTM 2");
+    hw.seed.PrintLine("LGTM 3");
   }
 
-  RunInference();
+  //RunInference();
   //Write2DArray("classifier.in", classifier.GetInputBuffer(), 1, 8);
-  Write2DArray("classifier.out", classifier.GetOutputBuffer(), 1, 2);
+  //Write2DArray("classifier.out", classifier.GetOutputBuffer(), 1, 2);
 
   hw.seed.DelayMs(10);  // ms
 }
@@ -201,6 +191,10 @@ void UpdateDisplay() {
 int main(void) {
 
   // assertions regarding shapes
+  AssertSame("inp->b0",
+    left_shift_input_buffer.GetOutputBufferSize(),
+    block0.GetInputBufferSize()
+  );
   AssertSame("b0->l0",
     block0.GetOutputBufferSize(),
     layer0_cache.GetInputBufferSize()
@@ -223,6 +217,7 @@ int main(void) {
   );
 
   // connect steps
+  left_shift_input_buffer.SetOutputBuffer(block0.GetInputBuffer());
   block0.SetOutputBuffer(layer0_cache.GetInputBuffer());
   layer0_cache.SetOutputBuffer(block1.GetInputBuffer());
   block1.SetOutputBuffer(layer1_cache.GetInputBuffer());
