@@ -41,13 +41,14 @@ class Block {
 
     float* GetInputBuffer() { return input_buffer_; }
     const size_t GetInputBufferSize() { return kernel_size_ * in_d_; }
+    void SetOutputBuffer(float* output_buffer) { output_buffer_ = output_buffer; }
     const size_t GetOutputBufferSize() { return out_d_; }
 
-    void Apply(float* result) { // ( out_dim, )
+    void Run() { // ( out_dim, )
       // expects value to be ready in input_buffer_
 
       // zero results
-      arm_fill_f32(0, result, out_d_);
+      arm_fill_f32(0, output_buffer_, out_d_);
 
       // run first convolution...
 
@@ -61,12 +62,12 @@ class Block {
         // do the mat mul
         arm_mat_mult_f32(&x_mi_, &c1_kernel_mi_, &matmul_result_mi_);
         // accumulate into result for c1
-        arm_add_f32(result, matmul_result_, result, out_d_);
+        arm_add_f32(output_buffer_, matmul_result_, output_buffer_, out_d_);
       }
 
       // apply bias ( in place on result ) and relu
-      arm_add_f32(result, c1_bias_, result, out_d_);
-      relu(result, out_d_);
+      arm_add_f32(output_buffer_, c1_bias_, output_buffer_, out_d_);
+      relu(output_buffer_, out_d_);
 
       // run second convolution....
 
@@ -74,11 +75,11 @@ class Block {
       // it can also use the same matmul result from
       // conv1 since the two convolutions share the output feature depth.
       arm_matrix_instance_f32 c1_out_mi;
-      arm_mat_init_f32(&c1_out_mi, 1, out_d_, result);
+      arm_mat_init_f32(&c1_out_mi, 1, out_d_, output_buffer_);
       arm_mat_mult_f32(&c1_out_mi, &c2_kernel_mi_, &matmul_result_mi_);
       // apply bias (this time from matmul_result to result) and relu
-      arm_add_f32(matmul_result_, c2_bias_, result, out_d_);
-      relu(result, out_d_);
+      arm_add_f32(matmul_result_, c2_bias_, output_buffer_, out_d_);
+      relu(output_buffer_, out_d_);
     }
 
   private:
@@ -86,6 +87,7 @@ class Block {
     const size_t in_d_;
     const size_t out_d_;
     float* input_buffer_;
+    float* output_buffer_;
     float* c1_kernel_;  // (kernel_size_, in_d, out_d)
     float* c1_bias_;    // (out_d,)
     float* c2_bias_;    // (out_d,)

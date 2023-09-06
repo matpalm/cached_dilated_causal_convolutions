@@ -67,8 +67,7 @@ Classifier classifier(
 );
 
 
-FixedCapStr<100> assert_failed_msg;
-bool assert_failed = false;
+
 
 void WriteArray(string msg, float* a, size_t n) {
   FixedCapStr<100> str;
@@ -107,6 +106,9 @@ void Write2DArray(string msg, float* a, size_t n, size_t m) {
     hw.seed.PrintLine("");
   }
 }
+
+FixedCapStr<100> assert_failed_msg;
+bool assert_failed = false;
 
 void AssertSame(string msg, size_t a, size_t b) {
   if (a == b) {
@@ -149,42 +151,11 @@ void RunInference() {
   }
   foo = !foo;
 
-  // run block0, writing into input buffer for layer0 cache
-  AssertSame("b0->l0",
-    block0.GetOutputBufferSize(),
-    layer0_cache.GetInputBufferSize()
-  );
-  block0.Apply(layer0_cache.GetInputBuffer());
-
-  // run layer0 cache propogation
-  // lookup cached values, into block1 input buffer
-  AssertSame("l0->b1",
-    layer0_cache.GetOutputBufferSize(),
-    block1.GetInputBufferSize()
-  );
-  layer0_cache.Apply(block1.GetInputBuffer());
-
-  // run block1, writing into input buffer for layer1 cache
-  AssertSame("b1->l2",
-    block1.GetOutputBufferSize(),
-    layer1_cache.GetInputBufferSize()
-  );
-  block1.Apply(layer1_cache.GetInputBuffer());
-
-  // run layer0 cache propogation
-  // lookup cached values, into block1 input buffer
-  AssertSame("l1->b2",
-    layer1_cache.GetOutputBufferSize(),
-    block2.GetInputBufferSize()
-  );
-  layer1_cache.Apply(block2.GetInputBuffer());
-
-  // run block2 writing into classifier
-  AssertSame("b2->c",
-    block2.GetOutputBufferSize(),
-    classifier.GetInputBufferSize()
-  );
-  block2.Apply(classifier.GetInputBuffer());
+  block0.Run();
+  layer0_cache.Run();
+  block1.Run();
+  layer1_cache.Run();
+  block2.Run();
 
   // // allocate final buffer output
   // float* classifier_out = new float[classifier.GetOutputBufferSize()];
@@ -232,6 +203,35 @@ void UpdateDisplay() {
 }
 
 int main(void) {
+
+  // assertions regarding shapes
+  AssertSame("b0->l0",
+    block0.GetOutputBufferSize(),
+    layer0_cache.GetInputBufferSize()
+  );
+  AssertSame("l0->b1",
+    layer0_cache.GetOutputBufferSize(),
+    block1.GetInputBufferSize()
+  );
+  AssertSame("b1->l2",
+    block1.GetOutputBufferSize(),
+    layer1_cache.GetInputBufferSize()
+  );
+  AssertSame("l1->b2",
+    layer1_cache.GetOutputBufferSize(),
+    block2.GetInputBufferSize()
+  );
+  AssertSame("b2->c",
+    block2.GetOutputBufferSize(),
+    classifier.GetInputBufferSize()
+  );
+
+  // connect steps
+  block0.SetOutputBuffer(layer0_cache.GetInputBuffer());
+  layer0_cache.SetOutputBuffer(block1.GetInputBuffer());
+  block1.SetOutputBuffer(layer1_cache.GetInputBuffer());
+  layer1_cache.SetOutputBuffer(block2.GetInputBuffer());
+  block2.SetOutputBuffer(classifier.GetInputBuffer());
 
   hw.Init();
   hw.SetAudioBlockSize(64); // number of samples handled per callback
