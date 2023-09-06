@@ -155,8 +155,7 @@ void RunInference() {
   block1.Run();
   layer1_cache.Run();
   block2.Run();
-
-  // classifier.Apply(inp, result);
+  classifier.Run();
 
   // WriteArray("classifier_out",
   //   classifier_out,
@@ -193,8 +192,8 @@ void UpdateDisplay() {
   }
 
   RunInference();
-  Write2DArray("classifier.in", classifier.GetInputBuffer(), 1, 8);
-  //Write2DArray("classifier", classifier.GetOutputBuffer(), 1, 2);
+  //Write2DArray("classifier.in", classifier.GetInputBuffer(), 1, 8);
+  Write2DArray("classifier.out", classifier.GetOutputBuffer(), 1, 2);
 
   hw.seed.DelayMs(10);  // ms
 }
