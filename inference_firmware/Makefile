@@ -14,10 +14,10 @@ C_INCLUDES += \
 -I$(LIBDAISY_DIR)/Drivers/CMSIS/DSP/Include
 
 # Project Name
-TARGET = patch_cdcc
+TARGET = inference_firmware
 
 # Sources
-CPP_SOURCES = patch_cdcc.cpp
+CPP_SOURCES = inference_firmware.cpp
 
 # Library Locations
 LIBDAISY_DIR = ./libDaisy/

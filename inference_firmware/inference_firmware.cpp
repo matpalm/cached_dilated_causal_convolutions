@@ -4,6 +4,7 @@
 #include "daisy_patch.h"
 #include "daisysp.h"
 
+#include "mu_law.h"
 #include "model_defn.h"
 
 using namespace daisy;
@@ -13,7 +14,6 @@ using namespace std;
 DaisyPatch hw;
 CpuLoadMeter cpu_load_meter;
 
-bool foo = true;
 long inference_calls = 0;
 
 void WriteArray(string msg, float* a, size_t n) {
@@ -94,25 +94,32 @@ void RunInference(float* next_inputs) {
 
 }
 
+float ctrl0_val, ctrl1_val;
+
 void AudioCallback(AudioHandle::InputBuffer in,
                    AudioHandle::OutputBuffer out,
                    size_t size) {
 
   cpu_load_meter.OnBlockStart();
 
-  // setup input for network, for now input is just the audio
-  float next_inputs[1];
-  //ctrl0_val = hw.controls[0].Value();
-  //next_inputs[0] = ctrl0_val;
+  ctrl0_val = hw.controls[0].Value();
+  ctrl1_val = hw.controls[1].Value();
+
+  // setup input for network for this block
+  // two values from ctrl0 and ctrl1, and audio in
+  float next_inputs[3];
+  next_inputs[0] = ctrl0_val;
+  next_inputs[1] = ctrl1_val;
+
   // take a ptr to the classifier output for copying to output buffers
   float* classifier_out = classifier.GetOutputBuffer();
+
   // run the blocks
   for (size_t b = 0; b < size; b++) {
-    next_inputs[0] = in[0][b];
+    next_inputs[2] = in[0][b];
     RunInference(next_inputs);
     out[0][b] = in[0][b];
     out[1][b] = classifier_out[0];
-    out[2][b] = classifier_out[1];
   }
 
   cpu_load_meter.OnBlockEnd();
@@ -139,14 +146,20 @@ void UpdateDisplay() {
   strs.push_back(string(str));
   //hw.seed.PrintLine(str);
 
-  // str.Clear();
-  // str.Append("ctrl0 ");
-  // str.AppendFloat(ctrl0_val, 3);
-  // strs.push_back(string(str));
+  strs.push_back("");
 
   str.Clear();
-  str.AppendInt(inference_calls);
+  str.Append("x2 ");
+  str.AppendFloat(ctrl0_val, 3);
   strs.push_back(string(str));
+  str.Clear();
+  str.Append("23 ");
+  str.AppendFloat(ctrl1_val, 3);
+  strs.push_back(string(str));
+
+  // str.Clear();
+  // str.AppendInt(inference_calls);
+  // strs.push_back(string(str));
 
   if (assert_failed) {
     hw.seed.PrintLine(assert_failed_msg);
@@ -154,12 +167,6 @@ void UpdateDisplay() {
 
   DisplayLines(strs);
   hw.display.Update();
-
-  //RunInference();
-  //Write2DArray("classifier.in", classifier.GetInputBuffer(), 1, 8);
-  //Write2DArray("classifier.out", classifier.GetOutputBuffer(), 1, 2);
-
-  //hw.seed.DelayMs(10);  // ms
 }
 
 int main(void) {
@@ -209,6 +216,9 @@ int main(void) {
   layer2_cache.SetOutputBuffer(block3.GetInputBuffer());
   block3.SetOutputBuffer(classifier.GetInputBuffer());
 
+  // populate the LUT for mu law encoding
+  //mu_law::PopulateLUT();
+
   hw.Init();
   hw.SetAudioBlockSize(64); // number of samples handled per callback
   hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_32KHZ);
@@ -218,12 +228,20 @@ int main(void) {
   hw.seed.StartLog();
   cpu_load_meter.Init(hw.AudioSampleRate(), hw.AudioBlockSize());
 
+  // for(size_t i=0;i<1000;i++) {
+  //   hw.seed.PrintLine("starting");
+  // }
+  // hw.seed.PrintLine("started");
+
+
   hw.StartAudio(AudioCallback);
 
   while(1) {
     hw.ProcessAllControls();
     UpdateDisplay();
+    // hw.seed.DelayMs(10);  // ms
   }
 
 }
+
 

@@ -2,6 +2,8 @@
 #include "daisy_patch.h"
 #include "daisysp.h"
 
+#include "mu_law.h"
+
 /*
 
 firmware for logging training data for patch_cdcc
@@ -28,12 +30,11 @@ enum State {
 State state = WAITING;
 
 // how many ctrl ins to record? ( logged once per audio callback )
-const size_t NUM_CTRLS_RECORDED = 1;  // e.g. x0 -> y0,y1
+const size_t NUM_CTRLS_RECORDED = 2;  // e.g. x0 -> y0,y1
 
 // how many input channels to record?
 const size_t NUM_CHANNELS_RECORDED = 3;  // e.g. x0 -> y0,y1
 
-//const size_t BUFFER_SIZE = 1000; // will need tuning depending on above
 const size_t BUFFER_SIZE = 20000; // will need tuning depending on above
 const size_t BLOCK_SIZE = 64;
 float DSY_SDRAM_BSS ctrl_vals[BUFFER_SIZE][NUM_CTRLS_RECORDED];
@@ -150,8 +151,15 @@ void UpdateDisplay() {
         str.Clear();
         str.Append("a");
         for (size_t c=0; c<NUM_CHANNELS_RECORDED; c++) {
+          float sample = input_audio[i][c][b];
           str.Append(" ");
-          str.AppendFloat(input_audio[i][c][b], 9);
+          str.AppendFloat(sample, 9);
+          // uint8_t encoded = mu_law::Encode(sample);
+          // str.Append(" ");
+          // str.AppendInt(encoded);
+          // float redecoded = mu_law::Decode(encoded);
+          // str.Append(" ");
+          // str.AppendFloat(redecoded, 9);
         }
         hw.seed.PrintLine(str);
       }
@@ -170,6 +178,9 @@ void UpdateDisplay() {
 
 
 int main(void) {
+
+  mu_law::PopulateLUT();
+
   hw.Init();
   hw.SetAudioBlockSize(BLOCK_SIZE); // number of samples handled per callback
   hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_32KHZ);

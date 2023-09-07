@@ -1,10 +1,14 @@
 import sys
 
-NUM_AUDIO_CHANNELS_RECORDED = 3
-
 next_expected_next_block = 0
 expected_num_audio_in_block = None  # set from first
 num_audio_in_last_block = 0
+
+num_ctrls_recorded = None  # set from first
+num_audio_ins_records = None  # set from first
+
+latest_ctrl_values = None  # these are records before each audio
+
 for line_num, line in enumerate(sys.stdin):
   line = line.strip()
   # ignore headers
@@ -13,7 +17,6 @@ for line_num, line in enumerate(sys.stdin):
   if 'wr' in line: continue
   # new block?
   if line.startswith('b'):
-
     # check blocks are going up
     block_id = int(line.split(" ")[1])
     if block_id != next_expected_next_block:
@@ -32,19 +35,31 @@ for line_num, line in enumerate(sys.stdin):
     else:
       assert num_audio_in_last_block == expected_num_audio_in_block, block_id
     num_audio_in_last_block = 0
+    latest_ctrl_values = None
 
   elif line.startswith('c'):
-    # ignore for now, see prototype notebook for parsing and join with
-    # audio values
-    pass
+    cols = line.split(" ")
+    first_col = cols.pop(0)
+    assert first_col == 'c'
+    if num_ctrls_recorded is None:
+      num_ctrls_recorded = len(cols)
+    else:
+      assert len(cols) == num_ctrls_recorded
+    _ = map(float, cols)  # just a check for parsable floats
+    latest_ctrl_values = cols
 
   elif line.startswith('a'):
+    assert latest_ctrl_values is not None
     num_audio_in_last_block += 1
     cols = line.split(" ")
-    assert len(cols) == NUM_AUDIO_CHANNELS_RECORDED + 1, f"{line_num} [{line}]"
-    assert cols[0] == 'a'
-    _ = map(float, cols[1:])  # just check parsable
-    print(" ".join(cols[1:]))
+    first_col = cols.pop(0)
+    assert first_col == 'a'
+    if num_audio_ins_records is None:
+      num_audio_ins_records = len(cols)
+    else:
+      assert len(cols) == num_audio_ins_records
+    _ = map(float, cols)  # just a check for parsable floats
+    print(" ".join(latest_ctrl_values + cols[1:]))
 
   else:
     raise Exception(f"unexpected line [{line}]")
