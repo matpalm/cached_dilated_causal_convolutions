@@ -2,7 +2,7 @@
 #include "left_shift_buffer.h"
 #include "block.h"
 #include "rolling_cache.h"
-#include "classifier.h"
+#include "regression.h"
 
 LeftShiftBuffer left_shift_input_buffer(
     4,   // kernel size
@@ -64,11 +64,11 @@ RollingCache layer2_cache(
   layer2_cache_buffer
 );
 
-float classifier_weights[8*1] = {0.9182196259498596, -0.20779570937156677, 1.1392040252685547, 0.7897021174430847, -0.8478359580039978, 0.491497278213501, 0.6364564299583435, -0.3721452057361603};
-float classifier_biases[1] = {-0.21785153448581696};
-Classifier classifier(
+float regression_weights[8*1] = {0.9182196259498596, -0.20779570937156677, 1.1392040252685547, 0.7897021174430847, -0.8478359580039978, 0.491497278213501, 0.6364564299583435, -0.3721452057361603};
+float regression_biases[1] = {-0.21785153448581696};
+Regression regression(
   8, // input_dim
   1, // output_dim
-  classifier_weights,
-  classifier_biases
+  regression_weights,
+  regression_biases
 );

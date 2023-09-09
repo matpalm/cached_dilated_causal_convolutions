@@ -1,8 +1,8 @@
 #pragma once
 
-class Classifier {
+class Regression {
   public:
-    Classifier(size_t in_d,
+    Regression(size_t in_d,
                size_t out_d,
                float* weights,     // (in_d_, out_d_)
                float* biases) :

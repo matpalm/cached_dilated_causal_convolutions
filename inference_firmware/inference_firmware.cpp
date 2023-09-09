@@ -88,7 +88,7 @@ void RunInference(float* next_inputs) {
   block2.Run();
   layer2_cache.Run();
   block3.Run();
-  classifier.Run();
+  regression.Run();
 
   inference_calls++;
 
@@ -111,15 +111,15 @@ void AudioCallback(AudioHandle::InputBuffer in,
   next_inputs[0] = ctrl0_val;
   next_inputs[1] = ctrl1_val;
 
-  // take a ptr to the classifier output for copying to output buffers
-  float* classifier_out = classifier.GetOutputBuffer();
+  // take a ptr to the regression output for copying to output buffers
+  float* regression_out = regression.GetOutputBuffer();
 
   // run the blocks
   for (size_t b = 0; b < size; b++) {
     next_inputs[2] = in[0][b];
     RunInference(next_inputs);
     out[0][b] = in[0][b];
-    out[1][b] = classifier_out[0];
+    out[1][b] = regression_out[0];
   }
 
   cpu_load_meter.OnBlockEnd();
@@ -200,9 +200,9 @@ int main(void) {
     layer2_cache.GetOutputBufferSize(),
     block3.GetInputBufferSize()
   );
-  AssertSame("b3->c",
+  AssertSame("b3->r",
     block3.GetOutputBufferSize(),
-    classifier.GetInputBufferSize()
+    regression.GetInputBufferSize()
   );
 
   // connect steps
@@ -214,7 +214,7 @@ int main(void) {
   layer1_cache.SetOutputBuffer(block2.GetInputBuffer());
   block2.SetOutputBuffer(layer2_cache.GetInputBuffer());
   layer2_cache.SetOutputBuffer(block3.GetInputBuffer());
-  block3.SetOutputBuffer(classifier.GetInputBuffer());
+  block3.SetOutputBuffer(regression.GetInputBuffer());
 
   // populate the LUT for mu law encoding
   //mu_law::PopulateLUT();

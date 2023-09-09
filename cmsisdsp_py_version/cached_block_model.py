@@ -5,7 +5,7 @@ import cmsisdsp as dsp
 from .block import Block
 from .rolling_cache import RollingCache
 
-class Classifier(object):
+class Regression(object):
 
     def __init__(self, weights, biases):
         assert len(weights.shape) == 2
@@ -28,10 +28,10 @@ class CachedBlockModel(object):
     def __init__(self,
                  blocks: List[Block],
                  input_feature_depth: int,
-                 classifier: Classifier):
+                 regression: Regression):
 
         self.blocks = blocks
-        self.classifier = classifier
+        self.regression = regression
 
         self.kernel_size = blocks[0].kernel_size
         self.input_feature_depth = input_feature_depth
@@ -70,7 +70,7 @@ class CachedBlockModel(object):
         final_block_out = self.blocks[-1].apply(feature_map)
 
         # run y_pred
-        y_pred = self.classifier.apply(final_block_out)
+        y_pred = self.regression.apply(final_block_out)
         return y_pred
 
 
@@ -85,7 +85,7 @@ class CachedBlockModel(object):
       print('#include "left_shift_buffer.h"', file=f)
       print('#include "block.h"', file=f)
       print('#include "rolling_cache.h"', file=f)
-      print('#include "classifier.h"', file=f)
+      print('#include "regression.h"', file=f)
       print("", file=f)
 
       print("LeftShiftBuffer left_shift_input_buffer(", file=f)
@@ -113,11 +113,11 @@ class CachedBlockModel(object):
         print(f");", file=f)
         print("", file=f)
 
-      print(f"float classifier_weights{ca(self.classifier.weights)}", file=f)
-      print(f"float classifier_biases{ca(self.classifier.biases)}", file=f)
-      print(f"Classifier classifier(", file=f)
-      print(f"  {self.classifier.input_dim}, // input_dim", file=f)
-      print(f"  {self.classifier.output_dim}, // output_dim", file=f)
-      print(f"  classifier_weights,", file=f)
-      print(f"  classifier_biases", file=f)
+      print(f"float regression_weights{ca(self.regression.weights)}", file=f)
+      print(f"float regression_biases{ca(self.regression.biases)}", file=f)
+      print(f"Regression regression(", file=f)
+      print(f"  {self.regression.input_dim}, // input_dim", file=f)
+      print(f"  {self.regression.output_dim}, // output_dim", file=f)
+      print(f"  regression_weights,", file=f)
+      print(f"  regression_biases", file=f)
       print(f");", file=f)
