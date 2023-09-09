@@ -21,6 +21,8 @@ using namespace std;
 DaisyPatch hw;
 CpuLoadMeter cpu_load_meter;
 
+auto SAMPLE_RATE = SaiHandle::Config::SampleRate::SAI_32KHZ;
+
 enum State {
   WAITING,     // initial powered up, waiting for encoder click
   RECORDING,   // recording sample
@@ -183,7 +185,7 @@ int main(void) {
 
   hw.Init();
   hw.SetAudioBlockSize(BLOCK_SIZE); // number of samples handled per callback
-  hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_32KHZ);
+  hw.SetAudioSampleRate(SAMPLE_RATE);
   hw.StartAdc();
 
   // Enable Logging, and set up the USB connection.

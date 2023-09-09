@@ -14,6 +14,8 @@ using namespace std;
 DaisyPatch hw;
 CpuLoadMeter cpu_load_meter;
 
+auto SAMPLE_RATE = SaiHandle::Config::SampleRate::SAI_32KHZ;
+
 long inference_calls = 0;
 
 void WriteArray(string msg, float* a, size_t n) {
@@ -101,7 +103,6 @@ void AudioCallback(AudioHandle::InputBuffer in,
                    size_t size) {
 
   cpu_load_meter.OnBlockStart();
-
   ctrl0_val = hw.controls[0].Value();
   ctrl1_val = hw.controls[1].Value();
 
@@ -221,8 +222,7 @@ int main(void) {
 
   hw.Init();
   hw.SetAudioBlockSize(64); // number of samples handled per callback
-  hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_32KHZ);
-  //hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
+  hw.SetAudioSampleRate(SAMPLE_RATE);
   hw.StartAdc();
 
   hw.seed.StartLog();
