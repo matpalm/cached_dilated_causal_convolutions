@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 
 next_expected_next_block = 0
@@ -59,7 +61,7 @@ for line_num, line in enumerate(sys.stdin):
     else:
       assert len(cols) == num_audio_ins_records
     _ = map(float, cols)  # just a check for parsable floats
-    print(" ".join(latest_ctrl_values + cols[1:]))
+    print(" ".join(latest_ctrl_values + cols))
 
   else:
     raise Exception(f"unexpected line [{line}]")
