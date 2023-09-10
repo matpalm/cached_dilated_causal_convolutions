@@ -21,7 +21,7 @@ using namespace std;
 DaisyPatch hw;
 CpuLoadMeter cpu_load_meter;
 
-auto SAMPLE_RATE = SaiHandle::Config::SampleRate::SAI_32KHZ;
+auto SAMPLE_RATE = SaiHandle::Config::SampleRate::SAI_48KHZ;
 
 enum State {
   WAITING,     // initial powered up, waiting for encoder click
