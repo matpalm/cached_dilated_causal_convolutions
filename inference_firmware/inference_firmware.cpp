@@ -16,8 +16,6 @@ CpuLoadMeter cpu_load_meter;
 
 auto SAMPLE_RATE = SaiHandle::Config::SampleRate::SAI_48KHZ;
 
-long inference_calls = 0;
-
 void WriteArray(string msg, float* a, size_t n) {
   FixedCapStr<100> str;
   str.Append(">>>>>>> [");
@@ -81,7 +79,6 @@ void AssertSame(string msg, size_t a, size_t b) {
 
 
 void RunInference(float* next_inputs) {
-
   left_shift_input_buffer.Add(next_inputs);
   block0.Run();
   layer0_cache.Run();
@@ -91,9 +88,6 @@ void RunInference(float* next_inputs) {
   layer2_cache.Run();
   block3.Run();
   regression.Run();
-
-  inference_calls++;
-
 }
 
 float ctrl0_val, ctrl1_val;
@@ -157,10 +151,6 @@ void UpdateDisplay() {
   str.Append("23 ");
   str.AppendFloat(ctrl1_val, 3);
   strs.push_back(string(str));
-
-  // str.Clear();
-  // str.AppendInt(inference_calls);
-  // strs.push_back(string(str));
 
   if (assert_failed) {
     hw.seed.PrintLine(assert_failed_msg);
