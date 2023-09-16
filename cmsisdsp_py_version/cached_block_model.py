@@ -104,13 +104,12 @@ class CachedBlockModel(object):
         print("", file=f)
 
       for n, lc in enumerate(self.layer_caches):
-        print(f"float layer{n}_cache_buffer[{lc.depth}*{lc.dilation}*{lc.kernel_size}];", file=f)
-        print(f"RollingCache layer{n}_cache(", file=f)
-        print(f"  {lc.depth}, // depth", file=f)
-        print(f"  {lc.dilation}, // dilation", file=f)
-        print(f"  {lc.kernel_size}, // kernel size", file=f)
-        print(f"  layer{n}_cache_buffer", file=f)
-        print(f");", file=f)
+        print(f"const size_t layer{n}_depth = {lc.depth};", file=f)
+        print(f"const size_t layer{n}_dilation = {lc.dilation};", file=f)
+        print(f"const size_t layer{n}_kernel_size = {lc.kernel_size};", file=f)
+        print(f"float layer{n}_cache_buffer[layer{n}_dilation * layer{n}_kernel_size * layer{n}_depth];", file=f)
+        print(f"RollingCache layer{n}_cache(layer{n}_depth, layer{n}_dilation,"
+              f" layer{n}_kernel_size, layer{n}_cache_buffer);", file=f)
         print("", file=f)
 
       print(f"float regression_weights{ca(self.regression.weights)}", file=f)

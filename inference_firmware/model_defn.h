@@ -40,29 +40,24 @@ Block block3(4, // kernel_size
              4, 8, // in_d, out_d
              b3_c1_kernel, b3_c1_bias, b3_c2_kernel, b3_c2_bias);
 
-float layer0_cache_buffer[4*4*4];
-RollingCache layer0_cache(
-  4, // depth
-  4, // dilation
-  4, // kernel size
-  layer0_cache_buffer
-);
+const size_t layer0_depth = 4;
+const size_t layer0_dilation = 4;
+const size_t layer0_kernel_size = 4;
+float layer0_cache_buffer[layer0_dilation * layer0_kernel_size * layer0_depth];
+RollingCache layer0_cache(layer0_depth, layer0_dilation, layer0_kernel_size, layer0_cache_buffer);
 
-float layer1_cache_buffer[4*16*4];
-RollingCache layer1_cache(
-  4, // depth
-  16, // dilation
-  4, // kernel size
-  layer1_cache_buffer
-);
+const size_t layer1_depth = 4;
+const size_t layer1_dilation = 16;
+const size_t layer1_kernel_size = 4;
+float layer1_cache_buffer[layer1_dilation * layer1_kernel_size * layer1_depth];
+RollingCache layer1_cache(layer1_depth, layer1_dilation, layer1_kernel_size, layer1_cache_buffer);
 
-float layer2_cache_buffer[4*64*4];
-RollingCache layer2_cache(
-  4, // depth
-  64, // dilation
-  4, // kernel size
-  layer2_cache_buffer
-);
+const size_t layer2_depth = 4;
+const size_t layer2_dilation = 64;
+const size_t layer2_kernel_size = 4;
+float layer2_cache_buffer[layer2_dilation * layer2_kernel_size * layer2_depth];
+RollingCache layer2_cache(layer2_depth, layer2_dilation, layer2_kernel_size, layer2_cache_buffer);
+
 
 float regression_weights[8*1] = {-1.781128168106079, 0.7995295524597168, 1.716429591178894, -0.6238880753517151, 0.8441929817199707, -0.6373463273048401, -1.087668776512146, -2.1165592670440674};
 float regression_biases[1] = {0.2017572820186615};
