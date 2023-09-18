@@ -28,6 +28,15 @@ def plot_train_data(df, fname):
     sns.lineplot(df[window], x='n', y='value', hue='variable')
     plt.savefig(fname)
 
+def extract_x_y(data, x2, x3, data_axis_for_y):
+    result = {}
+    result['x'] = np.empty((len(data), 3), dtype=np.float32)
+    result['x'][:,0] = x2
+    result['x'][:,1] = x3
+    result['x'][:,2] = data[:, 0] # triangle
+    result['y'] = np.expand_dims(data[:,data_axis_for_y], -1) # target wave
+    return result
+
 def split_train_val_test(d):
     assert 'x' in d
     assert 'y' in d
@@ -41,12 +50,6 @@ def split_train_val_test(d):
         d['validate'][xy] = d[xy][-2*val_test_split_size:-val_test_split_size]
         d['test'][xy] = d[xy][-val_test_split_size:]
         d.pop(xy)
-
-def create_configured_keras_model(seq_len, all_outputs):
-    return create_dilated_model(
-        seq_len, in_d=IN_D, filter_sizes=FILTER_SIZES,
-        kernel_size=K, out_d=OUT_D,
-        all_outputs=all_outputs)
 
 def masked_mse(y_true, y_pred):
     assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
@@ -62,12 +65,12 @@ def masked_mse(y_true, y_pred):
     # return average over batch and sequence
     return tf.reduce_mean(mse)
 
-def dataset_from(x, y, s):
+def tf_dataset_from(x, y, s):
     def gen():
         idxs = list(range(len(x)-TRAIN_SEQ_LEN-1))  # ~1.3M
         random.Random(1337).shuffle(idxs)
         if s == 'train':
-            idxs = idxs[:2_000]   # 200_000
+            idxs = idxs[:20_000]   # 200_000
         else:
             idxs = idxs[:500]   # 5_000
         for i in idxs:
@@ -78,9 +81,9 @@ def dataset_from(x, y, s):
                                tf.TensorSpec(shape=(TRAIN_SEQ_LEN, OUT_D), dtype=tf.float32)))
     return ds
 
-def datasets_for_split(s):
+def tf_datasets_for_split(s):
     return  [
-        dataset_from(tri_to[wave][s]['x'], tri_to[wave][s]['y'], s) #.cache() #filename=f"tf_data_cache_{wave}")
+        tf_dataset_from(tri_to[wave][s]['x'], tri_to[wave][s]['y'], s) #.cache() #filename=f"tf_data_cache_{wave}")
         for wave in ['sine', 'ramp', 'square', 'zigzag']
     ]
 
@@ -90,49 +93,30 @@ def wave_coords(wave):
 
 
 
-
 if __name__ == '__main__':
   # parse input
   tsr_df_w, tsr_df_l = parse('datalogger_firmware/data/2d_embed/32kHz/tri_sine_ramp.ssv')
   tsz_df_w, tsz_df_l = parse('datalogger_firmware/data/2d_embed/32kHz/tri_squ_zigzag.ssv')
 
+  # TODO would be better to just join these dfs before doing anything else..
+
   # sanity check plot
   plot_train_data(tsr_df_l, "triangle_sine_ramp.train.png")
   plot_train_data(tsz_df_l, "triangle_square_zigzag.train.png")
 
-  # rebuild datasets as tri_to[WAVE][X/Y]
-  #TODO: refactor in a method
-  data = tsr_df_w.to_numpy().astype(np.float32)
+  # rebuild datasets as tri_to[WAVE][X/Y] with triangle wave in x with x2, x3
+  # and target wave as y
   tri_to = {}
-  tri_to['sine'] = {}
-  tri_to['sine']['x'] = np.empty((len(data), 3), dtype=np.float32)
-  tri_to['sine']['x'][:,0] = 0  # x2
-  tri_to['sine']['x'][:,1] = 0  # x3
-  tri_to['sine']['x'][:,2] = data[:,0] # triangle
-  tri_to['sine']['y'] = np.expand_dims(data[:,1], -1) # sine
-  tri_to['ramp'] = {}
-  tri_to['ramp']['x'] = np.empty((len(data), 3), dtype=np.float32)
-  tri_to['ramp']['x'][:,0] = 0  # x2
-  tri_to['ramp']['x'][:,1] = 1  # x3
-  tri_to['ramp']['x'][:,2] = data[:,0] # triangle
-  tri_to['ramp']['y'] = np.expand_dims(data[:,2], -1) # ramp
+  data = tsr_df_w.to_numpy().astype(np.float32)
+  tri_to['sine'] = extract_x_y(data, x2=0, x3=0, data_axis_for_y=1)
+  tri_to['ramp'] = extract_x_y(data, x2=0, x3=1, data_axis_for_y=2)
   data = tsz_df_w.to_numpy().astype(np.float32)
-  tri_to['square'] = {}
-  tri_to['square']['x'] = np.empty((len(data), 3), dtype=np.float32)
-  tri_to['square']['x'][:,0] = 1  # x2
-  tri_to['square']['x'][:,1] = 0  # x3
-  tri_to['square']['x'][:,2] = data[:,0] # triangle
-  tri_to['square']['y'] = np.expand_dims(data[:,1], -1) # square
-  tri_to['zigzag'] = {}
-  tri_to['zigzag']['x'] = np.empty((len(data), 3), dtype=np.float32)
-  tri_to['zigzag']['x'][:,0] = 1  # x2
-  tri_to['zigzag']['x'][:,1] = 1  # x3
-  tri_to['zigzag']['x'][:,2] = data[:,0] # triangle
-  tri_to['zigzag']['y'] = np.expand_dims(data[:,2], -1) # zigzag
+  tri_to['square'] = extract_x_y(data, x2=1, x3=0, data_axis_for_y=1)
+  tri_to['zigzag'] = extract_x_y(data, x2=1, x3=1, data_axis_for_y=2)
 
   # train/val/test split
   for wave in ['sine', 'ramp', 'square', 'zigzag']:
-    split_train_val_test(tri_to[wave])
+      split_train_val_test(tri_to[wave])
 
   # training config
   # prep training config
@@ -157,12 +141,15 @@ if __name__ == '__main__':
   print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
   # make model
-  train_model = create_configured_keras_model(TRAIN_SEQ_LEN, all_outputs=False)
+  train_model = create_dilated_model(
+        TRAIN_SEQ_LEN, in_d=IN_D, filter_sizes=FILTER_SIZES,
+        kernel_size=K, out_d=OUT_D,
+        all_outputs=False)
 
   # make tf dataset
-  train_ds = tf.data.Dataset.sample_from_datasets(datasets_for_split('train'))
+  train_ds = tf.data.Dataset.sample_from_datasets(tf_datasets_for_split('train'))
   train_ds = train_ds.batch(128).prefetch(tf.data.AUTOTUNE)
-  validate_ds = tf.data.Dataset.sample_from_datasets(datasets_for_split('validate'))
+  validate_ds = tf.data.Dataset.sample_from_datasets(tf_datasets_for_split('validate'))
   validate_ds = validate_ds.batch(128).prefetch(tf.data.AUTOTUNE)
 
   # train model
@@ -170,11 +157,11 @@ if __name__ == '__main__':
     filepath='weights/{epoch:03d}-{val_loss:.5f}',
     save_weights_only=True
   )
-  train_model.compile(Adam(1e-4), loss=masked_mse)
+  train_model.compile(Adam(1e-3), loss=masked_mse)
   train_model.fit(train_ds,
                   validation_data=validate_ds,
                   callbacks=[checkpoint_cb],
-                  epochs=1)
+                  epochs=5)
 
   # generate graphs of y_pred against test data
   for wave in ['sine', 'ramp', 'square', 'zigzag']:
