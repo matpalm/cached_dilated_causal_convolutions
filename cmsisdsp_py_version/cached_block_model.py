@@ -122,38 +122,31 @@ class CachedBlockModel(object):
 
 
 def create_cached_block_model_from_keras_model(keras_model, input_feature_depth):
-    assert len(keras_model.layers) in [8, 10], len(keras_model.layers)
+    from tensorflow.keras.layers import InputLayer, Conv1D
 
-    blocks = [
-        Block(
-            c1_kernel = keras_model.layers[1].weights[0].numpy(),
-            c1_bias = keras_model.layers[1].weights[1].numpy(),
-            c2_kernel = keras_model.layers[2].weights[0].numpy(),
-            c2_bias = keras_model.layers[2].weights[1].numpy(),
-        ),
-        Block(
-            c1_kernel = keras_model.layers[3].weights[0].numpy(),
-            c1_bias = keras_model.layers[3].weights[1].numpy(),
-            c2_kernel = keras_model.layers[4].weights[0].numpy(),
-            c2_bias = keras_model.layers[4].weights[1].numpy(),
-        ),
-        Block(
-            c1_kernel = keras_model.layers[5].weights[0].numpy(),
-            c1_bias = keras_model.layers[5].weights[1].numpy(),
-            c2_kernel = keras_model.layers[6].weights[0].numpy(),
-            c2_bias = keras_model.layers[6].weights[1].numpy(),
-        ),
-    ]
+    assert type(keras_model.layers[0]) == InputLayer
 
-    if len(keras_model.layers) == 10:
-        blocks.append(
-            Block(
-              c1_kernel = keras_model.layers[7].weights[0].numpy(),
-              c1_bias = keras_model.layers[7].weights[1].numpy(),
-              c2_kernel = keras_model.layers[8].weights[0].numpy(),
-              c2_bias = keras_model.layers[8].weights[1].numpy(),
-            ))
+    blocks = []
+    i = 1
+    while i+1 < len(keras_model.layers):
+        # next two layer should be 1) dilated conv and then 2) 1x1 conv
 
+        block_c1 = keras_model.layers[i]
+        block_c2 = keras_model.layers[i+1]
+        assert type(block_c1) == Conv1D
+        assert type(block_c2) == Conv1D
+
+        # these two make up the next block
+        blocks.append(Block(
+            c1_kernel = block_c1.weights[0].numpy(),
+            c1_bias = block_c1.weights[1].numpy(),
+            c2_kernel = block_c2.weights[0].numpy(),
+            c2_bias = block_c2.weights[1].numpy(),
+        ))
+
+        i += 2
+
+    # final layer is the regression
     regression = Regression(
         weights=keras_model.layers[-1].weights[0].numpy()[0],
         biases=keras_model.layers[-1].weights[1].numpy()
