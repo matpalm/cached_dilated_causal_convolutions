@@ -6,12 +6,8 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
-from cmsisdsp_py_version.block import Block
-from cmsisdsp_py_version.cached_block_model import CachedBlockModel, Regression
-from cmsisdsp_py_version.rolling_cache import RollingCache
-
 from .keras_model import create_dilated_model
-
+from cmsisdsp_py_version.cached_block_model import create_cached_block_model_from_keras_model
 
 def parse(fname):
     df_w = pd.read_csv(fname, sep=' ', names=['tri', 'w0', 'w1'])
@@ -191,55 +187,7 @@ if __name__ == '__main__':
       plt.savefig(f"/tmp/test_{wave}.png")
 
   # export model_defn.c
-  # TODO: move this into  CachedBlockModel
-
-  # 8 => 3 conv blocks, 10 => 4 conv blocks
-  assert len(train_model.layers) in [8, 10], len(train_model.layers)
-
-  # layer[0] is input
-
-  blocks = [
-      Block(
-          c1_kernel = train_model.layers[1].weights[0].numpy(),
-          c1_bias = train_model.layers[1].weights[1].numpy(),
-          c2_kernel = train_model.layers[2].weights[0].numpy(),
-          c2_bias = train_model.layers[2].weights[1].numpy(),
-      ),
-      Block(
-          c1_kernel = train_model.layers[3].weights[0].numpy(),
-          c1_bias = train_model.layers[3].weights[1].numpy(),
-          c2_kernel = train_model.layers[4].weights[0].numpy(),
-          c2_bias = train_model.layers[4].weights[1].numpy(),
-      ),
-      Block(
-          c1_kernel = train_model.layers[5].weights[0].numpy(),
-          c1_bias = train_model.layers[5].weights[1].numpy(),
-          c2_kernel = train_model.layers[6].weights[0].numpy(),
-          c2_bias = train_model.layers[6].weights[1].numpy(),
-      ),
-  ]
-
-  if len(train_model.layers) == 10:
-      blocks.append(
-          Block(
-              c1_kernel = train_model.layers[7].weights[0].numpy(),
-              c1_bias = train_model.layers[7].weights[1].numpy(),
-              c2_kernel = train_model.layers[8].weights[0].numpy(),
-              c2_bias = train_model.layers[8].weights[1].numpy(),
-          ))
-
-  regression = Regression(
-      weights=train_model.layers[-1].weights[0].numpy()[0],
-      biases=train_model.layers[-1].weights[1].numpy()
-  )
-
-  # create CachedBlockModel since it creates correct layer
-  # caches
-  cached_block_model = CachedBlockModel(
-      blocks=blocks,
-      input_feature_depth=IN_D,
-      regression=regression
-  )
-
+  cached_block_model = create_cached_block_model_from_keras_model(
+    train_model, input_feature_depth=IN_D)
   with open("/tmp/model_defn.h", 'w') as f:
       cached_block_model.write_model_defn_h(f) #sys.stdout)
