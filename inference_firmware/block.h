@@ -24,8 +24,8 @@ class Block {
       // for now set it to what, will become, invalid memory but ignore
       // since we'll reset the pData when required
       float i_too_like_to_live_dangerously[in_d] = {0};
-      arm_mat_init_f32(&c1_input_mi, 1, in_d, i_too_like_to_live_dangerously);
-      arm_mat_init_f32(&c2_input_mi, 1, out_d_, i_too_like_to_live_dangerously);
+      arm_mat_init_f32(&c1_input_mi_, 1, in_d, i_too_like_to_live_dangerously);
+      arm_mat_init_f32(&c2_input_mi_, 1, out_d_, i_too_like_to_live_dangerously);
 
       // prep matrix instances for kernels
       arm_mat_init_f32(&c1_kernel_mi_, in_d, out_d, c1_kernel);
@@ -58,10 +58,10 @@ class Block {
       // been setup, then just need their pData shifted along for each kernel
       for (size_t k=0; k < kernel_size_; k++) {
         // point matrix instances at next kernel
-        c1_input_mi.pData = (float *)input_buffer_ + (k * in_d_);
+        c1_input_mi_.pData = (float *)input_buffer_ + (k * in_d_);
         c1_kernel_mi_.pData = (float *)c1_kernel_ + (k * in_d_ * out_d_);
         // do the mat mul
-        arm_mat_mult_f32(&c1_input_mi, &c1_kernel_mi_, &matmul_result_mi_);
+        arm_mat_mult_f32(&c1_input_mi_, &c1_kernel_mi_, &matmul_result_mi_);
         // accumulate into result for c1
         arm_add_f32(output_buffer_, matmul_result_, output_buffer_, out_d_);
       }
@@ -75,8 +75,8 @@ class Block {
       // since second convolution is 1x1 it only needs one mat mul.
       // it can also use the same matmul result from
       // conv1 since the two convolutions share the output feature depth.
-      c2_input_mi.pData = output_buffer_;
-      arm_mat_mult_f32(&c2_input_mi, &c2_kernel_mi_, &matmul_result_mi_);
+      c2_input_mi_.pData = output_buffer_;
+      arm_mat_mult_f32(&c2_input_mi_, &c2_kernel_mi_, &matmul_result_mi_);
       // apply bias (this time from matmul_result to result) and relu
       arm_add_f32(matmul_result_, c2_bias_, output_buffer_, out_d_);
       relu(output_buffer_, out_d_);
@@ -91,9 +91,9 @@ class Block {
     float* c1_kernel_;  // (kernel_size_, in_d, out_d)
     float* c1_bias_;    // (out_d,)
     float* c2_bias_;    // (out_d,)
-    arm_matrix_instance_f32 c1_input_mi;    // (1, in_d)
+    arm_matrix_instance_f32 c1_input_mi_;    // (1, in_d)
     arm_matrix_instance_f32 c1_kernel_mi_;  // (in_d, out_d)
-    arm_matrix_instance_f32 c2_input_mi;    // (1, out_d)
+    arm_matrix_instance_f32 c2_input_mi_;    // (1, out_d)
     arm_matrix_instance_f32 c2_kernel_mi_;  // (1, out_d)
     float* matmul_result_; // (out_d,)
     arm_matrix_instance_f32 matmul_result_mi_;
