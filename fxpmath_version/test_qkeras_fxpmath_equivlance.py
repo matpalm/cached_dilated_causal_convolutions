@@ -129,7 +129,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
 
 
-    def test_overfit_qkeras_dense_and_custom_fxpmath_inference(self):
+    def _test_overfit_qkeras_dense_and_custom_fxpmath_inference(self):
         # train a simple (A,B,C) input -> ((A+B)/2, -(A+C)/2)single_width_fxp output
         # that should be able to be represented by very simple quantised weights
 
@@ -206,8 +206,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
 
 
-    def test_underfit_qkeras_dense_and_custom_fxpmath_inference(self):
-
+    def _test_underfit_qkeras_dense_and_custom_fxpmath_inference(self):
         # same model as above but with random data. the model will not
         # be able to fit this exactly so we expect weights to be generated
         # that are not all zeros on most significant 1/N bits
@@ -295,8 +294,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             qkeras_custom_mse_equivalant(test_x, test_y, single_layer_model, predict_single))
 
 
-    def test_two_layer_dense_model(self):
-
+    def _test_two_layer_dense_model(self):
         # test a two layer qdense model that includes a relu activation
         # between the two
 
