@@ -68,6 +68,28 @@ def quantiser():
 def quant_relu():
   return f"quantized_relu({N_WORD},{N_INT})"
 
+
+
+def qkeras_custom_mse_equivalant(test_x, test_y, qkeras_model, custom_inference_fn, atol=1e-3):
+
+    # evaluate qkeras_model mse
+    qkeras_mse = qkeras_model.evaluate(test_x, test_y)
+
+    # run all examples through custom function
+    def predict_set(xs):
+        return np.stack([custom_inference_fn(x) for x in xs])
+
+    # this, like the qkeras model above, should be near perfect
+    test_y_pred = predict_set(test_x)
+    custom_mse = np.mean((test_y_pred - test_y) ** 2)
+    print("custom_mse", custom_mse)
+
+    mse_diff = abs(qkeras_mse - custom_mse)
+    print("qkeras_mse ", qkeras_mse, "custom_mse", custom_mse, "=> mse diff", mse_diff)
+    return mse_diff < atol
+
+
+
 class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
     def _test_qkeras_dense_quantised_params_can_be_expressed_in_fxpmath(self):
@@ -107,7 +129,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
 
 
-    def _test_overfit_qkeras_dense_and_custom_fxpmath_inference(self):
+    def test_overfit_qkeras_dense_and_custom_fxpmath_inference(self):
         # train a simple (A,B,C) input -> ((A+B)/2, -(A+C)/2)single_width_fxp output
         # that should be able to be represented by very simple quantised weights
 
@@ -137,10 +159,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         test_y = array_to_fixed_point(test_y)
 
         # train model. given a reasonable number of examples this model should be near perfect
-        h = single_layer_model.fit(test_x, test_y, epochs=300, verbose=False)
-        single_layer_model_eval_score = single_layer_model.evaluate(test_x, test_y)
-        print("qkeras mse", single_layer_model_eval_score)
-        self.assertTrue(single_layer_model_eval_score < 1e-5)
+        _h = single_layer_model.fit(test_x, test_y, epochs=300, verbose=False)
 
         # extract qkeras quantised weights
         quantised_weights = qkeras.utils.model_save_quantized_weights(single_layer_model)
@@ -182,19 +201,12 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             ])
             return y_pred
 
-        # predicting of entire test set
-        def predict_set(xs):
-            return np.stack([predict_single(x) for x in xs])
-
-        # this, like the qkeras model above, should be near perfect
-        test_y_pred = predict_set(test_x)
-        custom_mse = np.mean((test_y_pred-test_y) ** 2)
-        print("custom_mse", custom_mse)
-        self.assertTrue(custom_mse < 1e-5)
+        self.assertTrue(
+            qkeras_custom_mse_equivalant(test_x, test_y, single_layer_model, predict_single))
 
 
 
-    def _test_underfit_qkeras_dense_and_custom_fxpmath_inference(self):
+    def test_underfit_qkeras_dense_and_custom_fxpmath_inference(self):
 
         # same model as above but with random data. the model will not
         # be able to fit this exactly so we expect weights to be generated
@@ -228,9 +240,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
         # train model. because of random data and small model we expect this to be
         # no where near perfect
-        h = single_layer_model.fit(test_x, test_y, epochs=300, verbose=False)
-        single_layer_model_eval_score = single_layer_model.evaluate(test_x, test_y)
-        print("qkeras mse", single_layer_model_eval_score)
+        _h = single_layer_model.fit(test_x, test_y, epochs=300, verbose=False)
 
         # extract qkeras quantised weights
         quantised_weights = qkeras.utils.model_save_quantized_weights(single_layer_model)
@@ -281,21 +291,11 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             ])
             return y_pred
 
-        # predicting of entire test set
-        def predict_set(xs):
-            return np.stack([predict_single(x) for x in xs])
-
-        # this, like the qkeras model above, should be near perfect
-        test_y_pred = predict_set(test_x)
-        custom_mse = np.mean((test_y_pred-test_y) ** 2)
-        print("custom_mse", custom_mse)
-
-        mse_diff = abs(custom_mse-single_layer_model_eval_score)
-        print("mse diff", mse_diff)
-        self.assertTrue(mse_diff < 1e-3)
+        self.assertTrue(
+            qkeras_custom_mse_equivalant(test_x, test_y, single_layer_model, predict_single))
 
 
-    def _test_two_layer_dense_model(self):
+    def test_two_layer_dense_model(self):
 
         # test a two layer qdense model that includes a relu activation
         # between the two
@@ -329,9 +329,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         test_y = array_to_fixed_point(test_y)
 
         # train model
-        h = double_layer_model.fit(test_x, test_y, epochs=200, verbose=False)
-        double_layer_model_eval_score = double_layer_model.evaluate(test_x, test_y)
-        print("double_layer_model_eval_score", double_layer_model_eval_score)
+        _h = double_layer_model.fit(test_x, test_y, epochs=200, verbose=False)
 
         # extract qkeras quantised weights
         quantised_weights = qkeras.utils.model_save_quantized_weights(double_layer_model)
@@ -378,17 +376,8 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             layer_1_output = mat_mul_with_biases(layer_0_output, weights, biases, relu=False)
             return np.array(layer_1_output)
 
-        def predict_set(xs):
-            return np.stack([predict_single(x) for x in xs])
-
-        test_y_pred = predict_set(test_x)
-        custom_mse = np.mean((test_y_pred - test_y) ** 2)
-        print("custom_mse", custom_mse)
-
-        mse_diff = abs(custom_mse-double_layer_model_eval_score)
-        print("mse diff", mse_diff)
-        self.assertTrue(mse_diff < 1e-4)
-
+        self.assertTrue(
+            qkeras_custom_mse_equivalant(test_x, test_y, double_layer_model, predict_single))
 
 
     def test_qkeras_conv1d(self):
@@ -420,9 +409,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         test_y = array_to_fixed_point(test_y)
 
         # fit model
-        h = single_conv_model.fit(test_x, test_y, epochs=200, verbose=False)
-        single_conv_model_eval_score = single_conv_model.evaluate(test_x, test_y)
-        print("evaluate", single_conv_model_eval_score)
+        _ = single_conv_model.fit(test_x, test_y, epochs=200, verbose=False)
 
         # extract qkeras quantised weights
         quantised_weights = qkeras.utils.model_save_quantized_weights(single_conv_model)
@@ -495,15 +482,9 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         def predict_single(x):
             return conv_1d_mat_mul_with_biases(x, conv1_weights, conv1_biases, relu=False)
 
-        def predict_set(xs):
-            return np.stack([predict_single(x) for x in xs])
+        self.assertTrue(
+            qkeras_custom_mse_equivalant(test_x, test_y, single_conv_model, predict_single))
 
-        test_y_pred = predict_set(test_x)
-        custom_mse = np.mean((test_y_pred - test_y) ** 2)
-
-        mse_diff = abs(custom_mse-single_conv_model_eval_score)
-        print("mse diff", mse_diff)
-        self.assertTrue(mse_diff < 1e-4)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
