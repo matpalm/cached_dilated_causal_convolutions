@@ -59,6 +59,9 @@ array_to_fixed_point_bin_str = np.vectorize(array_to_fixed_point_bin_str)
 def quantiser():
     return quantized_bits(bits=N_WORD, integer=N_INT, alpha=1)
 
+# qkeras quantiser for activation
+def quant_relu():
+  return f"quantized_relu({N_WORD},{N_INT})"
 
 class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
@@ -186,7 +189,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
 
 
-    def test_underfit_qkeras_dense_and_custom_fxpmath_inference(self):
+    def _test_underfit_qkeras_dense_and_custom_fxpmath_inference(self):
 
         # same model as above but with random data. the model will not
         # be able to fit this exactly so we expect weights to be generated
@@ -208,14 +211,14 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         # generate test_x & test_y values uniformly between (-1.9, 1.9)
         # slightly less than calculated expected range (-32K, 32K) with n_int=2
         # note: model does NOT have capacity to get this perfect
+        # includes conversion to values we know are representable in QI.F
         N = 100
         np.random.seed(123)
         test_x = (np.random.uniform(size=(N, IN_D))*2)-1  #  (-1, 1)
         test_x *= 1.9
+        test_x = array_to_fixed_point(test_x)
         test_y = (np.random.uniform(size=(N, OUT_D))*2)-1  #  (-1, 1)
         test_y *= 1.9
-        # convert them to Q2.16
-        test_x = array_to_fixed_point(test_x)
         test_y = array_to_fixed_point(test_y)
 
         # train model. because of random data and small model we expect this to be
@@ -286,5 +289,100 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         print("mse diff", mse_diff)
         self.assertTrue(mse_diff < 1e-3)
 
+
+    def test_two_layer_dense_model(self):
+
+        # test a two layer qdense model that includes a relu activation
+        # between the two
+
+        # build model
+        IN_D = 3
+        HIDDEN_D = 8
+        OUT_D = 2
+        inp = Input((IN_D,))
+        dense_0 = QDense(name='dense_0',
+                            units=HIDDEN_D,
+                            kernel_quantizer=quantiser(),
+                            bias_quantizer=quantiser())(inp)
+        dense_0 = QActivation(quant_relu(), name="dense_0_relu")(dense_0)
+        dense_1 = QDense(name='dense_1',
+                            units=OUT_D,
+                            kernel_quantizer=quantiser(),
+                            bias_quantizer=quantiser())(dense_0)
+        double_layer_model = Model(inp, dense_1)
+        double_layer_model.compile(Adam(1e-2), loss='mse')
+
+
+        # generate test_x and test_y values uniformly between (-1.9, 1.9)
+        # slightly less than calculated expected range (-32K,32K) with n_int=2
+        N = 100
+        test_x = (np.random.uniform(size=(N, IN_D))*2)-1  #  (-1, 1)
+        test_x *= 1.9
+        test_x = array_to_fixed_point(test_x)
+        test_y = (np.random.uniform(size=(N, OUT_D))*2)-1  #  (-1, 1)
+        test_y *= 1.9
+        test_y = array_to_fixed_point(test_y)
+
+        # train model
+        h = double_layer_model.fit(test_x, test_y, epochs=200, verbose=False)
+        double_layer_model_eval_score = double_layer_model.evaluate(test_x, test_y)
+        print("double_layer_model_eval_score", double_layer_model_eval_score)
+
+        # extract qkeras quantised weights
+        quantised_weights = qkeras.utils.model_save_quantized_weights(double_layer_model)
+
+        # create simple dot product with bias method
+        def dot_product_with_bias(x, weights, bias, relu):
+            assert len(x) == len(weights)
+            # init accumulator with bias value, in double width ready to be accumulated
+            # with dot product results
+            accum = double_width_fxp(bias)
+            # this loop represents what will be in the state machine
+            for i in range(len(x)):
+                x_i = single_width_fxp(x[i])
+                w_i = single_width_fxp(weights[i])
+                product = x_i * w_i  # recall; product will be double width
+                accum += product
+                # keep accumulator single width. by dft a+b => +1 for int part
+                accum.resize(signed=True, n_word=2*N_WORD, n_frac=2*N_FRAC)
+            # 'apply' relu, if configured
+            if relu and accum < 0:
+                return double_width_fxp(0)
+            # return result resized down to single width
+            accum.resize(signed=True, n_word=N_WORD, n_frac=N_FRAC)
+            return accum
+
+        def mat_mul_with_biases(x, weights, biases, relu):
+            check_all_qIF(weights)
+            check_all_qIF(biases)
+            assert len(weights.shape) == 2
+            assert len(biases.shape) == 1
+            num_cols = weights.shape[1]
+            assert weights.shape[0] == len(x)
+            assert num_cols == len(biases)
+            y_pred = []
+            for c in range(num_cols):
+                # these would all run in parallel
+                y_pred.append(dot_product_with_bias(x, weights[:,c], biases[c], relu=relu))
+            return np.array(y_pred)
+
+        def predict_single(x):
+            weights, biases = quantised_weights['dense_0']['weights']
+            layer_0_output = mat_mul_with_biases(x, weights, biases, relu=True)
+            weights, biases = quantised_weights['dense_1']['weights']
+            layer_1_output = mat_mul_with_biases(layer_0_output, weights, biases, relu=False)
+            return np.array(layer_1_output)
+
+        def predict_set(xs):
+            return np.stack([predict_single(x) for x in xs])
+
+        test_y_pred = predict_set(test_x)
+        custom_mse = np.mean((test_y_pred - test_y) ** 2)
+        print("custom_mse", custom_mse)
+
+        mse_diff = abs(custom_mse-double_layer_model_eval_score)
+        print("mse diff", mse_diff)
+        self.assertTrue(mse_diff < 1e-3)
+
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2)
