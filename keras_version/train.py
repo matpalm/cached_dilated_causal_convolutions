@@ -7,23 +7,10 @@ import matplotlib.pyplot as plt
 
 from tensorflow.keras.optimizers import Adam
 
-from .keras_model import create_dilated_model
+from .keras_model import create_dilated_model, masked_mse
 from cmsisdsp_py_version.cached_block_model import create_cached_block_model_from_keras_model
 
 from .data import WaveFormData
-
-def masked_mse(receptive_field_size):
-    def loss_fn(y_true, y_pred):
-        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
-        assert y_true.shape == y_pred.shape
-        # average over elements of y
-        mse = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
-        # we want to ignore the first elements of the loss since they
-        # have been fed with left padded data
-        mse = mse[:,receptive_field_size:]
-        # return average over batch and sequence
-        return tf.reduce_mean(mse)
-    return loss_fn
 
 def wave_coords(wave):
     return {'sine': '(0, 0)', 'ramp': '(0, 1)',
@@ -72,9 +59,9 @@ if __name__ == '__main__':
             kernel_size=K, out_d=OUT_D,
             all_outputs=False)
 
-    # make tf dataset
-    train_ds, validate_ds = data.train_validate_tf_datasets(
-        TRAIN_SEQ_LEN, opts.num_train_egs, opts.num_validate_egs)
+    # make tf datasets
+    train_ds = data.tf_dataset_for_split('train', TRAIN_SEQ_LEN, opts.num_train_egs)
+    validate_ds = data.tf_dataset_for_split('validate', TRAIN_SEQ_LEN, opts.num_validate_egs)
 
     # train model
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
@@ -90,6 +77,7 @@ if __name__ == '__main__':
                     epochs=opts.epochs)
 
     # generate graphs of y_pred against test data
+    # TODO: port to use data.tf_dataset_for_split('test'.. with single batch, no shuffle etc
     for wave in ['sine', 'ramp', 'square', 'zigzag']:
 
         test_records = []

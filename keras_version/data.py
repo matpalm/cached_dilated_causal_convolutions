@@ -48,25 +48,26 @@ def tf_dataset_from(x, y, split, max_samples, seq_len):
 
     def gen():
         idxs = list(range(len(x)-seq_len-1))  # ~1.3M
-        random.Random(1337).shuffle(idxs)
+        if split != 'test':
+            random.Random(1337).shuffle(idxs)
         idxs = idxs[:max_samples]
         for i in idxs:
             yield x[i:i+seq_len], y[i+1:i+1+seq_len]
 
-    ds = tf.data.Dataset.from_generator(
+    return tf.data.Dataset.from_generator(
         gen, output_signature=(tf.TensorSpec(shape=(seq_len, in_d), dtype=tf.float32),
                                tf.TensorSpec(shape=(seq_len, out_d), dtype=tf.float32)))
-    return ds
 
 class WaveFormData(object):
 
-    def __init__(self):
-        tsr_df_w, tsr_df_l = parse('datalogger_firmware/data/2d_embed/32kHz/tri_sine_ramp.ssv')
-        tsz_df_w, tsz_df_l = parse('datalogger_firmware/data/2d_embed/32kHz/tri_squ_zigzag.ssv')
+    def __init__(self, root_dir='datalogger_firmware/data', generate_plots=False):
+        tsr_df_w, tsr_df_l = parse(f"{root_dir}/2d_embed/32kHz/tri_sine_ramp.ssv")
+        tsz_df_w, tsz_df_l = parse(f"{root_dir}/2d_embed/32kHz/tri_squ_zigzag.ssv")
 
         # # sanity check plot
-        plot_train_data(tsr_df_l, "triangle_sine_ramp.train.png")
-        plot_train_data(tsz_df_l, "triangle_square_zigzag.train.png")
+        if generate_plots:
+            plot_train_data(tsr_df_l, "triangle_sine_ramp.train.png")
+            plot_train_data(tsz_df_l, "triangle_square_zigzag.train.png")
 
         # rebuild datasets as tri_to[WAVE][X/Y] with triangle wave in x with x2, x3
         # and target wave as y
@@ -83,20 +84,22 @@ class WaveFormData(object):
             split_train_val_test(self.tri_to[wave])
 
 
-    def tf_datasets_for_split(self, split, max_samples, seq_len):
-        return  [
+    def tf_dataset_for_split(self,
+            split, seq_len, max_samples,
+            waves=['sine', 'ramp', 'square', 'zigzag']):
+
+        assert split in ['train', 'validate', 'test']
+        sampled_ds = tf.data.Dataset.sample_from_datasets([
             tf_dataset_from(
                 self.tri_to[wave][split]['x'],
                 self.tri_to[wave][split]['y'],
                 split, max_samples, seq_len)
-            for wave in ['sine', 'ramp', 'square', 'zigzag']
-        ]
+            for wave in waves
+        ])
 
-    def train_validate_tf_datasets(self, seq_len, num_train_egs, num_validate_egs):
-        train_ds = tf.data.Dataset.sample_from_datasets(
-            self.tf_datasets_for_split('train', num_train_egs, seq_len))
-        train_ds = train_ds.batch(128).prefetch(tf.data.AUTOTUNE)
-        validate_ds = tf.data.Dataset.sample_from_datasets(
-            self.tf_datasets_for_split('validate', num_validate_egs, seq_len))
-        validate_ds = validate_ds.batch(128).prefetch(tf.data.AUTOTUNE)
-        return train_ds, validate_ds
+        if split == 'train':
+            sampled_ds = sampled_ds.shuffle(1000)
+
+        sampled_ds = sampled_ds.batch(1 if split=='test' else 128)
+
+        return sampled_ds.prefetch(tf.data.AUTOTUNE)
