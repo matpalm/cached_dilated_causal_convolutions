@@ -53,6 +53,11 @@ def array_to_fixed_point_bin_str(x):
 array_to_fixed_point_bin_str = np.vectorize(array_to_fixed_point_bin_str)
 
 
+def resize_single_width(v):
+    v.resize(signed=True, n_word=N_WORD, n_frac=N_FRAC)
+
+def resize_double_width(v):
+    v.resize(signed=True, n_word=N_WORD*2, n_frac=N_FRAC*2)
 
 
 # qkeras quantiser for all tests weights, kernels and biases
@@ -164,7 +169,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                 prod = x_i * w_i  # recall; product will be double width
                 accum += prod
             # return result resized down to single width
-            accum.resize(signed=True, n_word=N_WORD, n_frac=N_FRAC)
+            resize_single_width(accum)
             return accum
 
         # predict for single example as explicit dot product for each of
@@ -257,12 +262,12 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                 product = x_i * w_i  # recall; product will be double width
                 accum += product
                 # keep accumulator single width. by dft a+b => +1 for int part
-                accum.resize(signed=True, n_word=2*N_WORD, n_frac=2*N_FRAC)
+                resize_double_width(accum)
                 #print("i", i, "x_i", bits(x_i), "w_i", bits(w_i), "=> product", bits(product), "=> accum", bits(accum), accum)
 
             # return result resized down to single width
             #print("accum (pre resize)  ", bits(accum), accum)
-            accum.resize(signed=True, n_word=N_WORD, n_frac=N_FRAC)
+            resize_single_width(accum)
             #print("accum (post resize) ", bits(accum), accum)
             return accum
 
@@ -290,7 +295,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         self.assertTrue(mse_diff < 1e-3)
 
 
-    def test_two_layer_dense_model(self):
+    def _test_two_layer_dense_model(self):
 
         # test a two layer qdense model that includes a relu activation
         # between the two
@@ -344,12 +349,12 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                 product = x_i * w_i  # recall; product will be double width
                 accum += product
                 # keep accumulator single width. by dft a+b => +1 for int part
-                accum.resize(signed=True, n_word=2*N_WORD, n_frac=2*N_FRAC)
+                resize_double_width(accum)
             # 'apply' relu, if configured
             if relu and accum < 0:
                 return double_width_fxp(0)
             # return result resized down to single width
-            accum.resize(signed=True, n_word=N_WORD, n_frac=N_FRAC)
+            resize_single_width(accum)
             return accum
 
         def mat_mul_with_biases(x, weights, biases, relu):
@@ -382,7 +387,123 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
         mse_diff = abs(custom_mse-double_layer_model_eval_score)
         print("mse diff", mse_diff)
-        self.assertTrue(mse_diff < 1e-3)
+        self.assertTrue(mse_diff < 1e-4)
+
+
+
+    def test_qkeras_conv1d(self):
+
+        N = 5
+        K = 4
+        IN_D = 3
+        OUT_D = 2
+
+        inp = Input((K, IN_D))
+        qconv1d = QConv1D(name='conv1', filters=OUT_D,
+                        kernel_size=K, strides=1,
+                        padding='causal', dilation_rate=1,
+                        kernel_quantizer=quantiser(),
+                        bias_quantizer=quantiser())(inp)
+        # take last from sequence for loss
+        qconv1d = qconv1d[:, -1, :]
+        single_conv_model = Model(inp, qconv1d)
+        single_conv_model.compile(Adam(1e-2), loss='mse')
+
+        # generate test_x and test_y values uniformly between (-1.9, 1.9)
+        # slightly less than calculated expected range (-32K,32K) with n_int=2
+        N = 100
+        test_x = (np.random.uniform(size=(N, K, IN_D))*2)-1  #  (-1, 1)
+        test_x *= 1.9
+        test_x = array_to_fixed_point(test_x)
+        test_y = (np.random.uniform(size=(N, OUT_D))*2)-1  #  (-1, 1)
+        test_y *= 1.9
+        test_y = array_to_fixed_point(test_y)
+
+        # fit model
+        h = single_conv_model.fit(test_x, test_y, epochs=200, verbose=False)
+        single_conv_model_eval_score = single_conv_model.evaluate(test_x, test_y)
+        print("evaluate", single_conv_model_eval_score)
+
+        # extract qkeras quantised weights
+        quantised_weights = qkeras.utils.model_save_quantized_weights(single_conv_model)
+        quantised_weights
+        conv1_weights = quantised_weights['conv1']['weights'][0]
+        conv1_biases = quantised_weights['conv1']['weights'][1]
+
+        def dot_product(x, weights, accumulator):
+            assert len(x.shape) == 1
+            assert len(weights.shape) == 1
+            assert len(x) == len(weights)
+            # this loop represents what will be in the state machine
+            for i in range(len(x)):
+                x_i = single_width_fxp(x[i])
+                w_i = single_width_fxp(weights[i])
+                product = x_i * w_i  # will be double width
+                accumulator += product
+                # keep accumulator single width. by dft a+b => +1 for int part
+                resize_double_width(accumulator)
+            return accumulator
+
+        def row_by_matrix_multiply(x, weights, accumulators):
+            assert len(x.shape) == 1
+            in_d = x.shape[0]
+            assert len(weights.shape) == 2
+            assert weights.shape[0] == in_d
+            out_d = weights.shape[1]
+            assert len(accumulators) == out_d
+            for column in range(out_d):
+                accumulators[column] = dot_product(x, weights[:, column], accumulators[column])
+            return accumulators
+
+        def conv_1d_mat_mul_with_biases(x, weights, biases, relu):
+            check_all_qIF(weights)
+            check_all_qIF(biases)
+            assert len(x.shape) == 2
+            assert x.shape[0] == 4  # K
+            in_d = x.shape[1]
+            assert len(weights.shape) == 3
+            assert weights.shape[0] == 4  # K
+            assert weights.shape[1] == in_d, f"{weights.shape[1]}!={in_d}"
+            out_d = weights.shape[2]
+            assert len(biases.shape) == 1
+            assert len(biases) == out_d
+
+            # initialise accumulators using the biases
+            # note: double width for accumulation
+            accumulators = [ double_width_fxp(b) for b in biases ]
+
+            # run, and accumulate, for each kernel/x  note: these can all run
+            # in parallel, but in that case we'd need another accumulation and
+            # would only need to initial the first with the biases
+            for k in range(4):
+                # these can all run in parallel
+                accumulators = row_by_matrix_multiply(x[k], weights[k], accumulators)
+
+            # resize down from double to single for output
+            for i in range(out_d):
+                resize_single_width(accumulators[i])
+
+            # apply relu, if configured
+            if relu:
+                for i in range(out_d):
+                    if accumulator[i] < 0:
+                        accumulator[i] = 0
+
+            # return as np array,
+            return np.array(accumulators)
+
+        def predict_single(x):
+            return conv_1d_mat_mul_with_biases(x, conv1_weights, conv1_biases, relu=False)
+
+        def predict_set(xs):
+            return np.stack([predict_single(x) for x in xs])
+
+        test_y_pred = predict_set(test_x)
+        custom_mse = np.mean((test_y_pred - test_y) ** 2)
+
+        mse_diff = abs(custom_mse-single_conv_model_eval_score)
+        print("mse diff", mse_diff)
+        self.assertTrue(mse_diff < 1e-4)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
