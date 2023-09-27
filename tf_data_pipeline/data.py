@@ -58,7 +58,7 @@ def tf_dataset_from(x, y, split, max_samples, seq_len):
         gen, output_signature=(tf.TensorSpec(shape=(seq_len, in_d), dtype=tf.float32),
                                tf.TensorSpec(shape=(seq_len, out_d), dtype=tf.float32)))
 
-class WaveFormData(object):
+class Embed2DWaveFormData(object):
 
     def __init__(self, root_dir='datalogger_firmware/data', generate_plots=False):
         tsr_df_w, tsr_df_l = parse(f"{root_dir}/2d_embed/32kHz/tri_sine_ramp.ssv")
@@ -83,10 +83,10 @@ class WaveFormData(object):
         for wave in ['sine', 'ramp', 'square', 'zigzag']:
             split_train_val_test(self.tri_to[wave])
 
-
     def tf_dataset_for_split(self,
             split, seq_len, max_samples,
             waves=['sine', 'ramp', 'square', 'zigzag']):
+        # dataset that is input (triangle, C1, C2) -> (output waves based on C1, C2)
 
         assert split in ['train', 'validate', 'test']
         sampled_ds = tf.data.Dataset.sample_from_datasets([

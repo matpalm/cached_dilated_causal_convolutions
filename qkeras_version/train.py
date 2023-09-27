@@ -1,4 +1,7 @@
 
+import tensorflow as tf
+from tensorflow.keras.optimizers import Adam
+
 from tf_data_pipeline.data import WaveFormData
 
 from .qkeras_model import create_dilated_model, masked_mse
@@ -16,7 +19,7 @@ if __name__ == '__main__':
     print("opts", opts)
 
     # parse files and do splits etc
-    data = WaveFormData()
+    data = Embed2DWaveFormData()
 
     # WIP in == out == filter_size
     # TODO: do three version of qconv1d see create_dilated_model
@@ -39,5 +42,25 @@ if __name__ == '__main__':
     train_model = create_dilated_model(TRAIN_SEQ_LEN,
             in_out_d=IN_OUT_D, num_layers=NUM_LAYERS, filter_size=FILTER_SIZE,
             all_outputs=False)
-
     print(train_model.summary())
+
+    # make tf datasets
+    train_ds = data.tf_dataset_for_split('train', TRAIN_SEQ_LEN, opts.num_train_egs)
+    validate_ds = data.tf_dataset_for_split('validate', TRAIN_SEQ_LEN, opts.num_validate_egs)
+
+    for x, y in train_ds:
+        print(x.shape, y.shape)
+        break
+    exit()
+
+    # train model
+    checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
+        filepath='weights/{epoch:03d}-{val_loss:.5f}',
+        save_weights_only=True
+    )
+    train_model.compile(Adam(opts.learning_rate),
+                        loss=masked_mse(RECEPTIVE_FIELD_SIZE))
+    train_model.fit(train_ds,
+                    validation_data=validate_ds,
+                    callbacks=[checkpoint_cb],
+                    epochs=opts.epochs)

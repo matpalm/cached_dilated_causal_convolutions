@@ -10,7 +10,7 @@ from tensorflow.keras.optimizers import Adam
 from .keras_model import create_dilated_model, masked_mse
 from cmsisdsp_py_version.cached_block_model import create_cached_block_model_from_keras_model
 
-from tf_data_pipeline.data import WaveFormData
+from tf_data_pipeline.data import Embed2DWaveFormData
 
 def wave_coords(wave):
     return {'sine': '(0, 0)', 'ramp': '(0, 1)',
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     print("opts", opts)
 
     # parse files and do splits etc
-    data = WaveFormData()
+    data = Embed2DWaveFormData()
 
     # training config
     # prep training config
