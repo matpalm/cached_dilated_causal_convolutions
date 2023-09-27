@@ -539,7 +539,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         fxp_conv1d.export_weights_per_dot_product('/tmp/test_qkeras_conv1d_object.hex')
 
         def predict_single(x):
-            return fxp_conv1d.run(x, relu=False)
+            return fxp_conv1d.apply(x, relu=False)
 
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, single_conv_model, predict_single))

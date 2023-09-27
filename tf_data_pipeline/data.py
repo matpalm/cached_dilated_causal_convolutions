@@ -111,8 +111,12 @@ class WaveToWaveData(object):
         fname = f"{root_dir}/2d_embed/32kHz/tri_squ_zigzag.ssv"
         data = pd.read_csv(fname, sep=' ', names=['tri', 'square', 'zigzag']).to_numpy()
 
-        # for prototype x is (tri,tri,tri), y is (tri,square,zigzag)
-        x, y = data[:,[0,0,0]], data
+        # for prototype
+        n = len(data)
+        x = np.concatenate([data[:,0:1], np.zeros((n, 3))], axis=-1)  # (tri, 0, 0, 0)
+        y = np.concatenate([data, np.zeros((n, 1))], axis=-1)         # (tri, square, zigzag, 0)
+        assert x.shape == (n, 4)
+        assert y.shape == (n, 4)
 
         # take splits
         val_test_split_size = int(len(x) * 0.1)  # 10% for val and test

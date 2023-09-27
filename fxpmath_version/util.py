@@ -1,8 +1,5 @@
 from fxpmath import Fxp
-
-# add vector b to entries in a
-
-
+import numpy as np
 
 class FxpUtil(object):
 
@@ -42,6 +39,13 @@ class FxpUtil(object):
             # can be parallel
             a[i].set_val(a[i] + b[i])
             self.resize_double_width(a[i])
+
+    # util to convert numpy array X to float values in QI.F
+    def nparray_to_fixed_point_floats(self, a):
+        def cast_to_fp_and_back(v):
+            return float(self.single_width(v))
+        return np.vectorize(cast_to_fp_and_back)(a)
+
 
 # fxp = FxpUtil()
 # a = fxp.single_width(3)

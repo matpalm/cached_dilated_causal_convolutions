@@ -21,9 +21,13 @@ def quant_relu():
     return f"quantized_relu({N_WORD},{N_INT})"
 
 
-def masked_mse(receptive_field_size):
+def masked_mse(receptive_field_size, filter_column_idx=None):
     def loss_fn(y_true, y_pred):
         assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
+        if filter_column_idx is not None:
+            # consider only a single column from output for loss
+            y_true = y_true[:,:,filter_column_idx:filter_column_idx+1]
+            y_pred = y_pred[:,:,filter_column_idx:filter_column_idx+1]
         assert y_true.shape == y_pred.shape
         # average over elements of y
         mse = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
@@ -41,7 +45,7 @@ def create_dilated_model(seq_len: int,
                          all_outputs: bool=False):
 
     if in_out_d != filter_size:
-        raise Exception("WIP constraints; in_out_d must == filter_size.")
+        print("WARNING! in_out_d != filter_size")
 
     # TODO: generalise code to support convs for each of....
     #   in_out_d -> filter_size     ( for first layer )
@@ -58,15 +62,16 @@ def create_dilated_model(seq_len: int,
 
     collected_outputs = []
     for i in range(num_layers):
-        conv_out = QConv1D(name=f"qconv_{i}", filters=filter_size,
+        last_layer = QConv1D(name=f"qconv_{i}", filters=filter_size,
                            kernel_size=4, padding='causal',
                            dilation_rate=4**i,  # fixed K=4
                            kernel_quantizer=quantiser(),
                            bias_quantizer=quantiser())(last_layer)
-        relu_out = QActivation(quant_relu(), name=f"qrelu_{i}")(conv_out)
+        collected_outputs.append(last_layer)
 
-        collected_outputs.append(relu_out)
-        last_layer = relu_out
+        if i != num_layers-1:
+            last_layer = QActivation(quant_relu(), name=f"qrelu_{i}")(last_layer)
+            collected_outputs.append(last_layer)
 
     # TODO: y_pred qconv1d with filter_size -> in_out_d
     # y_pred = Conv1D(name='y_pred', filters=filter_size,

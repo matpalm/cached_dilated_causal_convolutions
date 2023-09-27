@@ -44,7 +44,7 @@ class FxpMathConv1D(object):
             self.dot_product(x, weights[column], accumulators[column])
 
 
-    def run(self, x, relu):
+    def apply(self, x, relu):
 
         assert len(x.shape) == 2
         assert x.shape[0] == 4  # K
