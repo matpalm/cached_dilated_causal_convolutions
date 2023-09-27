@@ -270,7 +270,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                 w_i = single_width_fxp(weights[i])
                 product = x_i * w_i  # recall; product will be double width
                 accum += product
-                # keep accumulator single width. by dft a+b => +1 for int part
+                # keep accumulator double width. by dft a+b => +1 for int part
                 resize_double_width(accum)
                 #print("i", i, "x_i", bits(x_i), "w_i", bits(w_i), "=> product", bits(product), "=> accum", bits(accum), accum)
 
@@ -378,7 +378,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             qkeras_custom_mse_equivalant(test_x, test_y, double_layer_model, predict_single))
 
 
-    def test_qkeras_conv1d(self):
+    def _test_qkeras_conv1d(self):
 
         N = 5
         K = 4
@@ -425,7 +425,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                 w_i = single_width_fxp(weights[i])
                 product = x_i * w_i  # will be double width
                 accumulator += product
-                # keep accumulator single width. by dft a+b => +1 for int part
+                # keep accumulator double width. by dft a+b => +1 for int part
                 resize_double_width(accumulator)
             return accumulator
 
@@ -476,6 +476,148 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
             # return as np array,
             return np.array(accumulators)
+
+        def predict_single(x):
+            return conv_1d_mat_mul_with_biases(x, conv1_weights, conv1_biases, relu=False)
+
+        self.assertTrue(
+            qkeras_custom_mse_equivalant(test_x, test_y, single_conv_model, predict_single))
+
+    def test_qkeras_conv1d_explicit_column_weights(self):
+
+        # single qkeras dense layer but with custom inference more like what
+        # we'll want to run in verilog
+
+        N = 5
+        K = 4
+        IN_D = 3
+        OUT_D = 2
+
+        inp = Input((K, IN_D))
+        qconv1d = QConv1D(name='conv1', filters=OUT_D,
+                        kernel_size=K, strides=1,
+                        padding='causal', dilation_rate=1,
+                        kernel_quantizer=quantiser(),
+                        bias_quantizer=quantiser())(inp)
+        # take last from sequence for loss
+        qconv1d = qconv1d[:, -1, :]
+        single_conv_model = Model(inp, qconv1d)
+        single_conv_model.compile(Adam(1e-2), loss='mse')
+
+        # generate test_x and test_y values uniformly between (-1.9, 1.9)
+        # slightly less than calculated expected range (-32K,32K) with n_int=2
+        N = 100
+        test_x = (np.random.uniform(size=(N, K, IN_D))*2)-1  #  (-1, 1)
+        test_x *= 1.9
+        test_x = array_to_fixed_point(test_x)
+        test_y = (np.random.uniform(size=(N, OUT_D))*2)-1  #  (-1, 1)
+        test_y *= 1.9
+        test_y = array_to_fixed_point(test_y)
+
+        # fit model
+        _ = single_conv_model.fit(test_x, test_y, epochs=200, verbose=False)
+
+        # extract qkeras quantised weights
+        quantised_weights = qkeras.utils.model_save_quantized_weights(single_conv_model)
+        quantised_weights
+        conv1_weights = quantised_weights['conv1']['weights'][0]
+        conv1_biases = quantised_weights['conv1']['weights'][1]
+
+        def dot_product(x, weights, accumulator):
+            assert len(x.shape) == 1
+            assert len(weights.shape) == 1
+            assert len(x) == len(weights)
+            # this loop represents what could be in the state machine
+            # but can be pipelined
+            for i in range(len(x)):
+                x_i = single_width_fxp(x[i])
+                w_i = single_width_fxp(weights[i])
+                prod = x_i * w_i  # will be double width
+                accumulator += prod
+                # keep accumulator double width. by dft a+b => +1 for int part
+                resize_double_width(accumulator)
+            return accumulator
+
+
+        def row_by_matrix_multiply(x, weights, accumulators):
+            assert len(x.shape) == 1
+            in_d = x.shape[0]
+            assert len(weights.shape) == 2
+            out_d = weights.shape[0]
+            assert weights.shape[1] == in_d
+            assert len(accumulators) == out_d
+            # this loop represents what could be in the state machine
+            # but can be pipelined
+            for column in range(out_d):
+                accumulators[column] = dot_product(
+                    x, weights[column], accumulators[column])
+            return accumulators
+
+        # add vector b to entries in a
+        def vector_add(a, b):
+            assert len(a) == len(b)
+            for i in range(len(a)):
+                # can be parallel
+                a[i] += b[i]
+
+        def conv_1d_mat_mul_with_biases(x, weights, biases, relu):
+            check_all_qIF(weights)
+            check_all_qIF(biases)
+
+            # weights are [kernel, in_d, out_d] but we want
+            # to slice [kernel] then [out_d] so transpose now to [kernel][out_d][in_d]
+            weights = weights.transpose(0,2,1)
+
+            assert len(x.shape) == 2
+            assert x.shape[0] == 4  # K
+            in_d = x.shape[1]
+
+            assert len(weights.shape) == 3
+            assert weights.shape[0] == 4  # K
+            out_d = weights.shape[1]
+            assert weights.shape[2] == in_d, f"{weights.shape[2]}!={in_d}"
+
+            assert len(biases.shape) == 1
+            assert len(biases) == out_d
+
+            # prepare initial accumulators for each kernsl and biases
+            accum0 = [double_width_fxp(0) for _ in range(out_d)]
+            accum1 = [double_width_fxp(0) for _ in range(out_d)]
+            accum2 = [double_width_fxp(0) for _ in range(out_d)]
+            accum3 = [double_width_fxp(0) for _ in range(out_d)]
+            double_width_biases = [double_width_fxp(b) for b in biases]
+
+            # step 1; run each kernel; can be in parallel
+            accum0 = row_by_matrix_multiply(x[0], weights[0], accum0)
+            accum1 = row_by_matrix_multiply(x[1], weights[1], accum1)
+            accum2 = row_by_matrix_multiply(x[2], weights[2], accum2)
+            accum3 = row_by_matrix_multiply(x[3], weights[3], accum3)
+
+            # step 2; hierarchical add, 1 of 2
+            # TODO: is overflow a concern here? or is the double width
+            # enough.
+            vector_add(accum0, accum1)  # 0+1 -> 0
+            vector_add(accum2, accum3)  # 2+3 -> 2
+
+            # step 3; hierarchical add, 2 of 2
+            vector_add(accum0, accum2)  # 0+2 -> 0
+
+            # step 4; add biases
+            vector_add(accum0, double_width_biases)
+
+            # step 5; resize down from double to single for output
+            for i in range(out_d):
+                accum0[i].resize(signed=True, n_word=N_WORD, n_frac=N_FRAC)
+
+            # step 6; apply relu, if configured
+            if relu:
+                for i in range(out_d):
+                    if accum0[i] < 0:
+                        accum0[i] = double_width_fxp(0)
+
+            # return as np array,
+            return np.array(accum0)
+
 
         def predict_single(x):
             return conv_1d_mat_mul_with_biases(x, conv1_weights, conv1_biases, relu=False)
