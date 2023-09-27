@@ -18,7 +18,7 @@ class FxpMathConv1D(object):
         assert len(weights.shape) == 3
         assert weights.shape[0] == 4  # K
         self.out_d = weights.shape[1]
-        # will check weights.shape[2] == in_d when we get x data
+        self.in_d = weights.shape[2]
 
         assert len(biases.shape) == 1
         assert len(biases) == self.out_d
@@ -27,12 +27,9 @@ class FxpMathConv1D(object):
         self.biases = biases
 
     def dot_product(self, x, weights, accumulator):
-        assert len(x.shape) == 1
-        assert len(weights.shape) == 1
-        assert len(x) == len(weights)
         # this loop represents what could be in the state machine
         # but can be pipelined
-        for i in range(len(x)):
+        for i in range(self.in_d):
             x_i = self.fxp.single_width(x[i])
             w_i = self.fxp.single_width(weights[i])
             prod = x_i * w_i  # will be double width
@@ -42,15 +39,9 @@ class FxpMathConv1D(object):
         return accumulator
 
     def row_by_matrix_multiply(self, x, weights, accumulators):
-        assert len(x.shape) == 1
-        in_d = x.shape[0]
-        assert len(weights.shape) == 2
-        out_d = weights.shape[0]
-        assert weights.shape[1] == in_d
-        assert len(accumulators) == out_d
         # this loop represents what could be in the state machine
         # but can be pipelined
-        for column in range(out_d):
+        for column in range(self.out_d):
             accumulators[column] = self.dot_product(
                 x, weights[column], accumulators[column])
         return accumulators
@@ -59,9 +50,7 @@ class FxpMathConv1D(object):
 
         assert len(x.shape) == 2
         assert x.shape[0] == 4  # K
-        in_d = x.shape[1]
-
-        assert self.weights.shape[2] == in_d
+        assert x.shape[1] == self.in_d
 
         # prepare initial accumulators for each kernsl and biases
         accum0 = [self.fxp.double_width(0) for _ in range(self.out_d)]
