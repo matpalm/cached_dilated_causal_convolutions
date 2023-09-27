@@ -7,6 +7,7 @@ def vector_add(a, b):
         # can be parallel
         a[i] += b[i]
 
+
 class FxpUtil(object):
 
     def __init__(self, n_word=16, n_int=4, n_frac=12):
@@ -29,3 +30,9 @@ class FxpUtil(object):
 
     def resize_double_width(self, v):
         v.resize(signed=True, n_word=self.n_word*2, n_frac=self.n_frac*2)
+
+    def check_all_qIF(self, a):
+        for v in a.flatten():
+            q_val = float(self.single_width_fxp(v))
+            if v != q_val:
+                raise Exception(f"value {v} not representable in QI.F; it converted to {q_val}")

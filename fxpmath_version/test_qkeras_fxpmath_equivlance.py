@@ -531,81 +531,15 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
         # extract qkeras quantised weights
         quantised_weights = qkeras.utils.model_save_quantized_weights(single_conv_model)
-        quantised_weights
         conv1_weights = quantised_weights['conv1']['weights'][0]
         conv1_biases = quantised_weights['conv1']['weights'][1]
 
+        # wrap in FxpMathConv1D object for inference using fxp math
         fxp_util = FxpUtil(n_word=N_WORD, n_int=N_INT, n_frac=N_FRAC)
-        fxp_conv1d = FxpMathConv1D(fxp_util)
-
-        # add vector b to entries in a
-        def vector_add(a, b):
-            assert len(a) == len(b)
-            for i in range(len(a)):
-                # can be parallel
-                a[i] += b[i]
-
-        def conv_1d_mat_mul_with_biases(x, weights, biases, relu):
-            check_all_qIF(weights)
-            check_all_qIF(biases)
-
-            # weights are [kernel, in_d, out_d] but we want
-            # to slice [kernel] then [out_d] so transpose now to [kernel][out_d][in_d]
-            weights = weights.transpose(0,2,1)
-
-            assert len(x.shape) == 2
-            assert x.shape[0] == 4  # K
-            in_d = x.shape[1]
-
-            assert len(weights.shape) == 3
-            assert weights.shape[0] == 4  # K
-            out_d = weights.shape[1]
-            assert weights.shape[2] == in_d, f"{weights.shape[2]}!={in_d}"
-
-            assert len(biases.shape) == 1
-            assert len(biases) == out_d
-
-            # prepare initial accumulators for each kernsl and biases
-            accum0 = [double_width_fxp(0) for _ in range(out_d)]
-            accum1 = [double_width_fxp(0) for _ in range(out_d)]
-            accum2 = [double_width_fxp(0) for _ in range(out_d)]
-            accum3 = [double_width_fxp(0) for _ in range(out_d)]
-            double_width_biases = [double_width_fxp(b) for b in biases]
-
-            # step 1; run each kernel; can be in parallel
-            accum0 = fxp_conv1d.row_by_matrix_multiply(x[0], weights[0], accum0)
-            accum1 = fxp_conv1d.row_by_matrix_multiply(x[1], weights[1], accum1)
-            accum2 = fxp_conv1d.row_by_matrix_multiply(x[2], weights[2], accum2)
-            accum3 = fxp_conv1d.row_by_matrix_multiply(x[3], weights[3], accum3)
-
-            # step 2; hierarchical add, 1 of 2
-            # TODO: is overflow a concern here? or is the double width
-            # enough.
-            vector_add(accum0, accum1)  # 0+1 -> 0
-            vector_add(accum2, accum3)  # 2+3 -> 2
-
-            # step 3; hierarchical add, 2 of 2
-            vector_add(accum0, accum2)  # 0+2 -> 0
-
-            # step 4; add biases
-            vector_add(accum0, double_width_biases)
-
-            # step 5; resize down from double to single for output
-            for i in range(out_d):
-                accum0[i].resize(signed=True, n_word=N_WORD, n_frac=N_FRAC)
-
-            # step 6; apply relu, if configured
-            if relu:
-                for i in range(out_d):
-                    if accum0[i] < 0:
-                        accum0[i] = double_width_fxp(0)
-
-            # return as np array,
-            return np.array(accum0)
-
+        fxp_conv1d = FxpMathConv1D(fxp_util, conv1_weights, conv1_biases)
 
         def predict_single(x):
-            return conv_1d_mat_mul_with_biases(x, conv1_weights, conv1_biases, relu=False)
+            return fxp_conv1d.run(x, relu=False)
 
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, single_conv_model, predict_single))
