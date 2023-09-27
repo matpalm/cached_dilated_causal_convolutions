@@ -2,7 +2,11 @@
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
-from tf_data_pipeline.data import WaveFormData
+import pickle
+
+from tf_data_pipeline.data import WaveToWaveData
+
+from qkeras.utils import model_save_quantized_weights
 
 from .qkeras_model import create_dilated_model, masked_mse
 
@@ -15,11 +19,12 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-train-egs', type=int, default=200_000)
     parser.add_argument('--num-validate-egs', type=int, default=1_000)
+    parser.add_argument('--save-weights', type=str, default='qkeras_weights.pkl')
     opts = parser.parse_args()
     print("opts", opts)
 
     # parse files and do splits etc
-    data = Embed2DWaveFormData()
+    data = WaveToWaveData()
 
     # WIP in == out == filter_size
     # TODO: do three version of qconv1d see create_dilated_model
@@ -48,11 +53,6 @@ if __name__ == '__main__':
     train_ds = data.tf_dataset_for_split('train', TRAIN_SEQ_LEN, opts.num_train_egs)
     validate_ds = data.tf_dataset_for_split('validate', TRAIN_SEQ_LEN, opts.num_validate_egs)
 
-    for x, y in train_ds:
-        print(x.shape, y.shape)
-        break
-    exit()
-
     # train model
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
         filepath='weights/{epoch:03d}-{val_loss:.5f}',
@@ -64,3 +64,9 @@ if __name__ == '__main__':
                     validation_data=validate_ds,
                     callbacks=[checkpoint_cb],
                     epochs=opts.epochs)
+
+    with open(opts.save_weights, 'wb') as f:
+        pickle.dump(model_save_quantized_weights(train_model),
+                    f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
