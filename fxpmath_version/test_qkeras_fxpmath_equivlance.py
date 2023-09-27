@@ -10,6 +10,9 @@ from qkeras import *
 
 from fxpmath import Fxp
 
+from .fxpmath_conv1d import FxpMathConv1D
+from .util import FxpUtil
+
 # a number of tests that train a qkeras model and then replicate the basic
 # inference using only fxpmath operations. we do this as a fpga prototype
 # because we will be able to implement the fxpmath versions exactly in
@@ -483,7 +486,10 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, single_conv_model, predict_single))
 
-    def test_qkeras_conv1d_explicit_column_weights(self):
+
+
+
+    def test_qkeras_conv1d_object(self):
 
         # single qkeras dense layer but with custom inference more like what
         # we'll want to run in verilog
@@ -494,6 +500,12 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         OUT_D = 2
 
         inp = Input((K, IN_D))
+
+        tf.random.set_seed(123)
+        np.random.seed(345)
+        import random
+        random.seed(456)
+
         qconv1d = QConv1D(name='conv1', filters=OUT_D,
                         kernel_size=K, strides=1,
                         padding='causal', dilation_rate=1,
@@ -523,35 +535,8 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         conv1_weights = quantised_weights['conv1']['weights'][0]
         conv1_biases = quantised_weights['conv1']['weights'][1]
 
-        def dot_product(x, weights, accumulator):
-            assert len(x.shape) == 1
-            assert len(weights.shape) == 1
-            assert len(x) == len(weights)
-            # this loop represents what could be in the state machine
-            # but can be pipelined
-            for i in range(len(x)):
-                x_i = single_width_fxp(x[i])
-                w_i = single_width_fxp(weights[i])
-                prod = x_i * w_i  # will be double width
-                accumulator += prod
-                # keep accumulator double width. by dft a+b => +1 for int part
-                resize_double_width(accumulator)
-            return accumulator
-
-
-        def row_by_matrix_multiply(x, weights, accumulators):
-            assert len(x.shape) == 1
-            in_d = x.shape[0]
-            assert len(weights.shape) == 2
-            out_d = weights.shape[0]
-            assert weights.shape[1] == in_d
-            assert len(accumulators) == out_d
-            # this loop represents what could be in the state machine
-            # but can be pipelined
-            for column in range(out_d):
-                accumulators[column] = dot_product(
-                    x, weights[column], accumulators[column])
-            return accumulators
+        fxp_util = FxpUtil(n_word=N_WORD, n_int=N_INT, n_frac=N_FRAC)
+        fxp_conv1d = FxpMathConv1D(fxp_util)
 
         # add vector b to entries in a
         def vector_add(a, b):
@@ -588,10 +573,10 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             double_width_biases = [double_width_fxp(b) for b in biases]
 
             # step 1; run each kernel; can be in parallel
-            accum0 = row_by_matrix_multiply(x[0], weights[0], accum0)
-            accum1 = row_by_matrix_multiply(x[1], weights[1], accum1)
-            accum2 = row_by_matrix_multiply(x[2], weights[2], accum2)
-            accum3 = row_by_matrix_multiply(x[3], weights[3], accum3)
+            accum0 = fxp_conv1d.row_by_matrix_multiply(x[0], weights[0], accum0)
+            accum1 = fxp_conv1d.row_by_matrix_multiply(x[1], weights[1], accum1)
+            accum2 = fxp_conv1d.row_by_matrix_multiply(x[2], weights[2], accum2)
+            accum3 = fxp_conv1d.row_by_matrix_multiply(x[3], weights[3], accum3)
 
             # step 2; hierarchical add, 1 of 2
             # TODO: is overflow a concern here? or is the double width
