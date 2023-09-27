@@ -1,11 +1,7 @@
 from fxpmath import Fxp
 
 # add vector b to entries in a
-def vector_add(a, b):
-    assert len(a) == len(b)
-    for i in range(len(a)):
-        # can be parallel
-        a[i] += b[i]
+
 
 
 class FxpUtil(object):
@@ -36,3 +32,24 @@ class FxpUtil(object):
             q_val = float(self.single_width(v))
             if v != q_val:
                 raise Exception(f"value {v} not representable in QI.F; it converted to {q_val}")
+
+    def bits(self, v):
+        return v.bin(frac_dot=True)
+
+    def vector_add(self, a, b):
+        assert len(a) == len(b)
+        for i in range(len(a)):
+            # can be parallel
+            a[i].set_val(a[i] + b[i])
+            self.resize_double_width(a[i])
+
+# fxp = FxpUtil()
+# a = fxp.single_width(3)
+# b = fxp.single_width(4)
+# ab = a + b
+# fxp.resize_single_width(ab)
+# print("a  ", fxp.bits(a))
+# print("b  ", fxp.bits(b))
+# print("ab ", fxp.bits(ab))
+
+

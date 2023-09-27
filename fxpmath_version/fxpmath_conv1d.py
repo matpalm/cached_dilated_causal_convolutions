@@ -1,7 +1,5 @@
 import numpy as np
 
-from .util import vector_add
-
 class FxpMathConv1D(object):
 
     def __init__(self, fxp_util, weights, biases):
@@ -26,6 +24,7 @@ class FxpMathConv1D(object):
         self.weights = weights
         self.biases = biases
 
+
     def dot_product(self, x, weights, accumulator):
         # this loop represents what could be in the state machine
         # but can be pipelined
@@ -33,18 +32,17 @@ class FxpMathConv1D(object):
             x_i = self.fxp.single_width(x[i])
             w_i = self.fxp.single_width(weights[i])
             prod = x_i * w_i  # will be double width
-            accumulator += prod
+            accumulator.set_val(accumulator + prod)
             # keep accumulator double width. by dft a+b => +1 for int part
             self.fxp.resize_double_width(accumulator)
-        return accumulator
+
 
     def row_by_matrix_multiply(self, x, weights, accumulators):
         # this loop represents what could be in the state machine
         # but can be pipelined
         for column in range(self.out_d):
-            accumulators[column] = self.dot_product(
-                x, weights[column], accumulators[column])
-        return accumulators
+            self.dot_product(x, weights[column], accumulators[column])
+
 
     def run(self, x, relu):
 
@@ -60,22 +58,22 @@ class FxpMathConv1D(object):
         double_width_biases = [self.fxp.double_width(b) for b in self.biases]
 
         # step 1; run each kernel; can be in parallel
-        accum0 = self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
-        accum1 = self.row_by_matrix_multiply(x[1], self.weights[1], accum1)
-        accum2 = self.row_by_matrix_multiply(x[2], self.weights[2], accum2)
-        accum3 = self.row_by_matrix_multiply(x[3], self.weights[3], accum3)
+        self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
+        self.row_by_matrix_multiply(x[1], self.weights[1], accum1)
+        self.row_by_matrix_multiply(x[2], self.weights[2], accum2)
+        self.row_by_matrix_multiply(x[3], self.weights[3], accum3)
 
         # step 2; hierarchical add, 1 of 2
         # TODO: is overflow a concern here? or is the double width
         # enough.
-        vector_add(accum0, accum1)  # 0+1 -> 0
-        vector_add(accum2, accum3)  # 2+3 -> 2
+        self.fxp.vector_add(accum0, accum1)  # 0+1 -> 0
+        self.fxp.vector_add(accum2, accum3)  # 2+3 -> 2
 
         # step 3; hierarchical add, 2 of 2
-        vector_add(accum0, accum2)  # 0+2 -> 0
+        self.fxp.vector_add(accum0, accum2)  # 0+2 -> 0
 
         # step 4; add biases
-        vector_add(accum0, double_width_biases)
+        self.fxp.vector_add(accum0, double_width_biases)
 
         # step 5; resize down from double to single for output
         for i in range(self.out_d):
