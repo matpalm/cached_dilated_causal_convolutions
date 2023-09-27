@@ -15,12 +15,12 @@ class FxpUtil(object):
         self.n_int = n_int
         self.n_frac = n_frac
 
-    def single_width_fxp(self, v):
+    def single_width(self, v):
         # convert a value to the target fixed point representation for
         # values or weights
         return Fxp(v, signed=True, n_word=self.n_word, n_frac=self.n_frac)
 
-    def double_width_fxp(self, v):
+    def double_width(self, v):
         # convert a value to the double width target fixed point
         # representation that will be used for products and accumulators
         return Fxp(v, signed=True, n_word=self.n_word*2, n_frac=self.n_frac*2)
@@ -33,6 +33,6 @@ class FxpUtil(object):
 
     def check_all_qIF(self, a):
         for v in a.flatten():
-            q_val = float(self.single_width_fxp(v))
+            q_val = float(self.single_width(v))
             if v != q_val:
                 raise Exception(f"value {v} not representable in QI.F; it converted to {q_val}")

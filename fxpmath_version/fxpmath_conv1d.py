@@ -33,8 +33,8 @@ class FxpMathConv1D(object):
         # this loop represents what could be in the state machine
         # but can be pipelined
         for i in range(len(x)):
-            x_i = self.fxp.single_width_fxp(x[i])
-            w_i = self.fxp.single_width_fxp(weights[i])
+            x_i = self.fxp.single_width(x[i])
+            w_i = self.fxp.single_width(weights[i])
             prod = x_i * w_i  # will be double width
             accumulator += prod
             # keep accumulator double width. by dft a+b => +1 for int part
@@ -64,11 +64,11 @@ class FxpMathConv1D(object):
         assert self.weights.shape[2] == in_d
 
         # prepare initial accumulators for each kernsl and biases
-        accum0 = [self.fxp.double_width_fxp(0) for _ in range(self.out_d)]
-        accum1 = [self.fxp.double_width_fxp(0) for _ in range(self.out_d)]
-        accum2 = [self.fxp.double_width_fxp(0) for _ in range(self.out_d)]
-        accum3 = [self.fxp.double_width_fxp(0) for _ in range(self.out_d)]
-        double_width_biases = [self.fxp.double_width_fxp(b) for b in self.biases]
+        accum0 = [self.fxp.double_width(0) for _ in range(self.out_d)]
+        accum1 = [self.fxp.double_width(0) for _ in range(self.out_d)]
+        accum2 = [self.fxp.double_width(0) for _ in range(self.out_d)]
+        accum3 = [self.fxp.double_width(0) for _ in range(self.out_d)]
+        double_width_biases = [self.fxp.double_width(b) for b in self.biases]
 
         # step 1; run each kernel; can be in parallel
         accum0 = self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
@@ -96,7 +96,7 @@ class FxpMathConv1D(object):
         if relu:
             for i in range(self.out_d):
                 if accum0[i] < 0:
-                    accum0[i] = self.fxp.double_width_fxp(0)
+                    accum0[i] = self.fxp.double_width(0)
 
         # return as np array,
         return np.array(accum0)
