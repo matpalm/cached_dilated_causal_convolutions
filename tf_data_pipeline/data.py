@@ -103,3 +103,49 @@ class Embed2DWaveFormData(object):
         sampled_ds = sampled_ds.batch(1 if split=='test' else 128)
 
         return sampled_ds.prefetch(tf.data.AUTOTUNE)
+
+
+class WaveToWaveData(object):
+
+    def __init__(self, root_dir='datalogger_firmware/data'):
+        fname = f"{root_dir}/2d_embed/32kHz/tri_squ_zigzag.ssv"
+        data = pd.read_csv(fname, sep=' ', names=['tri', 'square', 'zigzag']).to_numpy()
+
+        # for prototype x is (tri,tri,tri), y is (tri,square,zigzag)
+        x, y = data[:,[0,0,0]], data
+
+        # take splits
+        val_test_split_size = int(len(x) * 0.1)  # 10% for val and test
+        self.data = {
+            'train': { 'x': x[:-2*val_test_split_size],
+                       'y': y[:-2*val_test_split_size]},
+            'validate': { 'x': x[-2*val_test_split_size:-val_test_split_size],
+                          'y': y[-2*val_test_split_size:-val_test_split_size]},
+            'test': { 'x': x[-val_test_split_size:],
+                      'y': y[-val_test_split_size:]}
+        }
+
+    def tf_dataset_for_split(self, split, seq_len, max_samples):
+        x = self.data[split]['x']
+        y = self.data[split]['y']
+
+        in_d, out_d = x.shape[-1], y.shape[-1]
+
+        def gen():
+            idxs = list(range(len(x)-seq_len-1))
+            if split != 'test':
+                random.Random(1337).shuffle(idxs)
+            idxs = idxs[:max_samples]
+            for i in idxs:
+                yield x[i:i+seq_len], y[i+1:i+1+seq_len]
+
+        ds = tf.data.Dataset.from_generator(
+            gen, output_signature=(tf.TensorSpec(shape=(seq_len, in_d), dtype=tf.float32),
+                                   tf.TensorSpec(shape=(seq_len, out_d), dtype=tf.float32)))
+
+        if split == 'train':
+            ds = ds.shuffle(1000)
+
+        ds = ds.batch(1 if split=='test' else 128)
+
+        return ds.prefetch(tf.data.AUTOTUNE)
