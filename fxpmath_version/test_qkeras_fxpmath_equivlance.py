@@ -71,7 +71,11 @@ def quantiser():
 def quant_relu():
   return f"quantized_relu({N_WORD},{N_INT})"
 
-
+def init_seeds(s):
+    tf.random.set_seed(s)
+    np.random.seed(s)
+    import random
+    random.seed(s)
 
 def qkeras_custom_mse_equivalant(test_x, test_y, qkeras_model, custom_inference_fn, atol=1e-3):
 
@@ -382,6 +386,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
 
     def _test_qkeras_conv1d(self):
+        raise Exception("replaced with test_qkeras_conv1d_object")
 
         N = 5
         K = 4
@@ -494,18 +499,12 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         # single qkeras dense layer but with custom inference more like what
         # we'll want to run in verilog
 
+        init_seeds(234)
         N = 5
         K = 4
         IN_D = 3
         OUT_D = 2
-
         inp = Input((K, IN_D))
-
-        tf.random.set_seed(123)
-        np.random.seed(345)
-        import random
-        random.seed(456)
-
         qconv1d = QConv1D(name='conv1', filters=OUT_D,
                         kernel_size=K, strides=1,
                         padding='causal', dilation_rate=1,
@@ -537,6 +536,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         # wrap in FxpMathConv1D object for inference using fxp math
         fxp_util = FxpUtil(n_word=N_WORD, n_int=N_INT, n_frac=N_FRAC)
         fxp_conv1d = FxpMathConv1D(fxp_util, conv1_weights, conv1_biases)
+        fxp_conv1d.export_weights_per_dot_product('/tmp/test_qkeras_conv1d_object.hex')
 
         def predict_single(x):
             return fxp_conv1d.run(x, relu=False)
@@ -544,6 +544,35 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, single_conv_model, predict_single))
 
+    def _test_weight_export_from_FxpMathConv1D(self):
+        # create dummy model
+        init_seeds(234)
+        N = 5
+        K = 4
+        IN_D = 2
+        OUT_D = 3
+        inp = Input((K, IN_D))
+        qconv1d = QConv1D(name='conv1', filters=OUT_D,
+                kernel_size=K, strides=1,
+                padding='causal', dilation_rate=1,
+                kernel_quantizer=quantiser(),
+                bias_quantizer=quantiser())(inp)
+        qconv1d = qconv1d[:, -1, :]
+        single_conv_model = Model(inp, qconv1d)
+
+        # convert (untrained) weights to qkeras values
+        quantised_weights = qkeras.utils.model_save_quantized_weights(single_conv_model)
+        conv1_weights = quantised_weights['conv1']['weights'][0]
+        conv1_biases = quantised_weights['conv1']['weights'][1]
+        check_all_qIF(conv1_weights)
+        check_all_qIF(conv1_biases)
+
+        # construct fxpmath inference wrapper
+        fxp_util = FxpUtil(n_word=N_WORD, n_int=N_INT, n_frac=N_FRAC)
+        fxp_conv1d = FxpMathConv1D(fxp_util, conv1_weights, conv1_biases)
+        fxp_conv1d.export_weights_per_dot_product('/tmp/foo.hex')
+
+        # todo; assert something about /tmp/foo.hex
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

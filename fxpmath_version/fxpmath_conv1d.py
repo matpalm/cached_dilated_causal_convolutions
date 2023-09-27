@@ -88,3 +88,27 @@ class FxpMathConv1D(object):
         # return as np array,
         return np.array(accum0)
 
+
+    def export_weights_per_dot_product(self, fname):
+        # export weights for this conv1d in format
+        # for loading in verilog with $readmemh
+
+        def hex_representation(w):
+            w_fp = self.fxp.single_width(w)
+            if w != float(w_fp):
+                raise Exception(f"??? value {k},{o},{i} ({w}) failed FP double check")
+            hex_string_without_0x = w_fp.hex()[2:]
+            assert len(hex_string_without_0x) == 4
+            return hex_string_without_0x
+
+        assert len(self.weights.shape) == 3
+        with open(fname, 'w') as f:
+            num_k, out_d, in_d = self.weights.shape
+            for k in range(num_k):
+                for o in range(out_d):
+                    for i in range(in_d):
+                        f.write(hex_representation(self.weights[k, o, i]))
+                        f.write(' ')
+                    f.write(hex_representation(self.biases[o]))
+                    f.write(f" // kernel_{k} column_{o}\n")
+
