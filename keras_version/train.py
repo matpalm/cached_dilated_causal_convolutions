@@ -10,7 +10,7 @@ from tensorflow.keras.optimizers import Adam
 from .keras_model import create_dilated_model, masked_mse
 from cmsisdsp_py_version.cached_block_model import create_cached_block_model_from_keras_model
 
-from .data import WaveFormData
+from tf_data_pipeline.data import WaveFormData
 
 def wave_coords(wave):
     return {'sine': '(0, 0)', 'ramp': '(0, 1)',
