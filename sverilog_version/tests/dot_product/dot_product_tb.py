@@ -28,19 +28,10 @@ async def test_1d_dot_product_low_values(dut):
         0xFFAF,   # 1111.111110101111 -0.019775390625
     ]
 
-    dut.b.value = [
-        0xF3D8,   # 1111.001111011000 -0.759765625
-        0x0999,   # 0000.100110011001 0.599853515625
-        0xFD75,   # 1111.110101110101 -0.158935546875
-        0x1000,   # 0001.000000000000 1.0
-        0x1000,   # 0001.000000000000 1.0
-        0xF800,   # 1111.100000000000 -0.5
-        0x1000,   # 0001.000000000000 1.0
-        0x1000,   # 0001.000000000000 1.0
-    ]
+    # note: b values read from b_values.hex
 
     for i in range(10):
-        if dut.valid_o.value:
+        if dut.out_v.value:
             break
         # print("i", i, "waiting", dut.dp_state.value)
         # print("acc0    ", dut.acc0.value)
@@ -48,6 +39,12 @@ async def test_1d_dot_product_low_values(dut):
         # print("product0", dut.product0.value)
         # print("product1", dut.product1.value)
         await RisingEdge(dut.clk)
+
+    # should be valid
+    assert dut.out_v.value == 1
+
+    # for i in range(8):
+    #     print("B_values", i, dut.b_values[i])
 
     # required some minor rounding
     # dump(-0.5751953125-(2**-10)+(2**-11)+(2**-12))
