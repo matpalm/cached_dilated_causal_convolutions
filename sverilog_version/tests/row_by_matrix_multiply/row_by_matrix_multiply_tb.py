@@ -17,6 +17,30 @@ async def test_row_by_matrix_multiply(dut):
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
 
+    dut.a.value = [0, 0, 0, 0]
+
+    dut.rst.value = 1
+    await RisingEdge(dut.clk)
+    dut.rst.value = 0
+    await RisingEdge(dut.clk)  # starts calculation
+
+    for i in range(10):
+        print("i", i,
+              "col0_v", dut.col0_v.value,
+              "col1_v", dut.col1_v.value,
+              "col2_v", dut.col2_v.value,
+              "col3_v", dut.col3_v.value)
+        if dut.out_v.value:
+            break
+        await RisingEdge(dut.clk)
+
+    assert dut.out_v.value == 1
+    assert dut.out[0].value == 0
+    assert dut.out[1].value == 0
+    assert dut.out[2].value == 0
+    assert dut.out[3].value == 0
+
+    # set new values for a
     dut.a.value = [
         0x0400,   # 0000.010000000000 0.25
         0xFDFC,   # 1111.110111111100 -0.1259765625
@@ -28,7 +52,11 @@ async def test_row_by_matrix_multiply(dut):
         # 0xFFAF,   # 1111.111110101111 -0.019775390625
     ]
 
-    # note: b values read from b_values.hex
+    # trigger new run
+    dut.rst.value = 1
+    await RisingEdge(dut.clk)
+    dut.rst.value = 0
+    await RisingEdge(dut.clk)  # starts calculation
 
     for i in range(10):
         print("i", i,
@@ -42,6 +70,11 @@ async def test_row_by_matrix_multiply(dut):
 
     # should be valid
     assert dut.out_v.value == 1
+
+    # print("dut.out[0].value", dut.out[0].value)
+    # print("dut.out[1].value", dut.out[1].value)
+    # print("dut.out[2].value", dut.out[2].value)
+    # print("dut.out[3].value", dut.out[3].value)
 
     assert dut.out[0].value == 0xFEAF415A   # 1111 1110 1010 1111 0100 0001 0101 1010
     assert dut.out[1].value == 0xFF702000   # 1111 1111 0111 0000 0010 0000 0000 0000

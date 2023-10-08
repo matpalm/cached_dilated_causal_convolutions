@@ -16,7 +16,6 @@ module row_by_matrix_multiply #(
     reg col2_v;
     reg col3_v;
 
-
     dot_product #(.B_VALUES({B_VALUES,"/c0.hex"})) col0 (
         .clk(clk), .rst(rst),
         .a(a), .out(out[0]), .out_v(col0_v)
