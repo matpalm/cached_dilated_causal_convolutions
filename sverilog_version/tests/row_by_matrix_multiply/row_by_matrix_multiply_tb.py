@@ -43,7 +43,7 @@ async def test_row_by_matrix_multiply(dut):
     # should be valid
     assert dut.out_v.value == 1
 
-    assert dut.out0.value == 0xFEAF415A   # 1111 1110 1010 1111 0100 0001 0101 1010
-    assert dut.out1.value == 0xFF702000   # 1111 1111 0111 0000 0010 0000 0000 0000
-    assert dut.out2.value == 0xFEAF415A   # same as col0
-    assert dut.out3.value == 0            # col3 weights are all zeros
+    assert dut.out[0].value == 0xFEAF415A   # 1111 1110 1010 1111 0100 0001 0101 1010
+    assert dut.out[1].value == 0xFF702000   # 1111 1111 0111 0000 0010 0000 0000 0000
+    assert dut.out[2].value == 0xFEAF415A   # same as col0
+    assert dut.out[3].value == 0            # col3 weights are all zeros
