@@ -1,7 +1,8 @@
 `default_nettype none
 
 module row_by_matrix_multiply #(
-    parameter W=16
+    parameter W=16,
+    parameter B_VALUES="test_matrix"
 )(
   input                        clk,
   input                        rst,
@@ -18,22 +19,23 @@ module row_by_matrix_multiply #(
     reg col2_v;
     reg col3_v;
 
-    dot_product #(.B_VALUES("test_col0.hex")) col0 (
+
+    dot_product #(.B_VALUES({B_VALUES,"/c0.hex"})) col0 (
         .clk(clk), .rst(rst),
         .a(a), .out(out0), .out_v(col0_v)
     );
 
-    dot_product #(.B_VALUES("test_col1.hex")) col1 (
+    dot_product #(.B_VALUES({B_VALUES,"/c1.hex"})) col1 (
         .clk(clk), .rst(rst),
         .a(a), .out(out1), .out_v(col1_v)
     );
 
-    dot_product #(.B_VALUES("test_col2.hex")) col2 (
+    dot_product #(.B_VALUES({B_VALUES,"/c2.hex"})) col2 (
         .clk(clk), .rst(rst),
         .a(a), .out(out2), .out_v(col2_v)
     );
 
-    dot_product #(.B_VALUES("test_col3.hex")) col3 (
+    dot_product #(.B_VALUES({B_VALUES,"/c3.hex"})) col3 (
         .clk(clk), .rst(rst),
         .a(a), .out(out3), .out_v(col3_v)
     );
