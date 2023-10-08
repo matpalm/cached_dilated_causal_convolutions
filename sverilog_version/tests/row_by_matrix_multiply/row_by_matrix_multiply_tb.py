@@ -12,7 +12,7 @@ from cocotb.handle import Force, Release
 # ported from https://github.com/apfelaudio/eurorack-pmod/blob/master/gateware/sim/vca/tb_vca.py
 
 @cocotb.test()
-async def test_1d_dot_product_low_values(dut):
+async def test_row_by_matrix_multiply(dut):
 
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
@@ -31,21 +31,19 @@ async def test_1d_dot_product_low_values(dut):
     # note: b values read from b_values.hex
 
     for i in range(10):
+        print("i", i,
+              "col0_v", dut.col0_v.value,
+              "col1_v", dut.col1_v.value,
+              "col2_v", dut.col2_v.value,
+              "col3_v", dut.col3_v.value)
         if dut.out_v.value:
             break
-        # print("i", i, "waiting", dut.dp_state.value)
-        # print("acc0    ", dut.acc0.value)
-        # print("acc1    ", dut.acc1.value)
-        # print("product0", dut.product0.value)
-        # print("product1", dut.product1.value)
         await RisingEdge(dut.clk)
 
     # should be valid
     assert dut.out_v.value == 1
 
-    # for i in range(8):
-    #     print("B_values", i, dut.b_values[i])
-
-    # required some minor rounding
-    # dump(-0.5751953125-(2**-10)+(2**-11)+(2**-12))
-    assert dut.out.value == 0xFEAF415A   # 1111 1110 1010 1111 0100 0001 0101 1010
+    assert dut.out0.value == 0xFEAF415A   # 1111 1110 1010 1111 0100 0001 0101 1010
+    assert dut.out1.value == 0xFF702000   # 1111 1111 0111 0000 0010 0000 0000 0000
+    assert dut.out2.value == 0xFEAF415A   # same as col0
+    assert dut.out3.value == 0            # col3 weights are all zeros

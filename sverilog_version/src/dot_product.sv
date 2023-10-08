@@ -7,7 +7,6 @@ module dot_product #(
   input                        clk,
   input                        rst,
   input signed [W-1:0]         a [0:3],
-  input signed [W-1:0]         b [0:3],
   output reg signed [2*W-1:0]  out,
   output reg                   out_v
 );
@@ -32,12 +31,11 @@ module dot_product #(
 
     // b values for dot product are network weights and are
     // provided by B_VALUES module level param
-    // initial begin
-    //     $readmemh(B_VALUES, b_values);
-    //     out_v <= 0;
-    // end
-    // reg signed [W-1:0] b_values [0:7];
-
+    initial begin
+        $readmemh(B_VALUES, b_values);
+        out_v <= 0;
+    end
+    reg signed [W-1:0] b_values [0:3];
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -48,15 +46,15 @@ module dot_product #(
                 MULT_01: begin
                     acc0 <= 0;
                     acc1 <= 0;
-                    product0 <= a[0] * b[0];
-                    product1 <= a[1] * b[1];
+                    product0 <= a[0] * b_values[0];
+                    product1 <= a[1] * b_values[1];
                     dp_state <= MULT_23;
                 end
                 MULT_23: begin
                     acc0 <= acc0 + product0;
                     acc1 <= acc1 + product1;
-                    product0 <= a[2] * b[2];
-                    product1 <= a[3] * b[3];
+                    product0 <= a[2] * b_values[2];
+                    product1 <= a[3] * b_values[3];
                     //dp_state <= MULT_45;
                     dp_state <= FINAL_ADD_1;
                 end
