@@ -15,8 +15,6 @@ module conv1d #(
   output reg                   out_v
 );
 
-    // state machine for pipelined mulitplies ( in pairs )
-    // and accumulation.
     localparam
         MAT_MUL_RUNNING  = 3'b000,
         ACCUMULATE       = 3'b001,
@@ -43,6 +41,13 @@ module conv1d #(
     // single width final result
     reg signed [W-1:0]  result [0:3];
 
+    // bias values
+    initial begin
+        $readmemh({B_VALUES,"/bias.hex"}, bias_values);
+    end
+    reg signed [2*W-1:0] bias_values [0:3];
+
+    // 4 kernel mat muls
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k0"})) kernel0 (
         .clk(clk), .rst(rst),
         .a(a0), .out(kernel0_out), .out_v(kernel0_v)
@@ -62,11 +67,6 @@ module conv1d #(
         .clk(clk), .rst(rst),
         .a(a3), .out(kernel3_out), .out_v(kernel3_v)
     );
-
-    initial begin
-        $readmemh({B_VALUES,"/bias.hex"}, bias_values);
-    end
-    reg signed [2*W-1:0] bias_values [0:3];
 
     `define relu(a) (a[W-1] == 1 ) ? 0 : a
 
