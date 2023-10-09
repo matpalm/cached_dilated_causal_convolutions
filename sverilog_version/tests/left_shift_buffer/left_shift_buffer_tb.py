@@ -20,4 +20,4 @@ async def test_left_shift_buffer(dut):
         await RisingEdge(dut.clk)
         print("i", dut.out.value)
 
-    assert dut.out.value == [8,7,6,5]
+    assert dut.out.value == [5,6,7,8]

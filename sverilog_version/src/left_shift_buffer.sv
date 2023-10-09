@@ -23,13 +23,16 @@ module left_shift_buffer #(
             buffer[i] <= 0;
     end
 
-    always @(posedge clk) begin
-
-        buffer[0] <= inp;
-
-        for(i=1; i<4; i=i+1)
-            buffer[i] <= buffer[i-1];
-
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            for(i=0; i<4; i=i+1)
+                buffer[i] <= 0;
+        end else begin
+            buffer[0] <= buffer[1];
+            buffer[1] <= buffer[2];
+            buffer[2] <= buffer[3];
+            buffer[3] <= inp;
+        end
     end
 
 endmodule
