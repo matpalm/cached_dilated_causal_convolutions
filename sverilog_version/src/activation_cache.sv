@@ -5,10 +5,10 @@ module activation_cache #(
     parameter DILATION = 16  // dilation
     // assume kernel size = 4
 )(
-    input               clk,
-    input               rst,
-    input       [W-1:0] inp,
-    output reg  [W-1:0] out [0:3]
+    input                     clk,
+    input                     rst,
+    input             [W-1:0] inp,
+    output reg signed [W-1:0] out [0:3]
 );
 
 localparam KERNEL_SIZE = 4;

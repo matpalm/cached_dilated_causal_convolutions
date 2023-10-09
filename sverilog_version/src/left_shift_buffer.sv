@@ -3,10 +3,10 @@
 module left_shift_buffer #(
     parameter W = 16  // width for each element
 )(
-    input              clk,
-    input              rst,
-    input [W-1:0]      inp,
-    output reg [W-1:0] out [0:3]
+    input                     clk,
+    input                     rst,
+    input signed [W-1:0]      inp,
+    output reg signed [W-1:0] out [0:3]
 );
 
     reg [W-1:0] buffer [0:3];
