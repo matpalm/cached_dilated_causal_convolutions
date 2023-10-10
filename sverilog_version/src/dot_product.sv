@@ -6,7 +6,10 @@ module dot_product #(
 )(
   input                        clk,
   input                        rst,
-  input signed [W-1:0]         a [0:3],
+  input signed [W-1:0]         a_d0,
+  input signed [W-1:0]         a_d1,
+  input signed [W-1:0]         a_d2,
+  input signed [W-1:0]         a_d3,
   output reg signed [2*W-1:0]  out,
   output reg                   out_v
 );
@@ -46,15 +49,15 @@ module dot_product #(
                 MULT_01: begin
                     acc0 <= 0;
                     acc1 <= 0;
-                    product0 <= a[0] * b_values[0];
-                    product1 <= a[1] * b_values[1];
+                    product0 <= a_d0 * b_values[0];
+                    product1 <= a_d1 * b_values[1];
                     dp_state <= MULT_23;
                 end
                 MULT_23: begin
                     acc0 <= acc0 + product0;
                     acc1 <= acc1 + product1;
-                    product0 <= a[2] * b_values[2];
-                    product1 <= a[3] * b_values[3];
+                    product0 <= a_d2 * b_values[2];
+                    product1 <= a_d3 * b_values[3];
                     //dp_state <= MULT_45;
                     dp_state <= FINAL_ADD_1;
                 end
