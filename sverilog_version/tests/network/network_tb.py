@@ -137,5 +137,6 @@ async def test_networks(dut):
         # print("ac_c1_3 out", dut.activation_cache_c1_3.out.value)
         print("c2_out_v", dut.c2_out_v.value)
         print("conv2.result.value", dut.conv2.result.value)
-        print("OUT", dut.out_v.value, dut.out.value)
+        out_values = [dut.out_d0.value, dut.out_d1.value, dut.out_d2.value, dut.out_d3.value]
+        print("OUT", dut.out_v.value, out_values)
         await RisingEdge(dut.clk)

@@ -6,7 +6,10 @@ module network #(
     input                     clk,
     input                     rst,
     input signed [W-1:0]      inp,
-    output reg signed [W-1:0] out [0:3],
+    output reg signed [W-1:0] out_d0,
+    output reg signed [W-1:0] out_d1,
+    output reg signed [W-1:0] out_d2,
+    output reg signed [W-1:0] out_d3,
     output reg                out_v
 );
 
@@ -364,10 +367,10 @@ module network #(
 
                 OUTPUT: begin
                     // final net output is conv2 output
-                    out[0] <= c2_out_d0;
-                    out[1] <= c2_out_d1;
-                    out[2] <= c2_out_d2;
-                    out[3] <= c2_out_d3;
+                    out_d0 <= c2_out_d0;
+                    out_d1 <= c2_out_d1;
+                    out_d2 <= c2_out_d2;
+                    out_d3 <= c2_out_d3;
                     out_v <= 1;
                     net_state <= CLK_LSB;
                 end
