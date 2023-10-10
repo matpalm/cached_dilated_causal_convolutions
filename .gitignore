@@ -3,3 +3,5 @@ DaisySP
 libDaisy
 .vscode/
 .ipynb_checkpoints
+prototyping_notebooks/trained_models/
+prototyping_notebooks/weights/

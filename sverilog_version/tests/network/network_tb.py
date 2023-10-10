@@ -97,8 +97,10 @@ async def test_networks(dut):
         print("i", i, "state", net_state_to_str(), dut.net_state.value)
         print("next_x_vals", next_x_vals)
 
-        print("lsb hex", dut.lsb.out.value)
-        print("lsb dec", fixed_point_array_to_decimals(dut.lsb.out.value))
+        lsb_out = [dut.lsb.out_d0.value, dut.lsb.out_d1.value,
+                   dut.lsb.out_d2.value, dut.lsb.out_d2.value]
+        print("lsb hex", lsb_out)
+        print("lsb dec", fixed_point_array_to_decimals(lsb_out))
 
         print("c0_out_v", dut.c0_out_v.value)
         print("conv0.result.value hex", dut.conv0.result.value)

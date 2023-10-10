@@ -10,7 +10,7 @@ from cocotb.handle import Force, Release
 #from util import *
 
 @cocotb.test()
-async def test_left_shift_buffer(dut):
+async def test_activation_cache(dut):
 
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())

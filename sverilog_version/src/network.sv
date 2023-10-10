@@ -28,10 +28,14 @@ module network #(
     // left shift buffer
 
     reg lsb_clk =0;
-    reg signed [W-1:0] lsb_out [0:3];
+    reg signed [W-1:0] lsb_out_d0;
+    reg signed [W-1:0] lsb_out_d1;
+    reg signed [W-1:0] lsb_out_d2;
+    reg signed [W-1:0] lsb_out_d3;
     left_shift_buffer lsb (
         .clk(lsb_clk), .rst(rst),
-        .inp(inp), .out(lsb_out)
+        .inp(inp),
+        .out_d0(lsb_out_d0), .out_d1(lsb_out_d1), .out_d2(lsb_out_d2), .out_d3(lsb_out_d3)
     );
 
     //--------------------------------
@@ -46,19 +50,19 @@ module network #(
     reg signed [W-1:0] c0_out [0:3];
     reg c0_out_v;
 
-    assign c0a0[0] = lsb.out[0];
+    assign c0a0[0] = lsb_out_d0;
     assign c0a0[1] = 0;
     assign c0a0[2] = 0;
     assign c0a0[3] = 0;
-    assign c0a1[0] = lsb.out[1];
+    assign c0a1[0] = lsb_out_d1;
     assign c0a1[1] = 0;
     assign c0a1[2] = 0;
     assign c0a1[3] = 0;
-    assign c0a2[0] = lsb.out[2];
+    assign c0a2[0] = lsb_out_d2;
     assign c0a2[1] = 0;
     assign c0a2[2] = 0;
     assign c0a2[3] = 0;
-    assign c0a3[0] = lsb.out[3];
+    assign c0a3[0] = lsb_out_d3;
     assign c0a3[1] = 0;
     assign c0a3[2] = 0;
     assign c0a3[3] = 0;
@@ -178,16 +182,6 @@ module network #(
         .clk(clk), .rst(c2_rst), .apply_relu(1'b0),
         .a0(c2a0), .a1(c2a1), .a2(c2a2), .a3(c2a3),
         .out(c2_out), .out_v(c2_out_v));
-
-    //-----------------------------
-    // initialisation
-
-    integer i;
-    initial begin
-        for(i=0; i<4; i=i+1) begin
-            lsb_out[i] <= 0;
-        end
-    end
 
     //---------------------------------
     // main network state machine
