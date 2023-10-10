@@ -46,6 +46,25 @@ class FxpUtil(object):
             return float(self.single_width(v))
         return np.vectorize(cast_to_fp_and_back)(a)
 
+    def _bit_not(self, n):
+        return (1 << self.n_int) - 1 - n
+
+    def _twos_comp_to_signed(self, n):
+        if (1 << (self.n_int-1) & n) > 0:
+            return -int(self._bit_not(n) + 1)
+        else:
+            return int(n)
+
+    def fixed_point_to_decimal(self, fixed_point_binary):
+        # TODO! assumes FP 4/12. #lazy
+        assert self.n_int == 4
+        assert self.n_frac == 12
+        integer_bits = fixed_point_binary >> 12
+        integer_value = self._twos_comp_to_signed(integer_bits)
+        fractional_bits = fixed_point_binary & 0xFFF
+        fractional_value = fractional_bits / float(2**12)
+        return integer_value + fractional_value
+
 
 # fxp = FxpUtil()
 # a = fxp.single_width(3)

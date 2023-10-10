@@ -16,6 +16,11 @@ module row_by_matrix_multiply #(
     reg col2_v;
     reg col3_v;
 
+    // reg signed [2*W-1:0]  col0_result;
+    // reg signed [2*W-1:0]  col1_result;
+    // reg signed [2*W-1:0]  col2_result;
+    // reg signed [2*W-1:0]  col3_result;
+
     dot_product #(.B_VALUES({B_VALUES,"/c0.hex"})) col0 (
         .clk(clk), .rst(rst),
         .a(a), .out(out[0]), .out_v(col0_v)
@@ -37,5 +42,11 @@ module row_by_matrix_multiply #(
     );
 
     assign out_v = col0_v && col1_v && col2_v && col3_v;
+
+    // assign out[0] = col0_result;
+    // assign out[1] = col1_result;
+    // assign out[2] = col2_result;
+    // assign out[3] = col3_result;
+
 
 endmodule

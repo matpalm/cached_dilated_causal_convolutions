@@ -2,7 +2,7 @@
 
 module activation_cache #(
     parameter W = 16,        // width for each element
-    parameter DILATION = 16  // dilation
+    parameter DILATION = 4   // dilation
     // assume kernel size = 4
 )(
     input                     clk,

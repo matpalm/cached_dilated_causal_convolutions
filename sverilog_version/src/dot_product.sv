@@ -24,10 +24,10 @@ module dot_product #(
     reg [2:0] dp_state = MULT_01;
 
     // see https://projectf.io/posts/fixed-point-numbers-in-verilog/
-    logic signed [2*W-1:0] acc0;
-    logic signed [2*W-1:0] product0;
-    logic signed [2*W-1:0] acc1;
-    logic signed [2*W-1:0] product1;
+    reg signed [2*W-1:0] acc0;
+    reg signed [2*W-1:0] product0;
+    reg signed [2*W-1:0] acc1;
+    reg signed [2*W-1:0] product1;
 
     // b values for dot product are network weights and are
     // provided by B_VALUES module level param
@@ -82,7 +82,7 @@ module dot_product #(
                     dp_state <= DONE;
                 end
                 DONE: begin
-                    out <= acc0; // emit double width[27:12];  // single precision rounding
+                    out <= acc0; // emit double width
                     out_v <= 1;
                 end
             endcase
