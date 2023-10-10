@@ -12,7 +12,7 @@ from cocotb.handle import Force, Release
 # ported from https://github.com/apfelaudio/eurorack-pmod/blob/master/gateware/sim/vca/tb_vca.py
 
 @cocotb.test()
-async def test_row_by_matrix_multiply(dut):
+async def test_conv1d(dut):
 
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())

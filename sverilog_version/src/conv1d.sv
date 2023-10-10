@@ -48,24 +48,33 @@ module conv1d #(
     reg signed [2*W-1:0] bias_values [0:3];
 
     // 4 kernel mat muls
+
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k0"})) kernel0 (
         .clk(clk), .rst(rst),
-        .a(a0), .out(kernel0_out), .out_v(kernel0_v)
+        .a_d0(a0[0]), .a_d1(a0[1]), .a_d2(a0[2]), .a_d3(a0[3]),
+        .out_d0(kernel0_out[0]), .out_d1(kernel0_out[1]), .out_d2(kernel0_out[2]), .out_d3(kernel0_out[3]),
+        .out_v(kernel0_v)
     );
 
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k1"})) kernel1 (
         .clk(clk), .rst(rst),
-        .a(a1), .out(kernel1_out), .out_v(kernel1_v)
+        .a_d0(a1[0]), .a_d1(a1[1]), .a_d2(a1[2]), .a_d3(a1[3]),
+        .out_d0(kernel1_out[0]), .out_d1(kernel1_out[1]), .out_d2(kernel1_out[2]), .out_d3(kernel1_out[3]),
+        .out_v(kernel1_v)
     );
 
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k2"})) kernel2 (
         .clk(clk), .rst(rst),
-        .a(a2), .out(kernel2_out), .out_v(kernel2_v)
+        .a_d0(a2[0]), .a_d1(a2[1]), .a_d2(a2[2]), .a_d3(a2[3]),
+        .out_d0(kernel2_out[0]), .out_d1(kernel2_out[1]), .out_d2(kernel2_out[2]), .out_d3(kernel2_out[3]),
+        .out_v(kernel2_v)
     );
 
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k3"})) kernel3 (
         .clk(clk), .rst(rst),
-        .a(a3), .out(kernel3_out), .out_v(kernel3_v)
+        .a_d0(a3[0]), .a_d1(a3[1]), .a_d2(a3[2]), .a_d3(a3[3]),
+        .out_d0(kernel3_out[0]), .out_d1(kernel3_out[1]), .out_d2(kernel3_out[2]), .out_d3(kernel3_out[3]),
+        .out_v(kernel3_v)
     );
 
     `define relu(a) (a[W-1] == 1 ) ? 0 : a
@@ -80,10 +89,10 @@ module conv1d #(
                     if (kernel0_v && kernel1_v && kernel2_v && kernel3_v) c1d_state = ACCUMULATE;
                 end
                 ACCUMULATE: begin
-                    accum[0] <= kernel0.out[0] + kernel1.out[0] + kernel2.out[0] + kernel3.out[0];
-                    accum[1] <= kernel0.out[1] + kernel1.out[1] + kernel2.out[1] + kernel3.out[1];
-                    accum[2] <= kernel0.out[2] + kernel1.out[2] + kernel2.out[2] + kernel3.out[2];
-                    accum[3] <= kernel0.out[3] + kernel1.out[3] + kernel2.out[3] + kernel3.out[3];
+                    accum[0] <= kernel0_out[0] + kernel1_out[0] + kernel2_out[0] + kernel3_out[0];
+                    accum[1] <= kernel0_out[1] + kernel1_out[1] + kernel2_out[1] + kernel3_out[1];
+                    accum[2] <= kernel0_out[2] + kernel1_out[2] + kernel2_out[2] + kernel3_out[2];
+                    accum[3] <= kernel0_out[3] + kernel1_out[3] + kernel2_out[3] + kernel3_out[3];
                     c1d_state <= BIAS_ADD;
                 end
                 BIAS_ADD: begin
