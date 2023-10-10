@@ -21,30 +21,25 @@ async def test_conv1d(dut):
 
     dut.apply_relu.value = 0
 
-    dut.a0.value = [
-        0x0400,   # 0000.010000000000 0.25
-        0xFDFC,   # 1111.110111111100 -0.1259765625
-        0x0506,   # 0000.010100000110 0.31396484375
-        0xF000    # 1111.000000000000 -1.0
-    ]
-    dut.a1.value = [
-        0x0400,   # 0000.010000000000 0.25
-        0xFDFC,   # 1111.110111111100 -0.1259765625
-        0x0506,   # 0000.010100000110 0.31396484375
-        0xF000    # 1111.000000000000 -1.0
-    ]
-    dut.a2.value = [
-        0x0400,   # 0000.010000000000 0.25
-        0xFDFC,   # 1111.110111111100 -0.1259765625
-        0x0506,   # 0000.010100000110 0.31396484375
-        0xF000    # 1111.000000000000 -1.0
-    ]
-    dut.a3.value = [
-        0x0400,   # 0000.010000000000 0.25
-        0xFDFC,   # 1111.110111111100 -0.1259765625
-        0x0506,   # 0000.010100000110 0.31396484375
-        0xF000    # 1111.000000000000 -1.0
-    ]
+    dut.a0_d0.value = 0x0400   # 0000.010000000000 0.25
+    dut.a0_d1.value = 0xFDFC   # 1111.110111111100 -0.1259765625
+    dut.a0_d2.value = 0x0506   # 0000.010100000110 0.31396484375
+    dut.a0_d3.value = 0xF000   # 1111.000000000000 -1.0
+
+    dut.a1_d0.value = 0x0400   # 0000.010000000000 0.25
+    dut.a1_d1.value = 0xFDFC   # 1111.110111111100 -0.1259765625
+    dut.a1_d2.value = 0x0506   # 0000.010100000110 0.31396484375
+    dut.a1_d3.value = 0xF000   # 1111.000000000000 -1.0
+
+    dut.a2_d0.value = 0x0400   # 0000.010000000000 0.25
+    dut.a2_d1.value = 0xFDFC   # 1111.110111111100 -0.1259765625
+    dut.a2_d2.value = 0x0506   # 0000.010100000110 0.31396484375
+    dut.a2_d3.value = 0xF000   # 1111.000000000000 -1.0
+
+    dut.a3_d0.value = 0x0400   # 0000.010000000000 0.25
+    dut.a3_d1.value = 0xFDFC   # 1111.110111111100 -0.1259765625
+    dut.a3_d2.value = 0x0506   # 0000.010100000110 0.31396484375
+    dut.a3_d3.value = 0xF000   # 1111.000000000000 -1.0
 
     dut.rst.value = 1
     await RisingEdge(dut.clk)
@@ -60,12 +55,10 @@ async def test_conv1d(dut):
         await RisingEdge(dut.clk)
 
     assert dut.out_v.value == 1
-    print("dut.out    ", dut.out.value)
-
-    assert dut.out[0].value == 0xFE7E  # 1111 1110 0111 1110
-    assert dut.out[1].value == 0xF716  # 1111 0111 0001 0110
-    assert dut.out[2].value == 0x0326  # 0000 0011 0010 0110
-    assert dut.out[3].value == 0x0E61  # 0000 1110 0110 0001
+    assert dut.out_d0.value == 0xFE7E  # 1111 1110 0111 1110
+    assert dut.out_d1.value == 0xF716  # 1111 0111 0001 0110
+    assert dut.out_d2.value == 0x0326  # 0000 0011 0010 0110
+    assert dut.out_d3.value == 0x0E61  # 0000 1110 0110 0001
 
     # same again with RELU
 
@@ -83,7 +76,7 @@ async def test_conv1d(dut):
 
     assert dut.out_v.value == 1
 
-    assert dut.out[0].value == 0
-    assert dut.out[1].value == 0
-    assert dut.out[2].value == 0x0326  # 0000 0011 0010 0110
-    assert dut.out[3].value == 0x0E61  # 0000 1110 0110 0001
+    assert dut.out_d0.value == 0
+    assert dut.out_d1.value == 0
+    assert dut.out_d2.value == 0x0326  # 0000 0011 0010 0110
+    assert dut.out_d3.value == 0x0E61  # 0000 1110 0110 0001

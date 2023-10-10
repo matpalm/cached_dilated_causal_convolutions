@@ -7,11 +7,26 @@ module conv1d #(
   input                        clk,
   input                        rst,
   input                        apply_relu,
-  input signed [W-1:0]         a0 [0:3],
-  input signed [W-1:0]         a1 [0:3],
-  input signed [W-1:0]         a2 [0:3],
-  input signed [W-1:0]         a3 [0:3],
-  output reg signed [W-1:0]    out [0:3],
+  input signed [W-1:0]         a0_d0,
+  input signed [W-1:0]         a0_d1,
+  input signed [W-1:0]         a0_d2,
+  input signed [W-1:0]         a0_d3,
+  input signed [W-1:0]         a1_d0,
+  input signed [W-1:0]         a1_d1,
+  input signed [W-1:0]         a1_d2,
+  input signed [W-1:0]         a1_d3,
+  input signed [W-1:0]         a2_d0,
+  input signed [W-1:0]         a2_d1,
+  input signed [W-1:0]         a2_d2,
+  input signed [W-1:0]         a2_d3,
+  input signed [W-1:0]         a3_d0,
+  input signed [W-1:0]         a3_d1,
+  input signed [W-1:0]         a3_d2,
+  input signed [W-1:0]         a3_d3,
+  output reg signed [W-1:0]    out_d0,
+  output reg signed [W-1:0]    out_d1,
+  output reg signed [W-1:0]    out_d2,
+  output reg signed [W-1:0]    out_d3,
   output reg                   out_v
 );
 
@@ -51,28 +66,28 @@ module conv1d #(
 
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k0"})) kernel0 (
         .clk(clk), .rst(rst),
-        .a_d0(a0[0]), .a_d1(a0[1]), .a_d2(a0[2]), .a_d3(a0[3]),
+        .a_d0(a0_d0), .a_d1(a0_d1), .a_d2(a0_d2), .a_d3(a0_d3),
         .out_d0(kernel0_out[0]), .out_d1(kernel0_out[1]), .out_d2(kernel0_out[2]), .out_d3(kernel0_out[3]),
         .out_v(kernel0_v)
     );
 
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k1"})) kernel1 (
         .clk(clk), .rst(rst),
-        .a_d0(a1[0]), .a_d1(a1[1]), .a_d2(a1[2]), .a_d3(a1[3]),
+        .a_d0(a1_d0), .a_d1(a1_d1), .a_d2(a1_d2), .a_d3(a1_d3),
         .out_d0(kernel1_out[0]), .out_d1(kernel1_out[1]), .out_d2(kernel1_out[2]), .out_d3(kernel1_out[3]),
         .out_v(kernel1_v)
     );
 
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k2"})) kernel2 (
         .clk(clk), .rst(rst),
-        .a_d0(a2[0]), .a_d1(a2[1]), .a_d2(a2[2]), .a_d3(a2[3]),
+        .a_d0(a2_d0), .a_d1(a2_d1), .a_d2(a2_d2), .a_d3(a2_d3),
         .out_d0(kernel2_out[0]), .out_d1(kernel2_out[1]), .out_d2(kernel2_out[2]), .out_d3(kernel2_out[3]),
         .out_v(kernel2_v)
     );
 
     row_by_matrix_multiply #(.B_VALUES({B_VALUES,"/k3"})) kernel3 (
         .clk(clk), .rst(rst),
-        .a_d0(a3[0]), .a_d1(a3[1]), .a_d2(a3[2]), .a_d3(a3[3]),
+        .a_d0(a3_d0), .a_d1(a3_d1), .a_d2(a3_d2), .a_d3(a3_d3),
         .out_d0(kernel3_out[0]), .out_d1(kernel3_out[1]), .out_d2(kernel3_out[2]), .out_d3(kernel3_out[3]),
         .out_v(kernel3_v)
     );
@@ -110,13 +125,14 @@ module conv1d #(
                     c1d_state = OUTPUT;
                 end
                 OUTPUT: begin
-                    out[0] <= apply_relu ? `relu(result[0]) : result[0];
-                    out[1] <= apply_relu ? `relu(result[1]) : result[1];
-                    out[2] <= apply_relu ? `relu(result[2]) : result[2];
-                    out[3] <= apply_relu ? `relu(result[3]) : result[3];
+                    out_d0 <= apply_relu ? `relu(result[0]) : result[0];
+                    out_d1 <= apply_relu ? `relu(result[1]) : result[1];
+                    out_d2 <= apply_relu ? `relu(result[2]) : result[2];
+                    out_d3 <= apply_relu ? `relu(result[3]) : result[3];
                     out_v <= 1;
                 end
             endcase
     end
 
 endmodule
+
