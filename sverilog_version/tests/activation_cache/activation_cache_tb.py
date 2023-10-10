@@ -18,6 +18,10 @@ async def test_activation_cache(dut):
     for i in range(120):
         dut.inp.value = i
         await RisingEdge(dut.clk)
-        print("i", i, "cached", dut.out.value)
+        print("i", i, "cached", dut.out_d0.value, dut.out_d1.value,
+                                dut.out_d2.value, dut.out_d3.value)
 
-    assert dut.out.value == [70, 86, 102, 118]
+    assert dut.out_d0.value == 0x006A  # 0000 0000 0110 1010
+    assert dut.out_d1.value == 0x006E  # 0000 0000 0110 1110
+    assert dut.out_d2.value == 0x0072  # 0000 0000 0111 0010
+    assert dut.out_d3.value == 0x0076  # 0000 0000 0111 0110

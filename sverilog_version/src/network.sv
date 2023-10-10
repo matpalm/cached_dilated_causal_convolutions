@@ -76,21 +76,49 @@ module network #(
     // conv 0 activation cache
 
     reg ac_c0_clk = 0;
-    reg signed [W-1:0] ac_c0_0_out [0:3];
-    reg signed [W-1:0] ac_c0_1_out [0:3];
-    reg signed [W-1:0] ac_c0_2_out [0:3];
-    reg signed [W-1:0] ac_c0_3_out [0:3];
+    reg signed [W-1:0] ac_c0_0_out_d0;
+    reg signed [W-1:0] ac_c0_0_out_d1;
+    reg signed [W-1:0] ac_c0_0_out_d2;
+    reg signed [W-1:0] ac_c0_0_out_d3;
+    reg signed [W-1:0] ac_c0_1_out_d0;
+    reg signed [W-1:0] ac_c0_1_out_d1;
+    reg signed [W-1:0] ac_c0_1_out_d2;
+    reg signed [W-1:0] ac_c0_1_out_d3;
+    reg signed [W-1:0] ac_c0_2_out_d0;
+    reg signed [W-1:0] ac_c0_2_out_d1;
+    reg signed [W-1:0] ac_c0_2_out_d2;
+    reg signed [W-1:0] ac_c0_2_out_d3;
+    reg signed [W-1:0] ac_c0_3_out_d0;
+    reg signed [W-1:0] ac_c0_3_out_d1;
+    reg signed [W-1:0] ac_c0_3_out_d2;
+    reg signed [W-1:0] ac_c0_3_out_d3;
     activation_cache #(.DILATION(4)) activation_cache_c0_0 (
-        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[0]), .out(ac_c0_0_out)
+        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[0]),
+        .out_d0(ac_c0_0_out_d0),
+        .out_d1(ac_c0_0_out_d1),
+        .out_d2(ac_c0_0_out_d2),
+        .out_d3(ac_c0_0_out_d3)
     );
     activation_cache #(.DILATION(4)) activation_cache_c0_1 (
-        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[1]), .out(ac_c0_1_out)
+        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[1]),
+        .out_d0(ac_c0_1_out_d0),
+        .out_d1(ac_c0_1_out_d1),
+        .out_d2(ac_c0_1_out_d2),
+        .out_d3(ac_c0_1_out_d3)
     );
     activation_cache #(.DILATION(4)) activation_cache_c0_2 (
-        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[2]), .out(ac_c0_2_out)
+        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[2]),
+        .out_d0(ac_c0_2_out_d0),
+        .out_d1(ac_c0_2_out_d1),
+        .out_d2(ac_c0_2_out_d2),
+        .out_d3(ac_c0_2_out_d3)
     );
     activation_cache #(.DILATION(4)) activation_cache_c0_3 (
-        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[3]), .out(ac_c0_3_out)
+        .clk(ac_c0_clk), .rst(rst), .inp(conv0.out[3]),
+        .out_d0(ac_c0_3_out_d0),
+        .out_d1(ac_c0_3_out_d1),
+        .out_d2(ac_c0_3_out_d2),
+        .out_d3(ac_c0_3_out_d3)
     );
 
     //--------------------------------
@@ -105,22 +133,22 @@ module network #(
     reg signed [W-1:0] c1_out [0:3];
     reg c1_out_v;
 
-    assign c1a0[0] = activation_cache_c0_0.out[0];
-    assign c1a0[1] = activation_cache_c0_1.out[0];
-    assign c1a0[2] = activation_cache_c0_2.out[0];
-    assign c1a0[3] = activation_cache_c0_3.out[0];
-    assign c1a1[0] = activation_cache_c0_0.out[1];
-    assign c1a1[1] = activation_cache_c0_1.out[1];
-    assign c1a1[2] = activation_cache_c0_2.out[1];
-    assign c1a1[3] = activation_cache_c0_3.out[1];
-    assign c1a2[0] = activation_cache_c0_0.out[2];
-    assign c1a2[1] = activation_cache_c0_1.out[2];
-    assign c1a2[2] = activation_cache_c0_2.out[2];
-    assign c1a2[3] = activation_cache_c0_3.out[2];
-    assign c1a3[0] = activation_cache_c0_0.out[3];
-    assign c1a3[1] = activation_cache_c0_1.out[3];
-    assign c1a3[2] = activation_cache_c0_2.out[3];
-    assign c1a3[3] = activation_cache_c0_3.out[3];
+    assign c1a0[0] = ac_c0_0_out_d0;
+    assign c1a0[1] = ac_c0_1_out_d0;
+    assign c1a0[2] = ac_c0_2_out_d0;
+    assign c1a0[3] = ac_c0_3_out_d0;
+    assign c1a1[0] = ac_c0_0_out_d1;
+    assign c1a1[1] = ac_c0_1_out_d1;
+    assign c1a1[2] = ac_c0_2_out_d1;
+    assign c1a1[3] = ac_c0_3_out_d1;
+    assign c1a2[0] = ac_c0_0_out_d2;
+    assign c1a2[1] = ac_c0_1_out_d2;
+    assign c1a2[2] = ac_c0_2_out_d2;
+    assign c1a2[3] = ac_c0_3_out_d2;
+    assign c1a3[0] = ac_c0_0_out_d3;
+    assign c1a3[1] = ac_c0_1_out_d3;
+    assign c1a3[2] = ac_c0_2_out_d3;
+    assign c1a3[3] = ac_c0_3_out_d3;
 
     conv1d #(.B_VALUES("qconv1_weights")) conv1 (
         .clk(clk), .rst(c1_rst), .apply_relu(1'b1),
@@ -131,21 +159,49 @@ module network #(
     // conv 1 activation cache
 
     reg ac_c1_clk = 0;
-    reg signed [W-1:0] ac_c1_0_out [0:3];
-    reg signed [W-1:0] ac_c1_1_out [0:3];
-    reg signed [W-1:0] ac_c1_2_out [0:3];
-    reg signed [W-1:0] ac_c1_3_out [0:3];
+    reg signed [W-1:0] ac_c1_0_out_d0;
+    reg signed [W-1:0] ac_c1_0_out_d1;
+    reg signed [W-1:0] ac_c1_0_out_d2;
+    reg signed [W-1:0] ac_c1_0_out_d3;
+    reg signed [W-1:0] ac_c1_1_out_d0;
+    reg signed [W-1:0] ac_c1_1_out_d1;
+    reg signed [W-1:0] ac_c1_1_out_d2;
+    reg signed [W-1:0] ac_c1_1_out_d3;
+    reg signed [W-1:0] ac_c1_2_out_d0;
+    reg signed [W-1:0] ac_c1_2_out_d1;
+    reg signed [W-1:0] ac_c1_2_out_d2;
+    reg signed [W-1:0] ac_c1_2_out_d3;
+    reg signed [W-1:0] ac_c1_3_out_d0;
+    reg signed [W-1:0] ac_c1_3_out_d1;
+    reg signed [W-1:0] ac_c1_3_out_d2;
+    reg signed [W-1:0] ac_c1_3_out_d3;
     activation_cache #(.DILATION(16)) activation_cache_c1_0 (
-        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[0]), .out(ac_c1_0_out)
+        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[0]),
+        .out_d0(ac_c1_0_out_d0),
+        .out_d1(ac_c1_0_out_d1),
+        .out_d2(ac_c1_0_out_d2),
+        .out_d3(ac_c1_0_out_d3)
     );
     activation_cache #(.DILATION(16)) activation_cache_c1_1 (
-        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[1]), .out(ac_c1_1_out)
+        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[1]),
+        .out_d0(ac_c1_1_out_d0),
+        .out_d1(ac_c1_1_out_d1),
+        .out_d2(ac_c1_1_out_d2),
+        .out_d3(ac_c1_1_out_d3)
     );
     activation_cache #(.DILATION(16)) activation_cache_c1_2 (
-        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[2]), .out(ac_c1_2_out)
+        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[2]),
+        .out_d0(ac_c1_2_out_d0),
+        .out_d1(ac_c1_2_out_d1),
+        .out_d2(ac_c1_2_out_d2),
+        .out_d3(ac_c1_2_out_d3)
     );
     activation_cache #(.DILATION(16)) activation_cache_c1_3 (
-        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[3]), .out(ac_c1_3_out)
+        .clk(ac_c1_clk), .rst(rst), .inp(conv1.out[3]),
+        .out_d0(ac_c1_3_out_d0),
+        .out_d1(ac_c1_3_out_d1),
+        .out_d2(ac_c1_3_out_d2),
+        .out_d3(ac_c1_3_out_d3)
     );
 
     //--------------------------------
@@ -161,22 +217,22 @@ module network #(
     reg signed [W-1:0] c2_out [0:3];
     reg c2_out_v;
 
-    assign c2a0[0] = activation_cache_c1_0.out[0];
-    assign c2a0[1] = activation_cache_c1_1.out[0];
-    assign c2a0[2] = activation_cache_c1_2.out[0];
-    assign c2a0[3] = activation_cache_c1_3.out[0];
-    assign c2a1[0] = activation_cache_c1_0.out[1];
-    assign c2a1[1] = activation_cache_c1_1.out[1];
-    assign c2a1[2] = activation_cache_c1_2.out[1];
-    assign c2a1[3] = activation_cache_c1_3.out[1];
-    assign c2a2[0] = activation_cache_c1_0.out[2];
-    assign c2a2[1] = activation_cache_c1_1.out[2];
-    assign c2a2[2] = activation_cache_c1_2.out[2];
-    assign c2a2[3] = activation_cache_c1_3.out[2];
-    assign c2a3[0] = activation_cache_c1_0.out[3];
-    assign c2a3[1] = activation_cache_c1_1.out[3];
-    assign c2a3[2] = activation_cache_c1_2.out[3];
-    assign c2a3[3] = activation_cache_c1_3.out[3];
+    assign c2a0[0] = ac_c1_0_out_d0;
+    assign c2a0[1] = ac_c1_1_out_d0;
+    assign c2a0[2] = ac_c1_2_out_d0;
+    assign c2a0[3] = ac_c1_3_out_d0;
+    assign c2a1[0] = ac_c1_0_out_d1;
+    assign c2a1[1] = ac_c1_1_out_d1;
+    assign c2a1[2] = ac_c1_2_out_d1;
+    assign c2a1[3] = ac_c1_3_out_d1;
+    assign c2a2[0] = ac_c1_0_out_d2;
+    assign c2a2[1] = ac_c1_1_out_d2;
+    assign c2a2[2] = ac_c1_2_out_d2;
+    assign c2a2[3] = ac_c1_3_out_d2;
+    assign c2a3[0] = ac_c1_0_out_d3;
+    assign c2a3[1] = ac_c1_1_out_d3;
+    assign c2a3[2] = ac_c1_2_out_d3;
+    assign c2a3[3] = ac_c1_3_out_d3;
 
     conv1d #(.B_VALUES("qconv2_weights")) conv2 (
         .clk(clk), .rst(c2_rst), .apply_relu(1'b0),

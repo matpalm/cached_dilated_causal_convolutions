@@ -8,7 +8,10 @@ module activation_cache #(
     input                     clk,
     input                     rst,
     input             [W-1:0] inp,
-    output reg signed [W-1:0] out [0:3]
+    output reg signed [W-1:0] out_d0,
+    output reg signed [W-1:0] out_d1,
+    output reg signed [W-1:0] out_d2,
+    output reg signed [W-1:0] out_d3
 );
 
 localparam KERNEL_SIZE = 4;
@@ -38,10 +41,10 @@ assign out3_addr = write_head - (3*DILATION);
 always @(posedge clk) begin
     write_head <= write_head + 1;
     buffer[write_head] <= inp;
-    out[0] <= buffer[`wrapped(out3_addr)];
-    out[1] <= buffer[`wrapped(out2_addr)];
-    out[2] <= buffer[`wrapped(out1_addr)];
-    out[3] <= inp;
+    out_d0 <= buffer[`wrapped(out3_addr)];
+    out_d1 <= buffer[`wrapped(out2_addr)];
+    out_d2 <= buffer[`wrapped(out1_addr)];
+    out_d3 <= inp;
 end
 
 endmodule
