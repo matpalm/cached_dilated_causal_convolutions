@@ -101,10 +101,22 @@ module network #(
     reg signed [W-1:0] c1_out [0:3];
     reg c1_out_v;
 
-    assign c1a0 = activation_cache_c0_0.out;
-    assign c1a1 = activation_cache_c0_1.out;
-    assign c1a2 = activation_cache_c0_2.out;
-    assign c1a3 = activation_cache_c0_3.out;
+    assign c1a0[0] = activation_cache_c0_0.out[0];
+    assign c1a0[1] = activation_cache_c0_1.out[0];
+    assign c1a0[2] = activation_cache_c0_2.out[0];
+    assign c1a0[3] = activation_cache_c0_3.out[0];
+    assign c1a1[0] = activation_cache_c0_0.out[1];
+    assign c1a1[1] = activation_cache_c0_1.out[1];
+    assign c1a1[2] = activation_cache_c0_2.out[1];
+    assign c1a1[3] = activation_cache_c0_3.out[1];
+    assign c1a2[0] = activation_cache_c0_0.out[2];
+    assign c1a2[1] = activation_cache_c0_1.out[2];
+    assign c1a2[2] = activation_cache_c0_2.out[2];
+    assign c1a2[3] = activation_cache_c0_3.out[2];
+    assign c1a3[0] = activation_cache_c0_0.out[3];
+    assign c1a3[1] = activation_cache_c0_1.out[3];
+    assign c1a3[2] = activation_cache_c0_2.out[3];
+    assign c1a3[3] = activation_cache_c0_3.out[3];
 
     conv1d #(.B_VALUES("qconv1_weights")) conv1 (
         .clk(clk), .rst(c1_rst), .apply_relu(1'b1),
@@ -145,10 +157,22 @@ module network #(
     reg signed [W-1:0] c2_out [0:3];
     reg c2_out_v;
 
-    assign c2a0 = activation_cache_c1_0.out;
-    assign c2a1 = activation_cache_c1_1.out;
-    assign c2a2 = activation_cache_c1_2.out;
-    assign c2a3 = activation_cache_c1_3.out;
+    assign c2a0[0] = activation_cache_c1_0.out[0];
+    assign c2a0[1] = activation_cache_c1_1.out[0];
+    assign c2a0[2] = activation_cache_c1_2.out[0];
+    assign c2a0[3] = activation_cache_c1_3.out[0];
+    assign c2a1[0] = activation_cache_c1_0.out[1];
+    assign c2a1[1] = activation_cache_c1_1.out[1];
+    assign c2a1[2] = activation_cache_c1_2.out[1];
+    assign c2a1[3] = activation_cache_c1_3.out[1];
+    assign c2a2[0] = activation_cache_c1_0.out[2];
+    assign c2a2[1] = activation_cache_c1_1.out[2];
+    assign c2a2[2] = activation_cache_c1_2.out[2];
+    assign c2a2[3] = activation_cache_c1_3.out[2];
+    assign c2a3[0] = activation_cache_c1_0.out[3];
+    assign c2a3[1] = activation_cache_c1_1.out[3];
+    assign c2a3[2] = activation_cache_c1_2.out[3];
+    assign c2a3[3] = activation_cache_c1_3.out[3];
 
     conv1d #(.B_VALUES("qconv2_weights")) conv2 (
         .clk(clk), .rst(c2_rst), .apply_relu(1'b0),

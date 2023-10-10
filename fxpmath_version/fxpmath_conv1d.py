@@ -32,7 +32,6 @@ class FxpMathConv1D(object):
         for i in range(self.in_d):
             x_i = self.fxp.single_width(x[i])
             w_i = self.fxp.single_width(weights[i])
-            print("dp", x_i, w_i)
             prod = x_i * w_i  # will be double width
             accumulator.set_val(accumulator + prod)
             # keep accumulator double width. by dft a+b => +1 for int part
@@ -43,7 +42,6 @@ class FxpMathConv1D(object):
         # this loop represents what could be in the state machine
         # but can be pipelined
         for column in range(self.out_d):
-            print(f">row_by_matrix_multiply column={column}")
             self.dot_product(x, weights[column], accumulators[column])
 
 
@@ -62,14 +60,9 @@ class FxpMathConv1D(object):
 
         # step 1; run each kernel; can be in parallel
         self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
-        print("< x0 w0 -> accum0=", accum0)
-        print("...", [self.fxp.bits(a) for a in accum0])
 
-        print("x1 w1")
         self.row_by_matrix_multiply(x[1], self.weights[1], accum1)
-        print("x2 w2")
         self.row_by_matrix_multiply(x[2], self.weights[2], accum2)
-        print("x3 w3")
         self.row_by_matrix_multiply(x[3], self.weights[3], accum3)
 
         # step 2; hierarchical add, 1 of 2
@@ -82,11 +75,7 @@ class FxpMathConv1D(object):
         self.fxp.vector_add(accum0, accum2)  # 0+2 -> 0
 
         # step 4; add biases
-        print("add biases", double_width_biases)
         self.fxp.vector_add(accum0, double_width_biases)
-
-        print("Result after add bias", accum0)
-        print("...", [self.fxp.bits(a) for a in accum0])
 
         # step 5; resize down from double to single for output
         for i in range(self.out_d):
