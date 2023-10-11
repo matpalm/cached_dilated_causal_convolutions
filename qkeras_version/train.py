@@ -29,10 +29,10 @@ if __name__ == '__main__':
     # WIP in == out == filter_size
     # TODO: do three version of qconv1d see create_dilated_model
 
-    IN_OUT_D = 3
-    NUM_LAYERS = 2
+    IN_OUT_D = 4
+    NUM_LAYERS = 3
     # WIP filter size of 3; final will be 8
-    FILTER_SIZE = 3
+    FILTER_SIZE = 4
 
     # note: kernel size and implied dilation rate always assumed 4
 

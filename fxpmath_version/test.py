@@ -30,12 +30,12 @@ for x, y in test_ds:
     break
 x, y = x[0], y[0].numpy()
 
-
 # run through fxp_model
 fxp_model = FxpModel('qkeras_weights.pkl')
-fxp_model.qconv0.export_weights_per_dot_product("/tmp/qconv0_weights")
-fxp_model.qconv1.export_weights_per_dot_product("/tmp/qconv1_weights")
-fxp_model.qconv2.export_weights_per_dot_product("/tmp/qconv2_weights")
+
+fxp_model.qconv0.export_weights_per_dot_product("/tmp/weights/qconv0")
+fxp_model.qconv1.export_weights_per_dot_product("/tmp/weights/qconv1")
+fxp_model.qconv2.export_weights_per_dot_product("/tmp/weights/qconv2")
 
 # run net
 y_pred = []
