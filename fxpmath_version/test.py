@@ -5,10 +5,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tf_data_pipeline.data import WaveToWaveData
 
-IN_OUT_D = 4
+IN_OUT_D = 8
 NUM_LAYERS = 3
-# WIP filter size; final will be 8
-FILTER_SIZE = 4
+FILTER_SIZE = 8
+
 # note: kernel size and implied dilation rate always assumed 4
 RECEPTIVE_FIELD_SIZE = 4**NUM_LAYERS
 TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE

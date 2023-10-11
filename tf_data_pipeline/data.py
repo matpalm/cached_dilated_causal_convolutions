@@ -113,10 +113,10 @@ class WaveToWaveData(object):
 
         # for prototype
         n = len(data)
-        x = np.concatenate([data[:,0:1], np.zeros((n, 3))], axis=-1)  # (tri, 0, 0, 0)
-        y = np.concatenate([data, np.zeros((n, 1))], axis=-1)         # (tri, square, zigzag, 0)
-        assert x.shape == (n, 4)
-        assert y.shape == (n, 4)
+        x = np.concatenate([data[:,0:1], np.zeros((n, 7))], axis=-1)  # (tri, 0, 0, 0, 0, 0, 0, 0)
+        y = np.concatenate([data, np.zeros((n, 5))], axis=-1)         # (tri, square, zigzag, 0, 0, 0, 0, 0)
+        assert x.shape == (n, 8)
+        assert y.shape == (n, 8)
 
         # take splits
         val_test_split_size = int(len(x) * 0.1)  # 10% for val and test

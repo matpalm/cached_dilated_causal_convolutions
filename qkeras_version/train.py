@@ -29,10 +29,10 @@ if __name__ == '__main__':
     # WIP in == out == filter_size
     # TODO: do three version of qconv1d see create_dilated_model
 
-    IN_OUT_D = 4
+    IN_OUT_D = 8
     NUM_LAYERS = 3
     # WIP filter size of 3; final will be 8
-    FILTER_SIZE = 4
+    FILTER_SIZE = 8
 
     # note: kernel size and implied dilation rate always assumed 4
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         save_weights_only=True
     )
     train_model.compile(Adam(opts.learning_rate),
-                        loss=masked_mse(RECEPTIVE_FIELD_SIZE))
+                        loss=masked_mse(RECEPTIVE_FIELD_SIZE, filter_column_idx=1))  # only calculate loss for col1, square wave
     train_model.fit(train_ds,
                     validation_data=validate_ds,
                     callbacks=[checkpoint_cb],
