@@ -21,13 +21,17 @@ async def test_row_by_matrix_multiply(dut):
     dut.a_d1.value = 0
     dut.a_d2.value = 0
     dut.a_d3.value = 0
+    dut.a_d4.value = 0
+    dut.a_d5.value = 0
+    dut.a_d6.value = 0
+    dut.a_d7.value = 0
 
     dut.rst.value = 1
     await RisingEdge(dut.clk)
     dut.rst.value = 0
     await RisingEdge(dut.clk)  # starts calculation
 
-    for i in range(10):
+    for i in range(20):
         print("i", i,
               "col0_v", dut.col0_v.value,
               "col1_v", dut.col1_v.value,
@@ -42,12 +46,20 @@ async def test_row_by_matrix_multiply(dut):
     assert dut.out_d1.value == 0
     assert dut.out_d2.value == 0
     assert dut.out_d3.value == 0
+    assert dut.out_d4.value == 0
+    assert dut.out_d5.value == 0
+    assert dut.out_d6.value == 0
+    assert dut.out_d7.value == 0
 
     # set new values for a
     dut.a_d0.value = 0x0400   # 0000.010000000000 0.25
     dut.a_d1.value = 0xFDFC   # 1111.110111111100 -0.1259765625
     dut.a_d2.value = 0x0506   # 0000.010100000110 0.31396484375
     dut.a_d3.value = 0xF000   # 1111.000000000000 -1.0
+    dut.a_d4.value = 0x0400   # 0000.010000000000 0.25
+    dut.a_d5.value = 0xFDFC   # 1111.110111111100 -0.1259765625
+    dut.a_d6.value = 0x0506   # 0000.010100000110 0.31396484375
+    dut.a_d7.value = 0xF000   # 1111.000000000000 -1.0
 
     # trigger new run
     dut.rst.value = 1
@@ -55,7 +67,7 @@ async def test_row_by_matrix_multiply(dut):
     dut.rst.value = 0
     await RisingEdge(dut.clk)  # starts calculation
 
-    for i in range(10):
+    for i in range(20):
         print("i", i,
               "col0_v", dut.col0_v.value,
               "col1_v", dut.col1_v.value,
@@ -68,7 +80,11 @@ async def test_row_by_matrix_multiply(dut):
     # should be valid
     assert dut.out_v.value == 1
 
-    assert dut.out_d0.value == 0xFEAF415A   # 1111 1110 1010 1111 0100 0001 0101 1010
-    assert dut.out_d1.value == 0xFF702000   # 1111 1111 0111 0000 0010 0000 0000 0000
-    assert dut.out_d2.value == 0xFEAF415A   # same as col0
+    assert dut.out_d0.value == 0b11111101010111101000001010110100
+    assert dut.out_d1.value == 0b11111110111000000100000000000000
+    assert dut.out_d2.value == 0b11111101010111101000001010110100
     assert dut.out_d3.value == 0            # col3 weights are all zeros
+    assert dut.out_d4.value == 0            # col3 weights are all zeros
+    assert dut.out_d5.value == 0            # col3 weights are all zeros
+    assert dut.out_d6.value == 0            # col3 weights are all zeros
+    assert dut.out_d7.value == 0            # col3 weights are all zeros
