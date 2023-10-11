@@ -50,97 +50,184 @@ module network #(
     reg signed [W-1:0] c0a0_d1;
     reg signed [W-1:0] c0a0_d2;
     reg signed [W-1:0] c0a0_d3;
+    reg signed [W-1:0] c0a0_d4;
+    reg signed [W-1:0] c0a0_d5;
+    reg signed [W-1:0] c0a0_d6;
+    reg signed [W-1:0] c0a0_d7;
+
     reg signed [W-1:0] c0a1_d0;
     reg signed [W-1:0] c0a1_d1;
     reg signed [W-1:0] c0a1_d2;
     reg signed [W-1:0] c0a1_d3;
+    reg signed [W-1:0] c0a1_d4;
+    reg signed [W-1:0] c0a1_d5;
+    reg signed [W-1:0] c0a1_d6;
+    reg signed [W-1:0] c0a1_d7;
+
     reg signed [W-1:0] c0a2_d0;
     reg signed [W-1:0] c0a2_d1;
     reg signed [W-1:0] c0a2_d2;
     reg signed [W-1:0] c0a2_d3;
+    reg signed [W-1:0] c0a2_d4;
+    reg signed [W-1:0] c0a2_d5;
+    reg signed [W-1:0] c0a2_d6;
+    reg signed [W-1:0] c0a2_d7;
+
     reg signed [W-1:0] c0a3_d0;
     reg signed [W-1:0] c0a3_d1;
     reg signed [W-1:0] c0a3_d2;
     reg signed [W-1:0] c0a3_d3;
+    reg signed [W-1:0] c0a3_d4;
+    reg signed [W-1:0] c0a3_d5;
+    reg signed [W-1:0] c0a3_d6;
+    reg signed [W-1:0] c0a3_d7;
+
     reg signed [W-1:0] c0_out_d0;
     reg signed [W-1:0] c0_out_d1;
     reg signed [W-1:0] c0_out_d2;
     reg signed [W-1:0] c0_out_d3;
+    reg signed [W-1:0] c0_out_d4;
+    reg signed [W-1:0] c0_out_d5;
+    reg signed [W-1:0] c0_out_d6;
+    reg signed [W-1:0] c0_out_d7;
+
     reg c0_out_v;
 
     assign c0a0_d0 = lsb_out_d0;
     assign c0a0_d1 = 0;
     assign c0a0_d2 = 0;
     assign c0a0_d3 = 0;
+    assign c0a0_d4 = 0;
+    assign c0a0_d5 = 0;
+    assign c0a0_d6 = 0;
+    assign c0a0_d7 = 0;
     assign c0a1_d0 = lsb_out_d1;
     assign c0a1_d1 = 0;
     assign c0a1_d2 = 0;
     assign c0a1_d3 = 0;
+    assign c0a1_d4 = 0;
+    assign c0a1_d5 = 0;
+    assign c0a1_d6 = 0;
+    assign c0a1_d7 = 0;
     assign c0a2_d0 = lsb_out_d2;
     assign c0a2_d1 = 0;
     assign c0a2_d2 = 0;
     assign c0a2_d3 = 0;
+    assign c0a2_d4 = 0;
+    assign c0a2_d5 = 0;
+    assign c0a2_d6 = 0;
+    assign c0a2_d7 = 0;
     assign c0a3_d0 = lsb_out_d3;
     assign c0a3_d1 = 0;
     assign c0a3_d2 = 0;
     assign c0a3_d3 = 0;
+    assign c0a3_d4 = 0;
+    assign c0a3_d5 = 0;
+    assign c0a3_d6 = 0;
+    assign c0a3_d7 = 0;
 
     conv1d #(.B_VALUES("weights/qconv0")) conv0 (
         .clk(clk), .rst(c0_rst), .apply_relu(1'b1),
-        .a0_d0(c0a0_d0), .a0_d1(c0a0_d1), .a0_d2(c0a0_d2), .a0_d3(c0a0_d3),
-        .a1_d0(c0a1_d0), .a1_d1(c0a1_d1), .a1_d2(c0a1_d2), .a1_d3(c0a1_d3),
-        .a2_d0(c0a2_d0), .a2_d1(c0a2_d1), .a2_d2(c0a2_d2), .a2_d3(c0a2_d3),
-        .a3_d0(c0a3_d0), .a3_d1(c0a3_d1), .a3_d2(c0a3_d2), .a3_d3(c0a3_d3),
+        .a0_d0(c0a0_d0), .a0_d1(c0a0_d1), .a0_d2(c0a0_d2), .a0_d3(c0a0_d3), .a0_d4(c0a0_d4), .a0_d5(c0a0_d5), .a0_d6(c0a0_d6), .a0_d7(c0a0_d7),
+        .a1_d0(c0a1_d0), .a1_d1(c0a1_d1), .a1_d2(c0a1_d2), .a1_d3(c0a1_d3), .a1_d4(c0a1_d4), .a1_d5(c0a1_d5), .a1_d6(c0a1_d6), .a1_d7(c0a1_d7),
+        .a2_d0(c0a2_d0), .a2_d1(c0a2_d1), .a2_d2(c0a2_d2), .a2_d3(c0a2_d3), .a2_d4(c0a2_d4), .a2_d5(c0a2_d5), .a2_d6(c0a2_d6), .a2_d7(c0a2_d7),
+        .a3_d0(c0a3_d0), .a3_d1(c0a3_d1), .a3_d2(c0a3_d2), .a3_d3(c0a3_d3), .a3_d4(c0a3_d4), .a3_d5(c0a3_d5), .a3_d6(c0a3_d6), .a3_d7(c0a3_d7),
         .out_d0(c0_out_d0), .out_d1(c0_out_d1), .out_d2(c0_out_d2), .out_d3(c0_out_d3),
+        .out_d4(c0_out_d4), .out_d5(c0_out_d5), .out_d6(c0_out_d6), .out_d7(c0_out_d7),
         .out_v(c0_out_v));
 
     //--------------------------------
     // conv 0 activation cache
 
     reg ac_c0_clk = 0;
-    reg signed [W-1:0] ac_c0_0_out_d0;
-    reg signed [W-1:0] ac_c0_0_out_d1;
-    reg signed [W-1:0] ac_c0_0_out_d2;
-    reg signed [W-1:0] ac_c0_0_out_d3;
-    reg signed [W-1:0] ac_c0_1_out_d0;
-    reg signed [W-1:0] ac_c0_1_out_d1;
-    reg signed [W-1:0] ac_c0_1_out_d2;
-    reg signed [W-1:0] ac_c0_1_out_d3;
-    reg signed [W-1:0] ac_c0_2_out_d0;
-    reg signed [W-1:0] ac_c0_2_out_d1;
-    reg signed [W-1:0] ac_c0_2_out_d2;
-    reg signed [W-1:0] ac_c0_2_out_d3;
-    reg signed [W-1:0] ac_c0_3_out_d0;
-    reg signed [W-1:0] ac_c0_3_out_d1;
-    reg signed [W-1:0] ac_c0_3_out_d2;
-    reg signed [W-1:0] ac_c0_3_out_d3;
+    reg signed [W-1:0] ac_c0_d0_out_l0;
+    reg signed [W-1:0] ac_c0_d0_out_l1;
+    reg signed [W-1:0] ac_c0_d0_out_l2;
+    reg signed [W-1:0] ac_c0_d0_out_l3;
+    reg signed [W-1:0] ac_c0_d1_out_l0;
+    reg signed [W-1:0] ac_c0_d1_out_l1;
+    reg signed [W-1:0] ac_c0_d1_out_l2;
+    reg signed [W-1:0] ac_c0_d1_out_l3;
+    reg signed [W-1:0] ac_c0_d2_out_l0;
+    reg signed [W-1:0] ac_c0_d2_out_l1;
+    reg signed [W-1:0] ac_c0_d2_out_l2;
+    reg signed [W-1:0] ac_c0_d2_out_l3;
+    reg signed [W-1:0] ac_c0_d3_out_l0;
+    reg signed [W-1:0] ac_c0_d3_out_l1;
+    reg signed [W-1:0] ac_c0_d3_out_l2;
+    reg signed [W-1:0] ac_c0_d3_out_l3;
+    reg signed [W-1:0] ac_c0_d4_out_l0;
+    reg signed [W-1:0] ac_c0_d4_out_l1;
+    reg signed [W-1:0] ac_c0_d4_out_l2;
+    reg signed [W-1:0] ac_c0_d4_out_l3;
+    reg signed [W-1:0] ac_c0_d5_out_l0;
+    reg signed [W-1:0] ac_c0_d5_out_l1;
+    reg signed [W-1:0] ac_c0_d5_out_l2;
+    reg signed [W-1:0] ac_c0_d5_out_l3;
+    reg signed [W-1:0] ac_c0_d6_out_l0;
+    reg signed [W-1:0] ac_c0_d6_out_l1;
+    reg signed [W-1:0] ac_c0_d6_out_l2;
+    reg signed [W-1:0] ac_c0_d6_out_l3;
+    reg signed [W-1:0] ac_c0_d7_out_l0;
+    reg signed [W-1:0] ac_c0_d7_out_l1;
+    reg signed [W-1:0] ac_c0_d7_out_l2;
+    reg signed [W-1:0] ac_c0_d7_out_l3;
+
     activation_cache #(.DILATION(4)) activation_cache_c0_0 (
         .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d0),
-        .out_d0(ac_c0_0_out_d0),
-        .out_d1(ac_c0_0_out_d1),
-        .out_d2(ac_c0_0_out_d2),
-        .out_d3(ac_c0_0_out_d3)
+        .out_l0(ac_c0_d0_out_l0),
+        .out_l1(ac_c0_d0_out_l1),
+        .out_l2(ac_c0_d0_out_l2),
+        .out_l3(ac_c0_d0_out_l3)
     );
     activation_cache #(.DILATION(4)) activation_cache_c0_1 (
         .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d1),
-        .out_d0(ac_c0_1_out_d0),
-        .out_d1(ac_c0_1_out_d1),
-        .out_d2(ac_c0_1_out_d2),
-        .out_d3(ac_c0_1_out_d3)
+        .out_l0(ac_c0_d1_out_l0),
+        .out_l1(ac_c0_d1_out_l1),
+        .out_l2(ac_c0_d1_out_l2),
+        .out_l3(ac_c0_d1_out_l3)
     );
     activation_cache #(.DILATION(4)) activation_cache_c0_2 (
         .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d2),
-        .out_d0(ac_c0_2_out_d0),
-        .out_d1(ac_c0_2_out_d1),
-        .out_d2(ac_c0_2_out_d2),
-        .out_d3(ac_c0_2_out_d3)
+        .out_l0(ac_c0_d2_out_l0),
+        .out_l1(ac_c0_d2_out_l1),
+        .out_l2(ac_c0_d2_out_l2),
+        .out_l3(ac_c0_d2_out_l3)
     );
     activation_cache #(.DILATION(4)) activation_cache_c0_3 (
         .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d3),
-        .out_d0(ac_c0_3_out_d0),
-        .out_d1(ac_c0_3_out_d1),
-        .out_d2(ac_c0_3_out_d2),
-        .out_d3(ac_c0_3_out_d3)
+        .out_l0(ac_c0_d3_out_l0),
+        .out_l1(ac_c0_d3_out_l1),
+        .out_l2(ac_c0_d3_out_l2),
+        .out_l3(ac_c0_d3_out_l3)
+    );
+    activation_cache #(.DILATION(4)) activation_cache_c0_4 (
+        .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d4),
+        .out_l0(ac_c0_d4_out_l0),
+        .out_l1(ac_c0_d4_out_l1),
+        .out_l2(ac_c0_d4_out_l2),
+        .out_l3(ac_c0_d4_out_l3)
+    );
+    activation_cache #(.DILATION(4)) activation_cache_c0_5 (
+        .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d5),
+        .out_l0(ac_c0_d5_out_l0),
+        .out_l1(ac_c0_d5_out_l1),
+        .out_l2(ac_c0_d5_out_l2),
+        .out_l3(ac_c0_d5_out_l3)
+    );
+    activation_cache #(.DILATION(4)) activation_cache_c0_6 (
+        .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d6),
+        .out_l0(ac_c0_d6_out_l0),
+        .out_l1(ac_c0_d6_out_l1),
+        .out_l2(ac_c0_d6_out_l2),
+        .out_l3(ac_c0_d6_out_l3)
+    );
+    activation_cache #(.DILATION(4)) activation_cache_c0_7 (
+        .clk(ac_c0_clk), .rst(rst), .inp(c0_out_d7),
+        .out_l0(ac_c0_d7_out_l0),
+        .out_l1(ac_c0_d7_out_l1),
+        .out_l2(ac_c0_d7_out_l2),
+        .out_l3(ac_c0_d7_out_l3)
     );
 
     //--------------------------------
@@ -148,101 +235,192 @@ module network #(
     // always connected to conv 0 activation cache
 
     reg c1_rst = 0;
+
     reg signed [W-1:0] c1a0_d0;
     reg signed [W-1:0] c1a0_d1;
     reg signed [W-1:0] c1a0_d2;
     reg signed [W-1:0] c1a0_d3;
+    reg signed [W-1:0] c1a0_d4;
+    reg signed [W-1:0] c1a0_d5;
+    reg signed [W-1:0] c1a0_d6;
+    reg signed [W-1:0] c1a0_d7;
+
     reg signed [W-1:0] c1a1_d0;
     reg signed [W-1:0] c1a1_d1;
     reg signed [W-1:0] c1a1_d2;
     reg signed [W-1:0] c1a1_d3;
+    reg signed [W-1:0] c1a1_d4;
+    reg signed [W-1:0] c1a1_d5;
+    reg signed [W-1:0] c1a1_d6;
+    reg signed [W-1:0] c1a1_d7;
+
     reg signed [W-1:0] c1a2_d0;
     reg signed [W-1:0] c1a2_d1;
     reg signed [W-1:0] c1a2_d2;
     reg signed [W-1:0] c1a2_d3;
+    reg signed [W-1:0] c1a2_d4;
+    reg signed [W-1:0] c1a2_d5;
+    reg signed [W-1:0] c1a2_d6;
+    reg signed [W-1:0] c1a2_d7;
+
     reg signed [W-1:0] c1a3_d0;
     reg signed [W-1:0] c1a3_d1;
     reg signed [W-1:0] c1a3_d2;
     reg signed [W-1:0] c1a3_d3;
+    reg signed [W-1:0] c1a3_d4;
+    reg signed [W-1:0] c1a3_d5;
+    reg signed [W-1:0] c1a3_d6;
+    reg signed [W-1:0] c1a3_d7;
+
     reg signed [W-1:0] c1_out_d0;
     reg signed [W-1:0] c1_out_d1;
     reg signed [W-1:0] c1_out_d2;
     reg signed [W-1:0] c1_out_d3;
+    reg signed [W-1:0] c1_out_d4;
+    reg signed [W-1:0] c1_out_d5;
+    reg signed [W-1:0] c1_out_d6;
+    reg signed [W-1:0] c1_out_d7;
+
     reg c1_out_v;
 
-    assign c1a0_d0 = ac_c0_0_out_d0;
-    assign c1a0_d1 = ac_c0_1_out_d0;
-    assign c1a0_d2 = ac_c0_2_out_d0;
-    assign c1a0_d3 = ac_c0_3_out_d0;
-    assign c1a1_d0 = ac_c0_0_out_d1;
-    assign c1a1_d1 = ac_c0_1_out_d1;
-    assign c1a1_d2 = ac_c0_2_out_d1;
-    assign c1a1_d3 = ac_c0_3_out_d1;
-    assign c1a2_d0 = ac_c0_0_out_d2;
-    assign c1a2_d1 = ac_c0_1_out_d2;
-    assign c1a2_d2 = ac_c0_2_out_d2;
-    assign c1a2_d3 = ac_c0_3_out_d2;
-    assign c1a3_d0 = ac_c0_0_out_d3;
-    assign c1a3_d1 = ac_c0_1_out_d3;
-    assign c1a3_d2 = ac_c0_2_out_d3;
-    assign c1a3_d3 = ac_c0_3_out_d3;
+    assign c1a0_d0 = ac_c0_d0_out_l0;
+    assign c1a0_d1 = ac_c0_d1_out_l0;
+    assign c1a0_d2 = ac_c0_d2_out_l0;
+    assign c1a0_d3 = ac_c0_d3_out_l0;
+    assign c1a0_d4 = ac_c0_d4_out_l0;
+    assign c1a0_d5 = ac_c0_d5_out_l0;
+    assign c1a0_d6 = ac_c0_d6_out_l0;
+    assign c1a0_d7 = ac_c0_d7_out_l0;
+
+    assign c1a1_d0 = ac_c0_d0_out_l1;
+    assign c1a1_d1 = ac_c0_d1_out_l1;
+    assign c1a1_d2 = ac_c0_d2_out_l1;
+    assign c1a1_d3 = ac_c0_d3_out_l1;
+    assign c1a1_d4 = ac_c0_d4_out_l1;
+    assign c1a1_d5 = ac_c0_d5_out_l1;
+    assign c1a1_d6 = ac_c0_d6_out_l1;
+    assign c1a1_d7 = ac_c0_d7_out_l1;
+
+    assign c1a2_d0 = ac_c0_d0_out_l2;
+    assign c1a2_d1 = ac_c0_d1_out_l2;
+    assign c1a2_d2 = ac_c0_d2_out_l2;
+    assign c1a2_d3 = ac_c0_d3_out_l2;
+    assign c1a2_d4 = ac_c0_d4_out_l2;
+    assign c1a2_d5 = ac_c0_d5_out_l2;
+    assign c1a2_d6 = ac_c0_d6_out_l2;
+    assign c1a2_d7 = ac_c0_d7_out_l2;
+
+    assign c1a3_d0 = ac_c0_d0_out_l3;
+    assign c1a3_d1 = ac_c0_d1_out_l3;
+    assign c1a3_d2 = ac_c0_d2_out_l3;
+    assign c1a3_d3 = ac_c0_d3_out_l3;
+    assign c1a3_d4 = ac_c0_d4_out_l3;
+    assign c1a3_d5 = ac_c0_d5_out_l3;
+    assign c1a3_d6 = ac_c0_d6_out_l3;
+    assign c1a3_d7 = ac_c0_d7_out_l3;
 
     conv1d #(.B_VALUES("weights/qconv1")) conv1 (
         .clk(clk), .rst(c1_rst), .apply_relu(1'b1),
-        .a0_d0(c1a0_d0), .a0_d1(c1a0_d1), .a0_d2(c1a0_d2), .a0_d3(c1a0_d3),
-        .a1_d0(c1a1_d0), .a1_d1(c1a1_d1), .a1_d2(c1a1_d2), .a1_d3(c1a1_d3),
-        .a2_d0(c1a2_d0), .a2_d1(c1a2_d1), .a2_d2(c1a2_d2), .a2_d3(c1a2_d3),
-        .a3_d0(c1a3_d0), .a3_d1(c1a3_d1), .a3_d2(c1a3_d2), .a3_d3(c1a3_d3),
+        .a0_d0(c1a0_d0), .a0_d1(c1a0_d1), .a0_d2(c1a0_d2), .a0_d3(c1a0_d3), .a0_d4(c1a0_d4), .a0_d5(c1a0_d5), .a0_d6(c1a0_d6), .a0_d7(c1a0_d7),
+        .a1_d0(c1a1_d0), .a1_d1(c1a1_d1), .a1_d2(c1a1_d2), .a1_d3(c1a1_d3), .a1_d4(c1a1_d4), .a1_d5(c1a1_d5), .a1_d6(c1a1_d6), .a1_d7(c1a1_d7),
+        .a2_d0(c1a2_d0), .a2_d1(c1a2_d1), .a2_d2(c1a2_d2), .a2_d3(c1a2_d3), .a2_d4(c1a2_d4), .a2_d5(c1a2_d5), .a2_d6(c1a2_d6), .a2_d7(c1a2_d7),
+        .a3_d0(c1a3_d0), .a3_d1(c1a3_d1), .a3_d2(c1a3_d2), .a3_d3(c1a3_d3), .a3_d4(c1a3_d4), .a3_d5(c1a3_d5), .a3_d6(c1a3_d6), .a3_d7(c1a3_d7),
         .out_d0(c1_out_d0), .out_d1(c1_out_d1), .out_d2(c1_out_d2), .out_d3(c1_out_d3),
+        .out_d4(c1_out_d4), .out_d5(c1_out_d5), .out_d6(c1_out_d6), .out_d7(c1_out_d7),
         .out_v(c1_out_v));
 
     //--------------------------------
     // conv 1 activation cache
 
     reg ac_c1_clk = 0;
-    reg signed [W-1:0] ac_c1_0_out_d0;
-    reg signed [W-1:0] ac_c1_0_out_d1;
-    reg signed [W-1:0] ac_c1_0_out_d2;
-    reg signed [W-1:0] ac_c1_0_out_d3;
-    reg signed [W-1:0] ac_c1_1_out_d0;
-    reg signed [W-1:0] ac_c1_1_out_d1;
-    reg signed [W-1:0] ac_c1_1_out_d2;
-    reg signed [W-1:0] ac_c1_1_out_d3;
-    reg signed [W-1:0] ac_c1_2_out_d0;
-    reg signed [W-1:0] ac_c1_2_out_d1;
-    reg signed [W-1:0] ac_c1_2_out_d2;
-    reg signed [W-1:0] ac_c1_2_out_d3;
-    reg signed [W-1:0] ac_c1_3_out_d0;
-    reg signed [W-1:0] ac_c1_3_out_d1;
-    reg signed [W-1:0] ac_c1_3_out_d2;
-    reg signed [W-1:0] ac_c1_3_out_d3;
+    reg signed [W-1:0] ac_c1_d0_out_l0;
+    reg signed [W-1:0] ac_c1_d0_out_l1;
+    reg signed [W-1:0] ac_c1_d0_out_l2;
+    reg signed [W-1:0] ac_c1_d0_out_l3;
+    reg signed [W-1:0] ac_c1_d1_out_l0;
+    reg signed [W-1:0] ac_c1_d1_out_l1;
+    reg signed [W-1:0] ac_c1_d1_out_l2;
+    reg signed [W-1:0] ac_c1_d1_out_l3;
+    reg signed [W-1:0] ac_c1_d2_out_l0;
+    reg signed [W-1:0] ac_c1_d2_out_l1;
+    reg signed [W-1:0] ac_c1_d2_out_l2;
+    reg signed [W-1:0] ac_c1_d2_out_l3;
+    reg signed [W-1:0] ac_c1_d3_out_l0;
+    reg signed [W-1:0] ac_c1_d3_out_l1;
+    reg signed [W-1:0] ac_c1_d3_out_l2;
+    reg signed [W-1:0] ac_c1_d3_out_l3;
+    reg signed [W-1:0] ac_c1_d4_out_l0;
+    reg signed [W-1:0] ac_c1_d4_out_l1;
+    reg signed [W-1:0] ac_c1_d4_out_l2;
+    reg signed [W-1:0] ac_c1_d4_out_l3;
+    reg signed [W-1:0] ac_c1_d5_out_l0;
+    reg signed [W-1:0] ac_c1_d5_out_l1;
+    reg signed [W-1:0] ac_c1_d5_out_l2;
+    reg signed [W-1:0] ac_c1_d5_out_l3;
+    reg signed [W-1:0] ac_c1_d6_out_l0;
+    reg signed [W-1:0] ac_c1_d6_out_l1;
+    reg signed [W-1:0] ac_c1_d6_out_l2;
+    reg signed [W-1:0] ac_c1_d6_out_l3;
+    reg signed [W-1:0] ac_c1_d7_out_l0;
+    reg signed [W-1:0] ac_c1_d7_out_l1;
+    reg signed [W-1:0] ac_c1_d7_out_l2;
+    reg signed [W-1:0] ac_c1_d7_out_l3;
+
     activation_cache #(.DILATION(16)) activation_cache_c1_0 (
         .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d0),
-        .out_d0(ac_c1_0_out_d0),
-        .out_d1(ac_c1_0_out_d1),
-        .out_d2(ac_c1_0_out_d2),
-        .out_d3(ac_c1_0_out_d3)
+        .out_l0(ac_c1_d0_out_l0),
+        .out_l1(ac_c1_d0_out_l1),
+        .out_l2(ac_c1_d0_out_l2),
+        .out_l3(ac_c1_d0_out_l3)
     );
     activation_cache #(.DILATION(16)) activation_cache_c1_1 (
         .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d1),
-        .out_d0(ac_c1_1_out_d0),
-        .out_d1(ac_c1_1_out_d1),
-        .out_d2(ac_c1_1_out_d2),
-        .out_d3(ac_c1_1_out_d3)
+        .out_l0(ac_c1_d1_out_l0),
+        .out_l1(ac_c1_d1_out_l1),
+        .out_l2(ac_c1_d1_out_l2),
+        .out_l3(ac_c1_d1_out_l3)
     );
     activation_cache #(.DILATION(16)) activation_cache_c1_2 (
         .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d2),
-        .out_d0(ac_c1_2_out_d0),
-        .out_d1(ac_c1_2_out_d1),
-        .out_d2(ac_c1_2_out_d2),
-        .out_d3(ac_c1_2_out_d3)
+        .out_l0(ac_c1_d2_out_l0),
+        .out_l1(ac_c1_d2_out_l1),
+        .out_l2(ac_c1_d2_out_l2),
+        .out_l3(ac_c1_d2_out_l3)
     );
     activation_cache #(.DILATION(16)) activation_cache_c1_3 (
         .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d3),
-        .out_d0(ac_c1_3_out_d0),
-        .out_d1(ac_c1_3_out_d1),
-        .out_d2(ac_c1_3_out_d2),
-        .out_d3(ac_c1_3_out_d3)
+        .out_l0(ac_c1_d3_out_l0),
+        .out_l1(ac_c1_d3_out_l1),
+        .out_l2(ac_c1_d3_out_l2),
+        .out_l3(ac_c1_d3_out_l3)
+    );
+    activation_cache #(.DILATION(16)) activation_cache_c1_4 (
+        .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d4),
+        .out_l0(ac_c1_d4_out_l0),
+        .out_l1(ac_c1_d4_out_l1),
+        .out_l2(ac_c1_d4_out_l2),
+        .out_l3(ac_c1_d4_out_l3)
+    );
+    activation_cache #(.DILATION(16)) activation_cache_c1_5 (
+        .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d5),
+        .out_l0(ac_c1_d5_out_l0),
+        .out_l1(ac_c1_d5_out_l1),
+        .out_l2(ac_c1_d5_out_l2),
+        .out_l3(ac_c1_d5_out_l3)
+    );
+    activation_cache #(.DILATION(16)) activation_cache_c1_6 (
+        .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d6),
+        .out_l0(ac_c1_d6_out_l0),
+        .out_l1(ac_c1_d6_out_l1),
+        .out_l2(ac_c1_d6_out_l2),
+        .out_l3(ac_c1_d6_out_l3)
+    );
+    activation_cache #(.DILATION(16)) activation_cache_c1_7 (
+        .clk(ac_c1_clk), .rst(rst), .inp(c1_out_d7),
+        .out_l0(ac_c1_d7_out_l0),
+        .out_l1(ac_c1_d7_out_l1),
+        .out_l2(ac_c1_d7_out_l2),
+        .out_l3(ac_c1_d7_out_l3)
     );
 
     //--------------------------------
@@ -250,52 +428,98 @@ module network #(
     // always connected to conv 1 activation cache
 
     reg c2_rst = 0;
+
     reg signed [W-1:0] c2a0_d0;
     reg signed [W-1:0] c2a0_d1;
     reg signed [W-1:0] c2a0_d2;
     reg signed [W-1:0] c2a0_d3;
+    reg signed [W-1:0] c2a0_d4;
+    reg signed [W-1:0] c2a0_d5;
+    reg signed [W-1:0] c2a0_d6;
+    reg signed [W-1:0] c2a0_d7;
+
     reg signed [W-1:0] c2a1_d0;
     reg signed [W-1:0] c2a1_d1;
     reg signed [W-1:0] c2a1_d2;
     reg signed [W-1:0] c2a1_d3;
+    reg signed [W-1:0] c2a1_d4;
+    reg signed [W-1:0] c2a1_d5;
+    reg signed [W-1:0] c2a1_d6;
+    reg signed [W-1:0] c2a1_d7;
+
     reg signed [W-1:0] c2a2_d0;
     reg signed [W-1:0] c2a2_d1;
     reg signed [W-1:0] c2a2_d2;
     reg signed [W-1:0] c2a2_d3;
+    reg signed [W-1:0] c2a2_d4;
+    reg signed [W-1:0] c2a2_d5;
+    reg signed [W-1:0] c2a2_d6;
+    reg signed [W-1:0] c2a2_d7;
+
     reg signed [W-1:0] c2a3_d0;
     reg signed [W-1:0] c2a3_d1;
     reg signed [W-1:0] c2a3_d2;
     reg signed [W-1:0] c2a3_d3;
+    reg signed [W-1:0] c2a3_d4;
+    reg signed [W-1:0] c2a3_d5;
+    reg signed [W-1:0] c2a3_d6;
+    reg signed [W-1:0] c2a3_d7;
+
     reg signed [W-1:0] c2_out_d0;
     reg signed [W-1:0] c2_out_d1;
     reg signed [W-1:0] c2_out_d2;
     reg signed [W-1:0] c2_out_d3;
+    reg signed [W-1:0] c2_out_d4;
+    reg signed [W-1:0] c2_out_d5;
+    reg signed [W-1:0] c2_out_d6;
+    reg signed [W-1:0] c2_out_d7;
+
     reg c2_out_v;
 
-    assign c2a0_d0 = ac_c1_0_out_d0;
-    assign c2a0_d1 = ac_c1_1_out_d0;
-    assign c2a0_d2 = ac_c1_2_out_d0;
-    assign c2a0_d3 = ac_c1_3_out_d0;
-    assign c2a1_d0 = ac_c1_0_out_d1;
-    assign c2a1_d1 = ac_c1_1_out_d1;
-    assign c2a1_d2 = ac_c1_2_out_d1;
-    assign c2a1_d3 = ac_c1_3_out_d1;
-    assign c2a2_d0 = ac_c1_0_out_d2;
-    assign c2a2_d1 = ac_c1_1_out_d2;
-    assign c2a2_d2 = ac_c1_2_out_d2;
-    assign c2a2_d3 = ac_c1_3_out_d2;
-    assign c2a3_d0 = ac_c1_0_out_d3;
-    assign c2a3_d1 = ac_c1_1_out_d3;
-    assign c2a3_d2 = ac_c1_2_out_d3;
-    assign c2a3_d3 = ac_c1_3_out_d3;
+    assign c2a0_d0 = ac_c1_d0_out_l0;
+    assign c2a0_d1 = ac_c1_d1_out_l0;
+    assign c2a0_d2 = ac_c1_d2_out_l0;
+    assign c2a0_d3 = ac_c1_d3_out_l0;
+    assign c2a0_d4 = ac_c1_d4_out_l0;
+    assign c2a0_d5 = ac_c1_d5_out_l0;
+    assign c2a0_d6 = ac_c1_d6_out_l0;
+    assign c2a0_d7 = ac_c1_d7_out_l0;
+
+    assign c2a1_d0 = ac_c1_d0_out_l1;
+    assign c2a1_d1 = ac_c1_d1_out_l1;
+    assign c2a1_d2 = ac_c1_d2_out_l1;
+    assign c2a1_d3 = ac_c1_d3_out_l1;
+    assign c2a1_d4 = ac_c1_d4_out_l1;
+    assign c2a1_d5 = ac_c1_d5_out_l1;
+    assign c2a1_d6 = ac_c1_d6_out_l1;
+    assign c2a1_d7 = ac_c1_d7_out_l1;
+
+    assign c2a2_d0 = ac_c1_d0_out_l2;
+    assign c2a2_d1 = ac_c1_d1_out_l2;
+    assign c2a2_d2 = ac_c1_d2_out_l2;
+    assign c2a2_d3 = ac_c1_d3_out_l2;
+    assign c2a2_d4 = ac_c1_d4_out_l2;
+    assign c2a2_d5 = ac_c1_d5_out_l2;
+    assign c2a2_d6 = ac_c1_d6_out_l2;
+    assign c2a2_d7 = ac_c1_d7_out_l2;
+
+    assign c2a3_d0 = ac_c1_d0_out_l3;
+    assign c2a3_d1 = ac_c1_d1_out_l3;
+    assign c2a3_d2 = ac_c1_d2_out_l3;
+    assign c2a3_d3 = ac_c1_d3_out_l3;
+    assign c2a3_d4 = ac_c1_d4_out_l3;
+    assign c2a3_d5 = ac_c1_d5_out_l3;
+    assign c2a3_d6 = ac_c1_d6_out_l3;
+    assign c2a3_d7 = ac_c1_d7_out_l3;
 
     conv1d #(.B_VALUES("weights/qconv2")) conv2 (
         .clk(clk), .rst(c2_rst), .apply_relu(1'b0),
-        .a0_d0(c2a0_d0), .a0_d1(c2a0_d1), .a0_d2(c2a0_d2), .a0_d3(c2a0_d3),
-        .a1_d0(c2a1_d0), .a1_d1(c2a1_d1), .a1_d2(c2a1_d2), .a1_d3(c2a1_d3),
-        .a2_d0(c2a2_d0), .a2_d1(c2a2_d1), .a2_d2(c2a2_d2), .a2_d3(c2a2_d3),
-        .a3_d0(c2a3_d0), .a3_d1(c2a3_d1), .a3_d2(c2a3_d2), .a3_d3(c2a3_d3),
+        .a0_d0(c2a0_d0), .a0_d1(c2a0_d1), .a0_d2(c2a0_d2), .a0_d3(c2a0_d3), .a0_d4(c2a0_d4), .a0_d5(c2a0_d5), .a0_d6(c2a0_d6), .a0_d7(c2a0_d7),
+        .a1_d0(c2a1_d0), .a1_d1(c2a1_d1), .a1_d2(c2a1_d2), .a1_d3(c2a1_d3), .a1_d4(c2a1_d4), .a1_d5(c2a1_d5), .a1_d6(c2a1_d6), .a1_d7(c2a1_d7),
+        .a2_d0(c2a2_d0), .a2_d1(c2a2_d1), .a2_d2(c2a2_d2), .a2_d3(c2a2_d3), .a2_d4(c2a2_d4), .a2_d5(c2a2_d5), .a2_d6(c2a2_d6), .a2_d7(c2a2_d7),
+        .a3_d0(c2a3_d0), .a3_d1(c2a3_d1), .a3_d2(c2a3_d2), .a3_d3(c2a3_d3), .a3_d4(c2a3_d4), .a3_d5(c2a3_d5), .a3_d6(c2a3_d6), .a3_d7(c2a3_d7),
         .out_d0(c2_out_d0), .out_d1(c2_out_d1), .out_d2(c2_out_d2), .out_d3(c2_out_d3),
+        .out_d4(c2_out_d4), .out_d5(c2_out_d5), .out_d6(c2_out_d6), .out_d7(c2_out_d7),
         .out_v(c2_out_v));
 
     //---------------------------------
