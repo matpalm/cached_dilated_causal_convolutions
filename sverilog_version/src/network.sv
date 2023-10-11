@@ -85,7 +85,7 @@ module network #(
     assign c0a3_d2 = 0;
     assign c0a3_d3 = 0;
 
-    conv1d #(.B_VALUES("qconv0_weights")) conv0 (
+    conv1d #(.B_VALUES("weights/qconv0")) conv0 (
         .clk(clk), .rst(c0_rst), .apply_relu(1'b1),
         .a0_d0(c0a0_d0), .a0_d1(c0a0_d1), .a0_d2(c0a0_d2), .a0_d3(c0a0_d3),
         .a1_d0(c0a1_d0), .a1_d1(c0a1_d1), .a1_d2(c0a1_d2), .a1_d3(c0a1_d3),
@@ -187,7 +187,7 @@ module network #(
     assign c1a3_d2 = ac_c0_2_out_d3;
     assign c1a3_d3 = ac_c0_3_out_d3;
 
-    conv1d #(.B_VALUES("qconv1_weights")) conv1 (
+    conv1d #(.B_VALUES("weights/qconv1")) conv1 (
         .clk(clk), .rst(c1_rst), .apply_relu(1'b1),
         .a0_d0(c1a0_d0), .a0_d1(c1a0_d1), .a0_d2(c1a0_d2), .a0_d3(c1a0_d3),
         .a1_d0(c1a1_d0), .a1_d1(c1a1_d1), .a1_d2(c1a1_d2), .a1_d3(c1a1_d3),
@@ -289,7 +289,7 @@ module network #(
     assign c2a3_d2 = ac_c1_2_out_d3;
     assign c2a3_d3 = ac_c1_3_out_d3;
 
-    conv1d #(.B_VALUES("qconv2_weights")) conv2 (
+    conv1d #(.B_VALUES("weights/qconv2")) conv2 (
         .clk(clk), .rst(c2_rst), .apply_relu(1'b0),
         .a0_d0(c2a0_d0), .a0_d1(c2a0_d1), .a0_d2(c2a0_d2), .a0_d3(c2a0_d3),
         .a1_d0(c2a1_d0), .a1_d1(c2a1_d1), .a1_d2(c2a1_d2), .a1_d3(c2a1_d3),
