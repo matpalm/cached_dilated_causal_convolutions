@@ -10,6 +10,10 @@ module dot_product #(
   input signed [W-1:0]         a_d1,
   input signed [W-1:0]         a_d2,
   input signed [W-1:0]         a_d3,
+  input signed [W-1:0]         a_d4,
+  input signed [W-1:0]         a_d5,
+  input signed [W-1:0]         a_d6,
+  input signed [W-1:0]         a_d7,
   output reg signed [2*W-1:0]  out,
   output reg                   out_v
 );
@@ -17,13 +21,17 @@ module dot_product #(
     // state machine for pipelined mulitplies ( in pairs )
     // and accumulation.
     localparam
-        MULT_D0     = 3'b000,
-        MULT_D1     = 3'b001,
-        MULT_D2     = 3'b010,
-        MULT_D3     = 3'b011,
-        FINAL_ADD   = 3'b100,
-        DONE        = 3'b101;
-    reg [2:0] dp_state = MULT_D0;
+        MULT_D0     = 4'b0000,
+        MULT_D1     = 4'b0001,
+        MULT_D2     = 4'b0010,
+        MULT_D3     = 4'b0011,
+        MULT_D4     = 4'b0100,
+        MULT_D5     = 4'b0101,
+        MULT_D6     = 4'b0110,
+        MULT_D7     = 4'b0111,
+        FINAL_ADD   = 4'b1000,
+        DONE        = 4'b1001;
+    reg [3:0] dp_state = MULT_D0;
 
     // see https://projectf.io/posts/fixed-point-numbers-in-verilog/
     reg signed [2*W-1:0] acc0;
@@ -37,7 +45,7 @@ module dot_product #(
         $readmemh(B_VALUES, b_values);
         out_v <= 0;
     end
-    reg signed [W-1:0] b_values [0:3];
+    reg signed [W-1:0] b_values [0:7];
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -63,6 +71,26 @@ module dot_product #(
                 MULT_D3: begin
                     acc0 <= acc0 + product0;
                     product0 <= a_d3 * b_values[3];
+                    dp_state <= MULT_D4;
+                end
+                MULT_D4: begin
+                    acc0 <= acc0 + product0;
+                    product0 <= a_d4 * b_values[4];
+                    dp_state <= MULT_D5;
+                end
+                MULT_D5: begin
+                    acc0 <= acc0 + product0;
+                    product0 <= a_d5 * b_values[5];
+                    dp_state <= MULT_D6;
+                end
+                MULT_D6: begin
+                    acc0 <= acc0 + product0;
+                    product0 <= a_d6 * b_values[6];
+                    dp_state <= MULT_D7;
+                end
+                MULT_D7: begin
+                    acc0 <= acc0 + product0;
+                    product0 <= a_d7 * b_values[7];
                     dp_state <= FINAL_ADD;
                 end
                 FINAL_ADD: begin
