@@ -34,9 +34,9 @@ async def test_1d_dot_product_low_values(dut):
             break
         print("i", i, "waiting", dut.dp_state.value)
         print("acc0    ", dut.acc0.value)
-        print("acc1    ", dut.acc1.value)
+        #print("acc1    ", dut.acc1.value)
         print("product0", dut.product0.value)
-        print("product1", dut.product1.value)
+        #print("product1", dut.product1.value)
         await RisingEdge(dut.clk)
 
     # should be valid

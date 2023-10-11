@@ -17,20 +17,19 @@ module dot_product #(
     // state machine for pipelined mulitplies ( in pairs )
     // and accumulation.
     localparam
-        MULT_01     = 3'b000,
-        MULT_23     = 3'b001,
-        // MULT_45     = 3'b010,
-        // MULT_67     = 3'b011,
-        FINAL_ADD_1 = 3'b100,
-        FINAL_ADD_2 = 3'b101,
-        DONE        = 3'b110;
-    reg [2:0] dp_state = MULT_01;
+        MULT_D0     = 3'b000,
+        MULT_D1     = 3'b001,
+        MULT_D2     = 3'b010,
+        MULT_D3     = 3'b011,
+        FINAL_ADD   = 3'b100,
+        DONE        = 3'b101;
+    reg [2:0] dp_state = MULT_D0;
 
     // see https://projectf.io/posts/fixed-point-numbers-in-verilog/
     reg signed [2*W-1:0] acc0;
     reg signed [2*W-1:0] product0;
-    reg signed [2*W-1:0] acc1;
-    reg signed [2*W-1:0] product1;
+    //reg signed [2*W-1:0] acc1;
+    //reg signed [2*W-1:0] product1;
 
     // b values for dot product are network weights and are
     // provided by B_VALUES module level param
@@ -42,50 +41,36 @@ module dot_product #(
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            dp_state <= MULT_01;
+            dp_state <= MULT_D0;
             out_v <= 0;
         end else
             case(dp_state)
-                MULT_01: begin
+                MULT_D0: begin
                     acc0 <= 0;
-                    acc1 <= 0;
                     product0 <= a_d0 * b_values[0];
-                    product1 <= a_d1 * b_values[1];
-                    dp_state <= MULT_23;
+                    dp_state <= MULT_D1;
                 end
-                MULT_23: begin
+                MULT_D1: begin
                     acc0 <= acc0 + product0;
-                    acc1 <= acc1 + product1;
+                    product0 <= a_d1 * b_values[1];
+                    dp_state <= MULT_D2;
+                end
+                MULT_D2: begin
+                    acc0 <= acc0 + product0;
                     product0 <= a_d2 * b_values[2];
-                    product1 <= a_d3 * b_values[3];
-                    //dp_state <= MULT_45;
-                    dp_state <= FINAL_ADD_1;
+                    dp_state <= MULT_D3;
                 end
-                // MULT_45: begin
-                //     acc0 <= acc0 + product0;
-                //     acc1 <= acc1 + product1;
-                //     product0 <= a[4] * b_values[4];
-                //     product1 <= a[5] * b_values[5];
-                //     dp_state <= MULT_67;
-                // end
-                // MULT_67: begin
-                //     acc0 <= acc0 + product0;
-                //     acc1 <= acc1 + product1;
-                //     product0 <= a[6] * b_values[6];
-                //     product1 <= a[7] * b_values[7];
-                //     dp_state <= FINAL_ADD_1;
-                // end
-                FINAL_ADD_1: begin
+                MULT_D3: begin
                     acc0 <= acc0 + product0;
-                    acc1 <= acc1 + product1;
-                    dp_state <= FINAL_ADD_2;
+                    product0 <= a_d3 * b_values[3];
+                    dp_state <= FINAL_ADD;
                 end
-                FINAL_ADD_2: begin
-                    acc0 <= acc0 + acc1;
+                FINAL_ADD: begin
+                    acc0 <= acc0 + product0;
                     dp_state <= DONE;
                 end
                 DONE: begin
-                    out <= acc0; // emit double width
+                    out <= acc0;
                     out_v <= 1;
                 end
             endcase
