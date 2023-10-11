@@ -36,6 +36,7 @@ fxp_model = FxpModel('qkeras_weights.pkl')
 fxp_model.qconv0.export_weights_per_dot_product("/tmp/weights/qconv0")
 fxp_model.qconv1.export_weights_per_dot_product("/tmp/weights/qconv1")
 fxp_model.qconv2.export_weights_per_dot_product("/tmp/weights/qconv2")
+fxp_model.qconv3.export_weights_per_dot_product("/tmp/weights/qconv3")
 
 # run net
 y_pred = []

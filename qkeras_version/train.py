@@ -26,17 +26,16 @@ if __name__ == '__main__':
     # parse files and do splits etc
     data = WaveToWaveData()
 
-    # WIP in == out == filter_size
-    # TODO: do three version of qconv1d see create_dilated_model
+    K = 4
 
     IN_OUT_D = 8
-    NUM_LAYERS = 3
+    NUM_LAYERS = 4
     # WIP filter size of 3; final will be 8
     FILTER_SIZE = 8
 
-    # note: kernel size and implied dilation rate always assumed 4
+    # note: kernel size and implied dilation rate always assumed K
 
-    RECEPTIVE_FIELD_SIZE = 4**NUM_LAYERS
+    RECEPTIVE_FIELD_SIZE = K**NUM_LAYERS
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)

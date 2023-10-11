@@ -78,13 +78,19 @@ async def test_networks(dut):
         elif dut.net_state.value == 8:
             return "CONV_2_RUNNING"
         elif dut.net_state.value == 9:
+            return "CLK_ACT_CACHE_2"
+        elif dut.net_state.value == 10:
+            return "RST_CONV_3"
+        elif dut.net_state.value == 11:
+            return "CONV_3_RUNNING"
+        elif dut.net_state.value == 12:
             return "OUTPUT"
         else:
             raise Exception(f"unknown state [{dut.net_state.value}]")
 
     for i in range(100000):
 
-        if dut.net_state.value == 9:
+        if dut.net_state.value == 12:
             if len(test_x_hex_values) == 0:
                 # we are done
                 break
@@ -125,7 +131,9 @@ async def test_networks(dut):
         # print("ac_c0_3 out d", fixed_point_array_to_decimals(dut.activation_cache_c0_3.out.value))
 
         print("c1_out_v", dut.c1_out_v.value)
-        print("conv1.result.value", dut.conv1.result.value)
+        print("conv1.result.value hex", dut.conv1.result.value)
+        print("conv1.result.value dec", fixed_point_array_to_decimals(dut.conv1.result.value))
+
         print("ac_c1_clk", dut.ac_c1_clk.value)
         # print("ac_c1_0 buffer", dut.activation_cache_c1_0.buffer.value)
         # print("ac_c1_1 buffer", dut.activation_cache_c1_1.buffer.value)
@@ -135,8 +143,16 @@ async def test_networks(dut):
         # print("ac_c1_1 out", dut.activation_cache_c1_1.out.value)
         # print("ac_c1_2 out", dut.activation_cache_c1_2.out.value)
         # print("ac_c1_3 out", dut.activation_cache_c1_3.out.value)
+
         print("c2_out_v", dut.c2_out_v.value)
-        print("conv2.result.value", dut.conv2.result.value)
+        print("conv2.result.value hex", dut.conv2.result.value)
+        print("conv2.result.value dec", fixed_point_array_to_decimals(dut.conv2.result.value))
+
+        print("ac_c2_clk", dut.ac_c2_clk.value)
+
+        print("c3_out_v", dut.c3_out_v.value)
+        print("conv3.result.value hex", dut.conv3.result.value)
+
         out_values = [dut.out_d0.value, dut.out_d1.value, dut.out_d2.value, dut.out_d3.value]
         print("OUT", dut.out_v.value, out_values)
         await RisingEdge(dut.clk)

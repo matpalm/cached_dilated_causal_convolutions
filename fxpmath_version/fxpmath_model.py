@@ -18,7 +18,7 @@ class FxpModel(object):
             self.weights = pickle.load(f)
 
         # assume just two convs
-        assert sorted(self.weights.keys()) == ['qconv_0', 'qconv_1', 'qconv_2']
+        assert sorted(self.weights.keys()) == ['qconv_0', 'qconv_1', 'qconv_2', 'qconv_3']
 
         # use first conv to derive in/out size
         # recall; for now we assume in==out
@@ -63,6 +63,15 @@ class FxpModel(object):
             weights=self.weights['qconv_2']['weights'][0],
             biases=self.weights['qconv_2']['weights'][1]
             )
+        self.activation_cache_2 = ActivationCache(
+            depth=self.in_out_d, dilation=4**3, kernel_size=4
+        )
+
+        self.qconv3 = FxpMathConv1D(
+            self.fxp,
+            weights=self.weights['qconv_3']['weights'][0],
+            biases=self.weights['qconv_3']['weights'][1]
+            )
 
 
     def predict(self, x):
@@ -78,23 +87,30 @@ class FxpModel(object):
         print("lsb", self.input)
 
         # pass input to qconv0, then activation cache
-        out0 = self.qconv0.apply(self.input, relu=True)
-        print("qconv0.out", out0)
-        self.activation_cache_0.add(out0)
-        out0 = self.activation_cache_0.cached_dilated_values()
-        print("activation_cache_0.out", out0)
+        y_pred = self.qconv0.apply(self.input, relu=True)
+        print("qconv0.out", y_pred)
+        self.activation_cache_0.add(y_pred)
+        y_pred = self.activation_cache_0.cached_dilated_values()
+        print("activation_cache_0.out", y_pred)
 
         # pass cached values to qconv1, then next activate cache
-        out1 = self.qconv1.apply(out0, relu=True)
-        print("qconv1.out", out1)
-        self.activation_cache_1.add(out1)
-        out1 = self.activation_cache_1.cached_dilated_values()
-        print("activation_cache_1.out", out1)
+        y_pred = self.qconv1.apply(y_pred, relu=True)
+        print("qconv1.out", y_pred)
+        self.activation_cache_1.add(y_pred)
+        y_pred = self.activation_cache_1.cached_dilated_values()
+        print("activation_cache_1.out", y_pred)
 
-        # pass cached values to qconv2, without relu, for result
-        out2 = self.qconv2.apply(out1, relu=False)
-        print("qconv2.out", out2)
-        return out2
+        # pass cached values to qconv2, then next activate cache
+        y_pred = self.qconv2.apply(y_pred, relu=True)
+        print("qconv2.out", y_pred)
+        self.activation_cache_2.add(y_pred)
+        y_pred = self.activation_cache_2.cached_dilated_values()
+        print("activation_cache_2.out", y_pred)
+
+        # pass cached values to qconv3, without relu, for result
+        y_pred = self.qconv3.apply(y_pred, relu=False)
+        print("qconv3.out", y_pred)
+        return y_pred
 
 if __name__ == '__main__':
     fxp_model = FxpModel(weights_file='qkeras_weights.pkl')

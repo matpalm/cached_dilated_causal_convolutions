@@ -60,11 +60,13 @@ def create_dilated_model(seq_len: int,
     # TODO: first conv should be in_out_d -> filter_size
     #  but for now assuming they are the same size.
 
+    K = 4
+
     collected_outputs = []
     for i in range(num_layers):
         last_layer = QConv1D(name=f"qconv_{i}", filters=filter_size,
-                           kernel_size=4, padding='causal',
-                           dilation_rate=4**i,  # fixed K=4
+                           kernel_size=K, padding='causal',
+                           dilation_rate=K**i,
                            kernel_quantizer=quantiser(),
                            bias_quantizer=quantiser())(last_layer)
         collected_outputs.append(last_layer)
