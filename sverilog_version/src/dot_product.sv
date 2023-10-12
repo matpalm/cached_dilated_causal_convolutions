@@ -1,11 +1,15 @@
 `default_nettype none
 
+// a . b_values -> out
+// (8,) . (8,) -> (1,)
+
 module dot_product #(
     parameter W=16,
     parameter B_VALUES="test_b_values.hex"
 )(
   input                        clk,
   input                        rst,
+
   input signed [W-1:0]         a_d0,
   input signed [W-1:0]         a_d1,
   input signed [W-1:0]         a_d2,
@@ -14,6 +18,7 @@ module dot_product #(
   input signed [W-1:0]         a_d5,
   input signed [W-1:0]         a_d6,
   input signed [W-1:0]         a_d7,
+
   output reg signed [2*W-1:0]  out,
   output reg                   out_v
 );

@@ -3,14 +3,18 @@
 module network #(
     parameter W = 16  // width for each element
 )(
-    input                     clk,
-    input                     rst,
-    input signed [W-1:0]      inp,
-    output reg signed [W-1:0] out_d0,
-    output reg signed [W-1:0] out_d1,
-    output reg signed [W-1:0] out_d2,
-    output reg signed [W-1:0] out_d3,
-    output reg                out_v
+    input rst,
+    input clk,
+    input sample_clk,
+    input signed [W-1:0] sample_in0,
+    input signed [W-1:0] sample_in1,
+    input signed [W-1:0] sample_in2,
+    input signed [W-1:0] sample_in3,
+    output signed [W-1:0] sample_out0,
+    output signed [W-1:0] sample_out1,
+    output signed [W-1:0] sample_out2,
+    output signed [W-1:0] sample_out3,
+    input [7:0] jack
 );
 
     localparam
@@ -33,14 +37,18 @@ module network #(
     //--------------------------------
     // left shift buffer
 
+    // TODO: do we need to register sample_in0?
+    // TODO: introduce three more lsbs for sample_in1, in2 and in3
+
     reg lsb_clk =0;
     reg signed [W-1:0] lsb_out_d0;
     reg signed [W-1:0] lsb_out_d1;
     reg signed [W-1:0] lsb_out_d2;
     reg signed [W-1:0] lsb_out_d3;
+
     left_shift_buffer lsb (
         .clk(lsb_clk), .rst(rst),
-        .inp(inp),
+        .inp(sample_in0),
         .out_d0(lsb_out_d0), .out_d1(lsb_out_d1), .out_d2(lsb_out_d2), .out_d3(lsb_out_d3)
     );
 
@@ -725,6 +733,16 @@ module network #(
     //---------------------------------
     // main network state machine
 
+    logic signed [W-1:0] out0;
+    logic signed [W-1:0] out1;
+    logic signed [W-1:0] out2;
+    logic signed [W-1:0] out3;
+
+    always @(posedge sample_clk) begin
+        // start forward pass of network
+        net_state <= CLK_LSB;
+    end
+
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             net_state <= CLK_LSB;
@@ -733,7 +751,6 @@ module network #(
 
                 CLK_LSB: begin
                     // signal left shift buffer to run once
-                    out_v <= 0;
                     lsb_clk <= 1;
                     net_state <= RST_CONV_0;
                 end
@@ -779,6 +796,7 @@ module network #(
                 RST_CONV_2: begin
                     // signal conv2 to reset and run
                     ac_c1_clk <= 0;
+
                     c2_rst <= 1;
                     net_state <= CONV_2_RUNNING;
                 end
@@ -810,18 +828,21 @@ module network #(
 
                 OUTPUT: begin
                     // final net output is conv2 output
-                    out_d0 <= c3_out_d0;
-                    out_d1 <= c3_out_d1;
-                    out_d2 <= c3_out_d2;
-                    out_d3 <= c3_out_d3;
-                    out_v <= 1;
-                    net_state <= CLK_LSB;
+                    out0 <= c3_out_d0;
+                    out1 <= c3_out_d1;
+                    out2 <= c3_out_d2;
+                    out3 <= c3_out_d3;
                 end
 
 
             endcase
 
     end
+
+    assign sample_out0 = out0;
+    assign sample_out1 = out1;
+    assign sample_out2 = out2;
+    assign sample_out3 = out3;
 
 endmodule
 

@@ -53,10 +53,11 @@ async def test_networks(dut):
             _i, x, fp_x, fp_x_hex = line.strip().split(" ")
             test_x_hex_values.append((x, fp_x, fp_x_hex))
 
-    # set initial value
+    # set initial value and clock sample
     next_x_vals = test_x_hex_values.pop(0)
     next_x_hex_val = next_x_vals[2]
-    dut.inp.value = eval(next_x_hex_val)
+    dut.sample_in0.value = eval(next_x_hex_val)
+    dut.sample_clk = 1
 
     def net_state_to_str():
         if dut.net_state.value == 0:
@@ -97,7 +98,8 @@ async def test_networks(dut):
             # prep next test x value
             next_x_vals = test_x_hex_values.pop(0)
             next_x_hex_val = next_x_vals[2]
-            dut.inp.value = eval(next_x_hex_val)
+            dut.sample_in0.value = eval(next_x_hex_val)
+            dut.sample_clk = 1
             print("|test_x_hex_values|=", len(test_x_hex_values))
 
         print("i", i, "state", net_state_to_str(), dut.net_state.value)
@@ -153,6 +155,10 @@ async def test_networks(dut):
         print("c3_out_v", dut.c3_out_v.value)
         print("conv3.result.value hex", dut.conv3.result.value)
 
-        out_values = [dut.out_d0.value, dut.out_d1.value, dut.out_d2.value, dut.out_d3.value]
-        print("OUT", dut.out_v.value, out_values)
+        out_values = [dut.sample_out0.value, dut.sample_out1.value,
+                      dut.sample_out2.value, dut.sample_out3.value]
+        print("OUT", out_values)
+
         await RisingEdge(dut.clk)
+
+        dut.sample_clk = 0

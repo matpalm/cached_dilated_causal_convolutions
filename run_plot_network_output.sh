@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -ex
 cat sverilog_version/tests/network/net.out \
- | grep ^OUT\ 1 \
- | cut -b26-41 \
+ | grep ^OUT | grep -v xxxx | uniq \
+ | cut -b24-39 \
  | python3 single_width_bin_to_decimal.py \
  > y_pred.sverilog.txt
 ./plot.py --plot-png verilog.y_pred.png < y_pred.sverilog.txt

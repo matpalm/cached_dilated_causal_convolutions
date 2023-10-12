@@ -1,5 +1,8 @@
 `default_nettype none
 
+// a . b_values -> out
+// (1, 8) . (8, 8) -> (1, 8)
+
 module row_by_matrix_multiply #(
     parameter W=16,
     parameter B_VALUES="test_matrix"
