@@ -155,30 +155,37 @@ module network #(
     reg signed [W-1:0] ac_c0_d0_out_l1;
     reg signed [W-1:0] ac_c0_d0_out_l2;
     reg signed [W-1:0] ac_c0_d0_out_l3;
+
     reg signed [W-1:0] ac_c0_d1_out_l0;
     reg signed [W-1:0] ac_c0_d1_out_l1;
     reg signed [W-1:0] ac_c0_d1_out_l2;
     reg signed [W-1:0] ac_c0_d1_out_l3;
+
     reg signed [W-1:0] ac_c0_d2_out_l0;
     reg signed [W-1:0] ac_c0_d2_out_l1;
     reg signed [W-1:0] ac_c0_d2_out_l2;
     reg signed [W-1:0] ac_c0_d2_out_l3;
+
     reg signed [W-1:0] ac_c0_d3_out_l0;
     reg signed [W-1:0] ac_c0_d3_out_l1;
     reg signed [W-1:0] ac_c0_d3_out_l2;
     reg signed [W-1:0] ac_c0_d3_out_l3;
+
     reg signed [W-1:0] ac_c0_d4_out_l0;
     reg signed [W-1:0] ac_c0_d4_out_l1;
     reg signed [W-1:0] ac_c0_d4_out_l2;
     reg signed [W-1:0] ac_c0_d4_out_l3;
+
     reg signed [W-1:0] ac_c0_d5_out_l0;
     reg signed [W-1:0] ac_c0_d5_out_l1;
     reg signed [W-1:0] ac_c0_d5_out_l2;
     reg signed [W-1:0] ac_c0_d5_out_l3;
+
     reg signed [W-1:0] ac_c0_d6_out_l0;
     reg signed [W-1:0] ac_c0_d6_out_l1;
     reg signed [W-1:0] ac_c0_d6_out_l2;
     reg signed [W-1:0] ac_c0_d6_out_l3;
+
     reg signed [W-1:0] ac_c0_d7_out_l0;
     reg signed [W-1:0] ac_c0_d7_out_l1;
     reg signed [W-1:0] ac_c0_d7_out_l2;
@@ -349,30 +356,37 @@ module network #(
     reg signed [W-1:0] ac_c1_d0_out_l1;
     reg signed [W-1:0] ac_c1_d0_out_l2;
     reg signed [W-1:0] ac_c1_d0_out_l3;
+
     reg signed [W-1:0] ac_c1_d1_out_l0;
     reg signed [W-1:0] ac_c1_d1_out_l1;
     reg signed [W-1:0] ac_c1_d1_out_l2;
     reg signed [W-1:0] ac_c1_d1_out_l3;
+
     reg signed [W-1:0] ac_c1_d2_out_l0;
     reg signed [W-1:0] ac_c1_d2_out_l1;
     reg signed [W-1:0] ac_c1_d2_out_l2;
     reg signed [W-1:0] ac_c1_d2_out_l3;
+
     reg signed [W-1:0] ac_c1_d3_out_l0;
     reg signed [W-1:0] ac_c1_d3_out_l1;
     reg signed [W-1:0] ac_c1_d3_out_l2;
     reg signed [W-1:0] ac_c1_d3_out_l3;
+
     reg signed [W-1:0] ac_c1_d4_out_l0;
     reg signed [W-1:0] ac_c1_d4_out_l1;
     reg signed [W-1:0] ac_c1_d4_out_l2;
     reg signed [W-1:0] ac_c1_d4_out_l3;
+
     reg signed [W-1:0] ac_c1_d5_out_l0;
     reg signed [W-1:0] ac_c1_d5_out_l1;
     reg signed [W-1:0] ac_c1_d5_out_l2;
     reg signed [W-1:0] ac_c1_d5_out_l3;
+
     reg signed [W-1:0] ac_c1_d6_out_l0;
     reg signed [W-1:0] ac_c1_d6_out_l1;
     reg signed [W-1:0] ac_c1_d6_out_l2;
     reg signed [W-1:0] ac_c1_d6_out_l3;
+
     reg signed [W-1:0] ac_c1_d7_out_l0;
     reg signed [W-1:0] ac_c1_d7_out_l1;
     reg signed [W-1:0] ac_c1_d7_out_l2;
@@ -544,30 +558,37 @@ module network #(
     reg signed [W-1:0] ac_c2_d0_out_l1;
     reg signed [W-1:0] ac_c2_d0_out_l2;
     reg signed [W-1:0] ac_c2_d0_out_l3;
+
     reg signed [W-1:0] ac_c2_d1_out_l0;
     reg signed [W-1:0] ac_c2_d1_out_l1;
     reg signed [W-1:0] ac_c2_d1_out_l2;
     reg signed [W-1:0] ac_c2_d1_out_l3;
+
     reg signed [W-1:0] ac_c2_d2_out_l0;
     reg signed [W-1:0] ac_c2_d2_out_l1;
     reg signed [W-1:0] ac_c2_d2_out_l2;
     reg signed [W-1:0] ac_c2_d2_out_l3;
+
     reg signed [W-1:0] ac_c2_d3_out_l0;
     reg signed [W-1:0] ac_c2_d3_out_l1;
     reg signed [W-1:0] ac_c2_d3_out_l2;
     reg signed [W-1:0] ac_c2_d3_out_l3;
+
     reg signed [W-1:0] ac_c2_d4_out_l0;
     reg signed [W-1:0] ac_c2_d4_out_l1;
     reg signed [W-1:0] ac_c2_d4_out_l2;
     reg signed [W-1:0] ac_c2_d4_out_l3;
+
     reg signed [W-1:0] ac_c2_d5_out_l0;
     reg signed [W-1:0] ac_c2_d5_out_l1;
     reg signed [W-1:0] ac_c2_d5_out_l2;
     reg signed [W-1:0] ac_c2_d5_out_l3;
+
     reg signed [W-1:0] ac_c2_d6_out_l0;
     reg signed [W-1:0] ac_c2_d6_out_l1;
     reg signed [W-1:0] ac_c2_d6_out_l2;
     reg signed [W-1:0] ac_c2_d6_out_l3;
+
     reg signed [W-1:0] ac_c2_d7_out_l0;
     reg signed [W-1:0] ac_c2_d7_out_l1;
     reg signed [W-1:0] ac_c2_d7_out_l2;
