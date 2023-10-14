@@ -1,5 +1,10 @@
 `default_nettype none
 
+// TODO: the whole _d0 -> _d7 for port arrays is crazy. need to
+//       either 1) pack everything into a single [8*W-1:] array or
+//       2) go back to the port arrays version and convert everything
+//       sv2v ( which worked for a prototype )
+
 module network #(
     parameter W = 16  // width for each element
 )(
