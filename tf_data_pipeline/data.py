@@ -107,16 +107,25 @@ class Embed2DWaveFormData(object):
 
 class WaveToWaveData(object):
 
-    def __init__(self, root_dir='datalogger_firmware/data'):
+    def __init__(self,
+                 root_dir='datalogger_firmware/data',
+                 in_out_d=8,
+                 rescaling_factor=1
+                 ):
+
         fname = f"{root_dir}/2d_embed/32kHz/tri_squ_zigzag.ssv"
         data = pd.read_csv(fname, sep=' ', names=['tri', 'square', 'zigzag']).to_numpy()
 
         # for prototype
         n = len(data)
-        x = np.concatenate([data[:,0:1], np.zeros((n, 7))], axis=-1)  # (tri, 0, 0, 0, 0, 0, 0, 0)
-        y = np.concatenate([data, np.zeros((n, 5))], axis=-1)         # (tri, square, zigzag, 0, 0, 0, 0, 0)
-        assert x.shape == (n, 8)
-        assert y.shape == (n, 8)
+        x = np.concatenate([data[:,0:1], np.zeros((n, in_out_d-1))], axis=-1)  # (tri, 0, 0, 0, 0, 0, 0, 0)
+        y = np.concatenate([data, np.zeros((n, in_out_d-3))], axis=-1)         # (tri, square, zigzag, 0, 0, 0, 0, 0)
+        assert x.shape == (n, in_out_d)
+        assert y.shape == (n, in_out_d)
+
+        if rescaling_factor != 1:
+            x *= rescaling_factor
+            y *= rescaling_factor
 
         # take splits
         val_test_split_size = int(len(x) * 0.1)  # 10% for val and test
@@ -153,3 +162,10 @@ class WaveToWaveData(object):
         ds = ds.batch(1 if split=='test' else 128)
 
         return ds.prefetch(tf.data.AUTOTUNE)
+
+
+
+# ds = WaveToWaveData(in_out_d=6, rescaling_factor=5.0)
+# for x, y in ds.tf_dataset_for_split('test', seq_len=4, max_samples=10):
+#     print(x, y)
+#     break
