@@ -17,25 +17,23 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--learning-rate', type=float, default=1e-3)
     parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--num-layers', type=int, default=4)
     parser.add_argument('--num-train-egs', type=int, default=200_000)
     parser.add_argument('--num-validate-egs', type=int, default=1_000)
+    parser.add_argument('--data-rescaling-factor', type=float, default=1.0)
     parser.add_argument('--save-weights', type=str, default='qkeras_weights.pkl')
     opts = parser.parse_args()
     print("opts", opts)
 
     # parse files and do splits etc
-    data = WaveToWaveData()
+    data = WaveToWaveData(rescaling_factor=opts.data_rescaling_factor)
 
     K = 4
-
-    IN_OUT_D = 8
-    NUM_LAYERS = 4
-    # WIP filter size of 3; final will be 8
-    FILTER_SIZE = 8
+    IN_OUT_D = FILTER_SIZE = 8
 
     # note: kernel size and implied dilation rate always assumed K
 
-    RECEPTIVE_FIELD_SIZE = K**NUM_LAYERS
+    RECEPTIVE_FIELD_SIZE = K**opts.num_layers
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
@@ -44,7 +42,8 @@ if __name__ == '__main__':
 
     # make model
     train_model = create_dilated_model(TRAIN_SEQ_LEN,
-            in_out_d=IN_OUT_D, num_layers=NUM_LAYERS, filter_size=FILTER_SIZE,
+            in_out_d=IN_OUT_D, num_layers=opts.num_layers,
+            filter_size=FILTER_SIZE,
             all_outputs=False)
     print(train_model.summary())
 
@@ -64,8 +63,9 @@ if __name__ == '__main__':
                     callbacks=[checkpoint_cb],
                     epochs=opts.epochs)
 
+    quantised_weights = model_save_quantized_weights(train_model)
+
     with open(opts.save_weights, 'wb') as f:
-        pickle.dump(model_save_quantized_weights(train_model),
-                    f, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 

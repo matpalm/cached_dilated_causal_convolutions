@@ -91,7 +91,7 @@ class FxpMathConv1D(object):
         return np.array(accum0)
 
 
-    def export_weights_per_dot_product(self, root_dir):
+    def export_weights_for_verilog(self, root_dir):
         # export weights for this conv1d in format
         # for loading in verilog with $readmemh
 

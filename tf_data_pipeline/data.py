@@ -110,7 +110,7 @@ class WaveToWaveData(object):
     def __init__(self,
                  root_dir='datalogger_firmware/data',
                  in_out_d=8,
-                 rescaling_factor=1
+                 rescaling_factor=1  # as a workaround to calibration on FPGA
                  ):
 
         fname = f"{root_dir}/2d_embed/32kHz/tri_squ_zigzag.ssv"

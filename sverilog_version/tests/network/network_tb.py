@@ -53,6 +53,9 @@ async def test_networks(dut):
             _i, x, fp_x, fp_x_hex = line.strip().split(" ")
             test_x_hex_values.append((x, fp_x, fp_x_hex))
 
+    # fxpmath version is only running 200, so only do 200 here too
+    test_x_hex_values = test_x_hex_values[:200]
+
     # set initial value and clock sample
     next_x_vals = test_x_hex_values.pop(0)
     next_x_hex_val = next_x_vals[2]
@@ -60,38 +63,38 @@ async def test_networks(dut):
     dut.sample_clk = 1
 
     def net_state_to_str():
-        if dut.net_state.value == 0:
+        if dut.state.value == 0:
             return "CLK_LSB"
-        elif dut.net_state.value == 1:
+        elif dut.state.value == 1:
             return "RST_CONV_0"
-        elif dut.net_state.value == 2:
+        elif dut.state.value == 2:
             return "CONV_0_RUNNING"
-        elif dut.net_state.value == 3:
+        elif dut.state.value == 3:
             return "CLK_ACT_CACHE_0"
-        elif dut.net_state.value == 4:
+        elif dut.state.value == 4:
             return "RST_CONV_1"
-        elif dut.net_state.value == 5:
+        elif dut.state.value == 5:
             return "CONV_1_RUNNING"
-        elif dut.net_state.value == 6:
+        elif dut.state.value == 6:
             return "CLK_ACT_CACHE_1"
-        elif dut.net_state.value == 7:
+        elif dut.state.value == 7:
             return "RST_CONV_2"
-        elif dut.net_state.value == 8:
+        elif dut.state.value == 8:
             return "CONV_2_RUNNING"
-        elif dut.net_state.value == 9:
+        elif dut.state.value == 9:
             return "CLK_ACT_CACHE_2"
-        elif dut.net_state.value == 10:
+        elif dut.state.value == 10:
             return "RST_CONV_3"
-        elif dut.net_state.value == 11:
+        elif dut.state.value == 11:
             return "CONV_3_RUNNING"
-        elif dut.net_state.value == 12:
+        elif dut.state.value == 12:
             return "OUTPUT"
         else:
-            raise Exception(f"unknown state [{dut.net_state.value}]")
+            raise Exception(f"unknown state [{dut.state.value}]")
 
     for i in range(100000):
 
-        if dut.net_state.value == 12:
+        if dut.state.value == 12:
             if len(test_x_hex_values) == 0:
                 # we are done
                 break
@@ -102,7 +105,7 @@ async def test_networks(dut):
             dut.sample_clk = 1
             print("|test_x_hex_values|=", len(test_x_hex_values))
 
-        print("i", i, "state", net_state_to_str(), dut.net_state.value)
+        print("i", i, "state", net_state_to_str(), dut.state.value)
         print("next_x_vals", next_x_vals)
 
         lsb_out = [dut.lsb.out_d0.value, dut.lsb.out_d1.value,
@@ -114,7 +117,7 @@ async def test_networks(dut):
         print("conv0.result.value hex", dut.conv0.result.value)
         print("conv0.result.value dec", fixed_point_array_to_decimals(dut.conv0.result.value))
 
-        print("ac_c0_clk", dut.ac_c0_clk.value)
+        # print("ac_c0_clk", dut.ac_c0_clk.value)
         # print("ac_c0_0 buffer", dut.activation_cache_c0_0.buffer.value)
         # print("ac_c0_1 buffer", dut.activation_cache_c0_1.buffer.value)
         # print("ac_c0_2 buffer", dut.activation_cache_c0_2.buffer.value)
@@ -132,11 +135,11 @@ async def test_networks(dut):
         # print("ac_c0_2 out d", fixed_point_array_to_decimals(dut.activation_cache_c0_2.out.value))
         # print("ac_c0_3 out d", fixed_point_array_to_decimals(dut.activation_cache_c0_3.out.value))
 
-        print("c1_out_v", dut.c1_out_v.value)
-        print("conv1.result.value hex", dut.conv1.result.value)
-        print("conv1.result.value dec", fixed_point_array_to_decimals(dut.conv1.result.value))
+        # print("c1_out_v", dut.c1_out_v.value)
+        # print("conv1.result.value hex", dut.conv1.result.value)
+        # print("conv1.result.value dec", fixed_point_array_to_decimals(dut.conv1.result.value))
 
-        print("ac_c1_clk", dut.ac_c1_clk.value)
+        # print("ac_c1_clk", dut.ac_c1_clk.value)
         # print("ac_c1_0 buffer", dut.activation_cache_c1_0.buffer.value)
         # print("ac_c1_1 buffer", dut.activation_cache_c1_1.buffer.value)
         # print("ac_c1_2 buffer", dut.activation_cache_c1_2.buffer.value)
@@ -146,14 +149,14 @@ async def test_networks(dut):
         # print("ac_c1_2 out", dut.activation_cache_c1_2.out.value)
         # print("ac_c1_3 out", dut.activation_cache_c1_3.out.value)
 
-        print("c2_out_v", dut.c2_out_v.value)
-        print("conv2.result.value hex", dut.conv2.result.value)
-        print("conv2.result.value dec", fixed_point_array_to_decimals(dut.conv2.result.value))
+        # print("c2_out_v", dut.c2_out_v.value)
+        # print("conv2.result.value hex", dut.conv2.result.value)
+        # print("conv2.result.value dec", fixed_point_array_to_decimals(dut.conv2.result.value))
 
-        print("ac_c2_clk", dut.ac_c2_clk.value)
+        # print("ac_c2_clk", dut.ac_c2_clk.value)
 
-        print("c3_out_v", dut.c3_out_v.value)
-        print("conv3.result.value hex", dut.conv3.result.value)
+        # print("c3_out_v", dut.c3_out_v.value)
+        # print("conv3.result.value hex", dut.conv3.result.value)
 
         out_values = [dut.sample_out0.value, dut.sample_out1.value,
                       dut.sample_out2.value, dut.sample_out3.value]

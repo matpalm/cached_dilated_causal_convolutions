@@ -2,16 +2,17 @@
 
 module activation_cache #(
     parameter W = 16,        // width for each element
+    parameter D = 2,         // size of packed port arrays
     parameter DILATION = 4   // dilation
     // assume kernel size = 4
 )(
     input                     clk,
     input                     rst,
-    input             [W-1:0] inp,
-    output reg signed [W-1:0] out_l0,
-    output reg signed [W-1:0] out_l1,
-    output reg signed [W-1:0] out_l2,
-    output reg signed [W-1:0] out_l3
+    input             [D*W-1:0] inp,
+    output reg signed [D*W-1:0] out_l0,
+    output reg signed [D*W-1:0] out_l1,
+    output reg signed [D*W-1:0] out_l2,
+    output reg signed [D*W-1:0] out_l3
 );
 
 localparam KERNEL_SIZE = 4;
@@ -19,7 +20,7 @@ localparam NUM_ENTRIES = DILATION * KERNEL_SIZE;
 localparam ADDR_W = $clog2(NUM_ENTRIES)-1;
 
 reg [ADDR_W:0] write_head = 0;
-reg signed [W-1:0] buffer [NUM_ENTRIES];
+reg signed [D*W-1:0] buffer [NUM_ENTRIES];
 
 integer i;
 initial begin

@@ -17,8 +17,11 @@ class FxpModel(object):
         with open(weights_file, 'rb') as f:
             self.weights = pickle.load(f)
 
-        # assume just two convs
-        assert sorted(self.weights.keys()) == ['qconv_0', 'qconv_1', 'qconv_2', 'qconv_3']
+        for weight_id in self.weights.keys():
+            assert weight_id.startswith('qconv_'), weight_id
+
+        self.num_layers = len(self.weights)
+        print("|layers|", self.num_layers)
 
         # use first conv to derive in/out size
         # recall; for now we assume in==out
@@ -40,76 +43,52 @@ class FxpModel(object):
         # buffer for layer0 input
         self.input = np.zeros((K, self.in_out_d), dtype=np.float32)
 
-        self.qconv0 = FxpMathConv1D(
-            self.fxp,
-            weights=self.weights['qconv_0']['weights'][0],
-            biases=self.weights['qconv_0']['weights'][1]
-            )
-        self.activation_cache_0 = ActivationCache(
-            depth=self.in_out_d, dilation=4**1, kernel_size=4
-        )
+        self.qconvs = []
+        self.activation_caches = []
 
-        self.qconv1 = FxpMathConv1D(
-            self.fxp,
-            weights=self.weights['qconv_1']['weights'][0],
-            biases=self.weights['qconv_1']['weights'][1]
-            )
-        self.activation_cache_1 = ActivationCache(
-            depth=self.in_out_d, dilation=4**2, kernel_size=4
-        )
+        for layer_id in range(self.num_layers):
+            self.qconvs.append(FxpMathConv1D(
+                self.fxp,
+                weights=self.weights[f"qconv_{layer_id}"]['weights'][0],
+                biases=self.weights[f"qconv_{layer_id}"]['weights'][1]
+                ))
+            is_last_layer = layer_id == self.num_layers - 1
+            if not is_last_layer:
+                self.activation_caches.append(ActivationCache(
+                    depth=self.in_out_d, dilation=K**(layer_id+1), kernel_size=K
+                ))
 
-        self.qconv2 = FxpMathConv1D(
-            self.fxp,
-            weights=self.weights['qconv_2']['weights'][0],
-            biases=self.weights['qconv_2']['weights'][1]
-            )
-        self.activation_cache_2 = ActivationCache(
-            depth=self.in_out_d, dilation=4**3, kernel_size=4
-        )
-
-        self.qconv3 = FxpMathConv1D(
-            self.fxp,
-            weights=self.weights['qconv_3']['weights'][0],
-            biases=self.weights['qconv_3']['weights'][1]
-            )
+        print("|self.qconvs|", len(self.qconvs))
+        print("|self.activation_caches|", len(self.activation_caches))
 
 
     def predict(self, x):
 
         # convert to near fixed point numbers and back to floats
         x = self.fxp.nparray_to_fixed_point_floats(x)
-        print("next_x", x)
+        print("next_x", list(x))
 
         # shift input values left, and add new entry to idx -1
         for i in range(K-1):
             self.input[i] = self.input[i+1]
         self.input[K-1] = x
-        print("lsb", self.input)
+#        print("lsb", self.input)
 
-        # pass input to qconv0, then activation cache
-        y_pred = self.qconv0.apply(self.input, relu=True)
-        print("qconv0.out", y_pred)
-        self.activation_cache_0.add(y_pred)
-        y_pred = self.activation_cache_0.cached_dilated_values()
-        print("activation_cache_0.out", y_pred)
+        y_pred = self.input
 
-        # pass cached values to qconv1, then next activate cache
-        y_pred = self.qconv1.apply(y_pred, relu=True)
-        print("qconv1.out", y_pred)
-        self.activation_cache_1.add(y_pred)
-        y_pred = self.activation_cache_1.cached_dilated_values()
-        print("activation_cache_1.out", y_pred)
+        for layer_id in range(self.num_layers):
+            print("layer_id", layer_id)
+            is_last_layer = layer_id == self.num_layers - 1
+            if not is_last_layer:
+                y_pred = self.qconvs[layer_id].apply(y_pred, relu=True)
+                print("post qconv y_pred", list(y_pred))
+                self.activation_caches[layer_id].add(y_pred)
+                y_pred = self.activation_caches[layer_id].cached_dilated_values()
+                print("post activation_cache y_pred", list(y_pred))
+            else:
+                y_pred = self.qconvs[layer_id].apply(y_pred, relu=False)
+                print("post (last) qconv y_pred", list(y_pred))
 
-        # pass cached values to qconv2, then next activate cache
-        y_pred = self.qconv2.apply(y_pred, relu=True)
-        print("qconv2.out", y_pred)
-        self.activation_cache_2.add(y_pred)
-        y_pred = self.activation_cache_2.cached_dilated_values()
-        print("activation_cache_2.out", y_pred)
-
-        # pass cached values to qconv3, without relu, for result
-        y_pred = self.qconv3.apply(y_pred, relu=False)
-        print("qconv3.out", y_pred)
         return y_pred
 
 if __name__ == '__main__':
