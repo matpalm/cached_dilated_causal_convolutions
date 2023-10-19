@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     # train model
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath='weights/{epoch:03d}-{val_loss:.5f}',
+        filepath='keras_weights/{epoch:03d}-{val_loss:.5f}',
         save_weights_only=True
     )
     train_model.compile(Adam(opts.learning_rate),
@@ -78,7 +78,6 @@ if __name__ == '__main__':
                     epochs=opts.epochs)
 
     quantised_weights = model_save_quantized_weights(train_model)
-
     with open(opts.save_weights, 'wb') as f:
         pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
 
