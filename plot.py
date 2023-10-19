@@ -18,5 +18,6 @@ df = pd.DataFrame()
 df['value'] = values
 df['n'] = range(len(values))
 
-sns.lineplot(df, x='n', y='value')
+p = sns.lineplot(df, x='n', y='value')
+p.set(ylim=(-2, 2))
 plt.savefig(opts.plot_png)

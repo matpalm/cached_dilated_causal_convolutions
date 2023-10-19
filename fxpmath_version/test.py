@@ -112,7 +112,8 @@ def process(wave):
     df['n'] = range(len(y_pred))
     wide_df = pd.melt(df, id_vars=['n'], value_vars=['y_pred', 'y_true'])
     plt.clf()
-    sns.lineplot(wide_df, x='n', y='value', hue='variable')
+    p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
+    p.set(ylim=(-2, 2))
     plt_fname = f"fxp_math.y_pred.{wave}.png"
     print("saving plot to", plt_fname)
     plt.savefig(plt_fname)
