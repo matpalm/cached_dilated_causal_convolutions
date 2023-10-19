@@ -13,20 +13,14 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
 parser.add_argument('--write-test-x', action='store_true')
-parser.add_argument('--data-rescaling-factor', type=float, default=1.0)
-parser.add_argument('--load-weights', type=str, default='qkeras_weights.pkl')
+parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
+parser.add_argument('--load-weights', type=str)
 parser.add_argument('--num-test-egs', type=int, default=100)
 opts = parser.parse_args()
 print("opts", opts)
 
 # run through fxp_model
 fxp_model = FxpModel(opts.load_weights)
-
-# export weights to tmp for verilog version
-for i, qconv_layer in enumerate(fxp_model.qconvs):
-    fname = f"weights/qconv{i}"
-    print("exporting qconv", i, "to", fname)
-    qconv_layer.export_weights_for_verilog(fname)
 
 IN_OUT_D = FILTER_SIZE = 8
 
@@ -98,7 +92,7 @@ def process(wave):
             hex_outputs.append("0x0000")  # just for completeness of 4 inputs in general
             print(" ".join(hex_outputs), file=test_x_hex_f)
 
-    print(fxp_model.under_and_overflow_counts())
+    print(wave, fxp_model.under_and_overflow_counts())
 
     y_pred = np.stack(y_pred)
 

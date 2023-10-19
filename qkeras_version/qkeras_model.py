@@ -5,6 +5,7 @@ import qkeras
 from tensorflow.keras.layers import Input
 from qkeras import quantized_bits, QConv1D, QActivation
 from tensorflow.keras.models import Model
+from tensorflow.keras import regularizers
 from typing import List
 
 N_WORD = 16
@@ -42,6 +43,7 @@ def create_dilated_model(seq_len: int,
                          in_out_d: int,
                          num_layers: int,
                          filter_size: int,
+                         l2: float=0.0,
                          all_outputs: bool=False):
 
     if in_out_d != filter_size:
@@ -68,7 +70,9 @@ def create_dilated_model(seq_len: int,
                            kernel_size=K, padding='causal',
                            dilation_rate=K**i,
                            kernel_quantizer=quantiser(),
-                           bias_quantizer=quantiser())(last_layer)
+                           bias_quantizer=quantiser(),
+                           kernel_regularizer=regularizers.L2(l2),
+                           bias_regularizer=regularizers.L2(l2))(last_layer)
         collected_outputs.append(last_layer)
 
         if i != num_layers-1:

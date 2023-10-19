@@ -5,10 +5,9 @@ if [[ -z "$WAVE" ]]; then
 fi
 
 set -x
-rm -rf sverilog_version/tests/network/{weights,net.out,test_x.hex} y_pred.sverilog.txt verilog.y_pred.png
+rm -rf sverilog_version/tests/network/{net.out,test_x.hex} y_pred.sverilog.txt verilog.y_pred.png
 
 set -e
-cp -r weights sverilog_version/tests/network/weights
 cp test_x*hex sverilog_version/tests/network/
 
 cd sverilog_version/tests/network

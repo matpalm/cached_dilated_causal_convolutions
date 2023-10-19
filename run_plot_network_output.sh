@@ -9,4 +9,3 @@ cat sverilog_version/tests/network/net.$WAVE.out \
  > y_pred.sverilog.$WAVE.txt
 ./plot.py --plot-png verilog.y_pred.$WAVE.png < y_pred.sverilog.$WAVE.txt
 rm y_pred.sverilog.$WAVE.txt
-geeqie verilog.y_pred.$WAVE.png

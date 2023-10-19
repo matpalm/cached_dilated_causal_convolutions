@@ -1,6 +1,8 @@
 import numpy as np
 import os
 
+VERBOSE = False
+
 class FxpMathConv1D(object):
 
     def __init__(self, fxp_util, weights, biases):
@@ -51,6 +53,14 @@ class FxpMathConv1D(object):
 
     def apply(self, x, relu):
 
+        def to_hex(v):
+            bin_str = str(v.bin())
+            assert len(bin_str) % 4 == 0
+            hex_str = f"{int(bin_str, 2):x}"
+            target_padded_width = len(bin_str) // 4
+            padding = "0" * (target_padded_width - len(hex_str))
+            return padding + hex_str
+
         assert len(x.shape) == 2
         assert x.shape[0] == 4  # K
         assert x.shape[1] == self.in_d
@@ -62,25 +72,25 @@ class FxpMathConv1D(object):
         accum3 = [self.fxp.double_width(0) for _ in range(self.out_d)]
         double_width_biases = [self.fxp.double_width(b) for b in self.biases]
 
+        if VERBOSE:
+            print("row_by_matrix_multiply inputs")
+            print("cNa0 ", x[0])
+            print("cNa1 ", x[1])
+            print("cNa2 ", x[2])
+            print("cNa3 ", x[3])
+
         # step 1; run each kernel; can be in parallel
         self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
         self.row_by_matrix_multiply(x[1], self.weights[1], accum1)
         self.row_by_matrix_multiply(x[2], self.weights[2], accum2)
         self.row_by_matrix_multiply(x[3], self.weights[3], accum3)
 
-        # def to_hex(v):
-        #     bin_str = str(v.bin())
-        #     assert len(bin_str) % 4 == 0
-        #     hex_str = f"{int(bin_str, 2):x}"
-        #     target_padded_width = len(bin_str) // 4
-        #     padding = "0" * (target_padded_width - len(hex_str))
-        #     return padding + hex_str
-
-        # print("KERNEL OUTPUTS")
-        # print("kernel_0 ", list(map(to_hex, accum0)))
-        # print("kernel_1 ", list(map(to_hex, accum1)))
-        # print("kernel_2 ", list(map(to_hex, accum2)))
-        # print("kernel_3 ", list(map(to_hex, accum3)))
+        if VERBOSE:
+            print("KERNEL OUTPUTS")
+            print("kernel_0 ", list(map(to_hex, accum0)))
+            print("kernel_1 ", list(map(to_hex, accum1)))
+            print("kernel_2 ", list(map(to_hex, accum2)))
+            print("kernel_3 ", list(map(to_hex, accum3)))
 
         # step 2; hierarchical add, 1 of 2
         # TODO: is overflow a concern here? or is the double width
