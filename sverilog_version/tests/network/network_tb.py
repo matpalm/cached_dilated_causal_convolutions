@@ -116,44 +116,54 @@ async def test_networks(dut):
     clock_next_sample()
 
     def net_state_to_str():
-        if dut.state.value == 0:
-            return "CLK_LSB"
-        elif dut.state.value == 1:
-            return "RST_CONV_0"
-        elif dut.state.value == 2:
-            return "CONV_0_RUNNING"
-        elif dut.state.value == 3:
-            return "CLK_ACT_CACHE_0"
-        elif dut.state.value == 4:
-            return "RST_CONV_1"
-        elif dut.state.value == 5:
-            return "CONV_1_RUNNING"
-        elif dut.state.value == 6:
-            return "CLK_ACT_CACHE_1"
-        elif dut.state.value == 7:
-            return "RST_CONV_2"
-        elif dut.state.value == 8:
-            return "CONV_2_RUNNING"
-        elif dut.state.value == 9:
-            return "CLK_ACT_CACHE_2"
-        elif dut.state.value == 10:
-            return "RST_CONV_3"
-        elif dut.state.value == 11:
-            return "CONV_3_RUNNING"
-        elif dut.state.value == 12:
-            return "OUTPUT"
-        else:
-            raise Exception(f"unknown state [{dut.state.value}]")
+        try:
+            if dut.state.value == 0:
+                return "CLK_LSB"
+            elif dut.state.value == 1:
+                return "RST_CONV_0"
+            elif dut.state.value == 2:
+                return "CONV_0_RUNNING"
+            elif dut.state.value == 3:
+                return "CLK_ACT_CACHE_0"
+            elif dut.state.value == 4:
+                return "RST_CONV_1"
+            elif dut.state.value == 5:
+                return "CONV_1_RUNNING"
+            elif dut.state.value == 6:
+                return "CLK_ACT_CACHE_1"
+            elif dut.state.value == 7:
+                return "RST_CONV_2"
+            elif dut.state.value == 8:
+                return "CONV_2_RUNNING"
+            elif dut.state.value == 9:
+                return "CLK_ACT_CACHE_2"
+            elif dut.state.value == 10:
+                return "RST_CONV_3"
+            elif dut.state.value == 11:
+                return "CONV_3_RUNNING"
+            elif dut.state.value == 12:
+                return "OUTPUT"
+            else:
+                raise Exception(f"unknown state [{dut.state.value}]")
+        except ValueError as e:
+            # just the fact dut.state.value not set yet (?)
+            assert 'Unresolvable bit in binary string' in str(e)
+            return "xxx"
 
     for i in range(100000):
 
         print("|test_x_hex_values|=", len(test_x_hex_values))
 
-        if int(dut.state.value) == 12:  # OUTPUT
-            if len(test_x_hex_values) == 0:
-                # we are done
-                break
-            clock_next_sample()
+        try:
+            if int(dut.state.value) == 12:  # OUTPUT
+                if len(test_x_hex_values) == 0:
+                    # we are done
+                    break
+                clock_next_sample()
+        except ValueError as e:
+            # just the fact dut.state.value not set yet (?)
+            assert 'Unresolvable bit in binary string' in str(e)
+            pass
 
         print("===i", i, "state", net_state_to_str(), dut.state.value)
 
@@ -267,16 +277,16 @@ async def test_networks(dut):
         # print("c0 k2 hex  ", c0k2_dec)
         # print("c0 k3 hex  ", c0k3_dec)
 
-        c0_out_bin_values = unpack_binary(dut.c0_out.value)
-        # print("c0_out  bin", c0_out_bin_values)
-        c0_out_hex = list(map(bits_to_hex, c0_out_bin_values))
-        # print("c0_out  hex", c0_out_hex)
-        c0_out_dec = list(map(hex_fp_value_to_decimal, c0_out_hex))
-        print("c0_out  dec", c0_out_dec)
+        # c0_out_bin_values = unpack_binary(dut.c0_out.value)
+        # # print("c0_out  bin", c0_out_bin_values)
+        # c0_out_hex = list(map(bits_to_hex, c0_out_bin_values))
+        # # print("c0_out  hex", c0_out_hex)
+        # c0_out_dec = list(map(hex_fp_value_to_decimal, c0_out_hex))
+        # print("c0_out  dec", c0_out_dec)
 
-        print("----------- ac0")
+        # print("----------- ac0")
 
-        print("ac_c0_clk", dut.ac_c0_clk.value)
+        # print("ac_c0_clk", dut.ac_c0_clk.value)
 
         # print("----------- conv1")
 
