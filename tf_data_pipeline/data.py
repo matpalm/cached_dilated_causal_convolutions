@@ -20,14 +20,17 @@ def plot_train_data(df, fname):
     sns.lineplot(df[window], x='n', y='value', hue='variable')
     plt.savefig(fname)
 
-def extract_x_y(data, x2, x3, data_axis_for_y):
-    result = {}
-    result['x'] = np.empty((len(data), 3), dtype=np.float32)
-    result['x'][:,0] = x2
-    result['x'][:,1] = x3
-    result['x'][:,2] = data[:, 0] # triangle
-    result['y'] = np.expand_dims(data[:,data_axis_for_y], -1) # target wave
-    return result
+def extract_x_y(data, e0, e1, data_axis_for_y):
+    x = np.zeros((len(data), 8), dtype=np.float32)
+    x[:,0] = data[:, 0] # triangle
+    x[:,1] = e0
+    x[:,2] = e1
+    # => x[:,3] = 0
+
+    y = np.zeros((len(data), 8), dtype=np.float32)
+    y[:,0] = data[:,data_axis_for_y]
+
+    return {'x': x, 'y': y}
 
 def split_train_val_test(d):
     assert 'x' in d
@@ -60,24 +63,31 @@ def tf_dataset_from(x, y, split, max_samples, seq_len):
 
 class Embed2DWaveFormData(object):
 
-    def __init__(self, root_dir='datalogger_firmware/data', generate_plots=False):
-        tsr_df_w, tsr_df_l = parse(f"{root_dir}/2d_embed/32kHz/tri_sine_ramp.ssv")
-        tsz_df_w, tsz_df_l = parse(f"{root_dir}/2d_embed/32kHz/tri_squ_zigzag.ssv")
+    def __init__(self,
+                    root_dir='datalogger_firmware/data/2d_embed/32kHz/',
+                    generate_plots=False,
+                    rescaling_factor=1):
+
+        tsr_df_w, tsr_df_l = parse(f"{root_dir}/tri_sine_ramp.ssv")
+        tsz_df_w, tsz_df_l = parse(f"{root_dir}/tri_squ_zigzag.ssv")
 
         # # sanity check plot
         if generate_plots:
             plot_train_data(tsr_df_l, "triangle_sine_ramp.train.png")
             plot_train_data(tsz_df_l, "triangle_square_zigzag.train.png")
 
-        # rebuild datasets as tri_to[WAVE][X/Y] with triangle wave in x with x2, x3
+        # rebuild datasets as tri_to[WAVE][X/Y] with triangle wave in x with e0,e1
         # and target wave as y
+        RS = rescaling_factor
         self.tri_to = {}
         data = tsr_df_w.to_numpy().astype(np.float32)
-        self.tri_to['sine'] = extract_x_y(data, x2=0, x3=0, data_axis_for_y=1)
-        self.tri_to['ramp'] = extract_x_y(data, x2=0, x3=1, data_axis_for_y=2)
+        data *= rescaling_factor
+        self.tri_to['sine'] = extract_x_y(data, e0=0, e1=0, data_axis_for_y=1)
+        self.tri_to['ramp'] = extract_x_y(data, e0=0, e1=RS, data_axis_for_y=2)
         data = tsz_df_w.to_numpy().astype(np.float32)
-        self.tri_to['square'] = extract_x_y(data, x2=1, x3=0, data_axis_for_y=1)
-        self.tri_to['zigzag'] = extract_x_y(data, x2=1, x3=1, data_axis_for_y=2)
+        data *= rescaling_factor
+        self.tri_to['square'] = extract_x_y(data, e0=RS, e1=0, data_axis_for_y=1)
+        self.tri_to['zigzag'] = extract_x_y(data, e0=RS, e1=RS, data_axis_for_y=2)
 
         # train/val/test split
         for wave in ['sine', 'ramp', 'square', 'zigzag']:
@@ -108,15 +118,18 @@ class Embed2DWaveFormData(object):
 class WaveToWaveData(object):
 
     def __init__(self,
-                 root_dir='datalogger_firmware/data',
+                 root_dir='datalogger_firmware/data/2d_embed/32kHz/',
                  in_out_d=8,
                  rescaling_factor=1  # as a workaround to calibration on FPGA
                  ):
 
-        fname = f"{root_dir}/2d_embed/32kHz/tri_squ_zigzag.ssv"
+        print("WaveToWave root_dir", root_dir)
+
+        fname = f"{root_dir}/tri_squ_zigzag.ssv"
         data = pd.read_csv(fname, sep=' ', names=['tri', 'square', 'zigzag']).to_numpy()
 
         # for prototype
+        # TDO: change this to output square in first slot
         n = len(data)
         x = np.concatenate([data[:,0:1], np.zeros((n, in_out_d-1))], axis=-1)  # (tri, 0, 0, 0, 0, 0, 0, 0)
         y = np.concatenate([data, np.zeros((n, in_out_d-3))], axis=-1)         # (tri, square, zigzag, 0, 0, 0, 0, 0)
