@@ -1,10 +1,10 @@
-
+0
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 import pickle
 
-from tf_data_pipeline.data import WaveToWaveData
+from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 
 from qkeras.utils import model_save_quantized_weights
 
@@ -15,6 +15,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    # parser.add_argument('--dataset', type=str, help='which dataset to train on')
     parser.add_argument('--learning-rate', type=float, default=1e-3)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-layers', type=int, default=4)
@@ -25,8 +26,21 @@ if __name__ == '__main__':
     opts = parser.parse_args()
     print("opts", opts)
 
-    # parse files and do splits etc
-    data = WaveToWaveData(rescaling_factor=opts.data_rescaling_factor)
+    # TODO: just focussing on Embed2DWaveFormData for now
+
+    filter_column_idx = None
+    # if opts.dataset == 'wave_to_wave':
+    #     data = WaveToWaveData(
+    #         root_dir='datalogger_firmware/data/2d_embed/32kHz',
+    #         rescaling_factor=opts.data_rescaling_factor)
+    #     filter_column_idx = 1  # square wave
+    # elif opts.dataset == 'embed_2d':
+    data = Embed2DWaveFormData(
+        root_dir='datalogger_firmware/data/2d_embed/32kHz',
+        rescaling_factor=opts.data_rescaling_factor)
+    filter_column_idx = 0
+    # else:
+    #     raise Exception("unknown --dataset")
 
     K = 4
     IN_OUT_D = FILTER_SIZE = 8
@@ -57,7 +71,7 @@ if __name__ == '__main__':
         save_weights_only=True
     )
     train_model.compile(Adam(opts.learning_rate),
-                        loss=masked_mse(RECEPTIVE_FIELD_SIZE, filter_column_idx=1))  # only calculate loss for col1, square wave
+                        loss=masked_mse(RECEPTIVE_FIELD_SIZE, filter_column_idx))
     train_model.fit(train_ds,
                     validation_data=validate_ds,
                     callbacks=[checkpoint_cb],
