@@ -25,6 +25,10 @@ class FxpMathConv1D(object):
         self.weights = weights
         self.biases = biases
 
+        # keep count of stats of under/overflows w.r.t double to single precision
+        # conversion. these are OK, but too many means something wrong
+        self.num_underflows = 0
+        self.num_overflows = 0
 
     def dot_product(self, x, weights, accumulator):
         # this loop represents what could be in the state machine
@@ -60,10 +64,23 @@ class FxpMathConv1D(object):
 
         # step 1; run each kernel; can be in parallel
         self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
-
         self.row_by_matrix_multiply(x[1], self.weights[1], accum1)
         self.row_by_matrix_multiply(x[2], self.weights[2], accum2)
         self.row_by_matrix_multiply(x[3], self.weights[3], accum3)
+
+        # def to_hex(v):
+        #     bin_str = str(v.bin())
+        #     assert len(bin_str) % 4 == 0
+        #     hex_str = f"{int(bin_str, 2):x}"
+        #     target_padded_width = len(bin_str) // 4
+        #     padding = "0" * (target_padded_width - len(hex_str))
+        #     return padding + hex_str
+
+        # print("KERNEL OUTPUTS")
+        # print("kernel_0 ", list(map(to_hex, accum0)))
+        # print("kernel_1 ", list(map(to_hex, accum1)))
+        # print("kernel_2 ", list(map(to_hex, accum2)))
+        # print("kernel_3 ", list(map(to_hex, accum3)))
 
         # step 2; hierarchical add, 1 of 2
         # TODO: is overflow a concern here? or is the double width
@@ -78,8 +95,19 @@ class FxpMathConv1D(object):
         self.fxp.vector_add(accum0, double_width_biases)
 
         # step 5; resize down from double to single for output
+        # print("double width result h ", list(map(to_hex, accum0)))
+        # print("double width result d ", list(np.array(accum0)))
         for i in range(self.out_d):
             self.fxp.resize_single_width(accum0[i])
+        # print("single width result h ", list(map(to_hex, accum0)))
+        # print("single width result d ", list(np.array(accum0)))
+
+        # check for example under/overflow
+        for a in accum0:
+            if a < -7.99:
+                self.num_underflows += 1
+            elif a > 7.99:
+                self.num_overflows += 1
 
         # step 6; apply relu, if configured
         if relu:

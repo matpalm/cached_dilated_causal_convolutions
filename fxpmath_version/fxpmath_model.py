@@ -9,6 +9,7 @@ from .util import FxpUtil
 from .activation_cache import ActivationCache
 
 K = 4
+VERBOSE = False
 
 class FxpModel(object):
 
@@ -58,39 +59,42 @@ class FxpModel(object):
                     depth=self.in_out_d, dilation=K**(layer_id+1), kernel_size=K
                 ))
 
-        print("|self.qconvs|", len(self.qconvs))
-        print("|self.activation_caches|", len(self.activation_caches))
-
+    def under_and_overflow_counts(self):
+        return {
+            'num_underflows': sum([q.num_underflows for q in self.qconvs]),
+            'num_overflows': sum([q.num_overflows for q in self.qconvs])
+        }
 
     def predict(self, x):
 
         # convert to near fixed point numbers and back to floats
         x = self.fxp.nparray_to_fixed_point_floats(x)
-        print("next_x", list(x))
+        if VERBOSE:
+            print("==============")
+            print("next_x", list(x))
 
         # shift input values left, and add new entry to idx -1
         for i in range(K-1):
             self.input[i] = self.input[i+1]
         self.input[K-1] = x
-#        print("lsb", self.input)
+        if VERBOSE: print("lsb", self.input)
 
         y_pred = self.input
 
         for layer_id in range(self.num_layers):
-            print("layer_id", layer_id)
+            if VERBOSE: print("layer_id", layer_id)
             is_last_layer = layer_id == self.num_layers - 1
             if not is_last_layer:
                 y_pred = self.qconvs[layer_id].apply(y_pred, relu=True)
-                print("post qconv y_pred", list(y_pred))
+                if VERBOSE: print("post qconv y_pred", list(y_pred))
                 self.activation_caches[layer_id].add(y_pred)
                 y_pred = self.activation_caches[layer_id].cached_dilated_values()
-                print("post activation_cache y_pred", list(y_pred))
+                if VERBOSE: print("post activation_cache y_pred", list(y_pred))
             else:
                 y_pred = self.qconvs[layer_id].apply(y_pred, relu=False)
-                print("post (last) qconv y_pred", list(y_pred))
+                if VERBOSE: print("post (last) qconv y_pred", list(y_pred))
 
+        if VERBOSE: print("y_pred", list(y_pred))
         return y_pred
 
-if __name__ == '__main__':
-    fxp_model = FxpModel(weights_file='qkeras_weights.pkl')
-    print(fxp_model.predict([0,0,0]))
+
