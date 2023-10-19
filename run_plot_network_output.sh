@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
+if [[ -z "$WAVE" ]]; then
+  echo "WAVE not set"
+  exit 1
+fi
 set -ex
-cat sverilog_version/tests/network/net.out \
- | grep ^OUT | grep -v xxxx | uniq \
- | cut -b24-39 \
- | python3 single_width_bin_to_decimal.py \
- > y_pred.sverilog.txt
-./plot.py --plot-png verilog.y_pred.png < y_pred.sverilog.txt
-rm y_pred.sverilog.txt
-geeqie verilog.y_pred.png
+cat sverilog_version/tests/network/net.$WAVE.out \
+ | grep "^OUT dec" | grep -v xxxx | cut -f3 -d' ' | uniq \
+ > y_pred.sverilog.$WAVE.txt
+./plot.py --plot-png verilog.y_pred.$WAVE.png < y_pred.sverilog.$WAVE.txt
+rm y_pred.sverilog.$WAVE.txt
+geeqie verilog.y_pred.$WAVE.png
