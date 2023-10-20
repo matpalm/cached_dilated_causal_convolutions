@@ -61,6 +61,8 @@ def tf_dataset_from(x, y, split, max_samples, seq_len):
         gen, output_signature=(tf.TensorSpec(shape=(seq_len, in_d), dtype=tf.float32),
                                tf.TensorSpec(shape=(seq_len, out_d), dtype=tf.float32)))
 
+
+
 class Embed2DWaveFormData(object):
 
     def __init__(self,
@@ -177,6 +179,58 @@ class WaveToWaveData(object):
         return ds.prefetch(tf.data.AUTOTUNE)
 
 
+class Embed2DInterpData(object):
+
+    def __init__(self,
+                    root_dir='datalogger_firmware/data/2d_embed/32kHz/',
+                    generate_plots=False,
+                    rescaling_factor=1):
+
+        tsr_df_w, tsr_df_l = parse(f"{root_dir}/tri_sine_ramp.ssv")
+        tsz_df_w, tsz_df_l = parse(f"{root_dir}/tri_squ_zigzag.ssv")
+
+        # # sanity check plot
+        if generate_plots:
+            plot_train_data(tsr_df_l, "triangle_sine_ramp.train.png")
+            plot_train_data(tsz_df_l, "triangle_square_zigzag.train.png")
+
+        # rebuild datasets as tri_to[WAVE][X/Y] with triangle wave in x with e0,e1
+        # and target wave as y
+        RS = rescaling_factor
+        self.tri_to = {}
+        data = tsr_df_w.to_numpy().astype(np.float32)
+        data *= rescaling_factor
+        self.tri_to['sine'] = extract_x_y(data, e0=0, e1=0, data_axis_for_y=1)
+        self.tri_to['ramp'] = extract_x_y(data, e0=RS, e1=RS, data_axis_for_y=2)
+        data = tsz_df_w.to_numpy().astype(np.float32)
+        data *= rescaling_factor
+        self.tri_to['square'] = extract_x_y(data, e0=RS, e1=0, data_axis_for_y=1)
+        self.tri_to['zigzag'] = extract_x_y(data, e0=0, e1=RS, data_axis_for_y=2)
+
+        # train/val/test split
+        for wave in ['sine', 'ramp', 'square', 'zigzag']:
+            split_train_val_test(self.tri_to[wave])
+
+    def tf_dataset_for_split(self,
+            split, seq_len, max_samples,
+            waves=['sine', 'ramp', 'square', 'zigzag']):
+        # dataset that is input (triangle, C1, C2) -> (output waves based on C1, C2)
+
+        assert split in ['train', 'validate', 'test']
+        sampled_ds = tf.data.Dataset.sample_from_datasets([
+            tf_dataset_from(
+                self.tri_to[wave][split]['x'],
+                self.tri_to[wave][split]['y'],
+                split, max_samples, seq_len)
+            for wave in waves
+        ])
+
+        if split == 'train':
+            sampled_ds = sampled_ds.shuffle(1000)
+
+        sampled_ds = sampled_ds.batch(1 if split=='test' else 128)
+
+        return sampled_ds.prefetch(tf.data.AUTOTUNE)
 
 # ds = WaveToWaveData(in_out_d=6, rescaling_factor=5.0)
 # for x, y in ds.tf_dataset_for_split('test', seq_len=4, max_samples=10):

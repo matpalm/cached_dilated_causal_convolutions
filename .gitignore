@@ -1,3 +1,7 @@
+verilog.y_pred.*.png
+fxp_math.y_pred.*.png
+sverilog_version/tests/network/net*out
+test_x.*.hex
 __pycache__/
 DaisySP
 libDaisy
@@ -7,3 +11,4 @@ prototyping_notebooks/trained_models/
 prototyping_notebooks/weights/
 prototyping_notebooks/util.py
 sverilog_version/tests/network/test_x.hex
+keras_weights/

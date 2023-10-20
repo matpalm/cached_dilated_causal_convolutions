@@ -35,7 +35,7 @@ State state = WAITING;
 const size_t NUM_CTRLS_RECORDED = 2;  // e.g. x0 -> y0,y1
 
 // how many input channels to record?
-const size_t NUM_CHANNELS_RECORDED = 3;  // e.g. x0 -> y0,y1
+const size_t NUM_CHANNELS_RECORDED = 4;  // e.g. x0 -> y0,y1
 
 const size_t BUFFER_SIZE = 20000; // will need tuning depending on above
 const size_t BLOCK_SIZE = 64;

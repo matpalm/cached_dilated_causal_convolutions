@@ -1,8 +1,8 @@
-0
+
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
-import pickle
+import pickle, os
 
 from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 
@@ -75,7 +75,9 @@ if __name__ == '__main__':
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             quantised_weights = model_save_quantized_weights(train_model)
-            with open(f"{opts.save_weights}_e{epoch:02d}.pkl", 'wb') as f:
+            if not os.path.exists(opts.save_weights):
+                os.makedirs(opts.save_weights)
+            with open(f"{opts.save_weights}/e{epoch:02d}.pkl", 'wb') as f:
                 pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
     save_quantised_weights_cb = SaveQuantisedWeights()
 

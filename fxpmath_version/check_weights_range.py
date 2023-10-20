@@ -3,7 +3,7 @@ import argparse
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--weights', type=str, default='qkeras_weights.pkl')
+parser.add_argument('--weights', type=str)
 opts = parser.parse_args()
 print("opts", opts)
 
