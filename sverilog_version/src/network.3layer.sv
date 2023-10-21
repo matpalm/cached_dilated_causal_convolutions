@@ -141,25 +141,14 @@ module network #(
     //--------------------------------
     // conv 1 block
 
-    // TODO: can we do away with c1aN and just use ac_c0_out_lN directly in conv1 ?
-    //       ( and same for c2aN etc )
-
     reg c1_rst = 0;
-    reg signed [D*W-1:0] c1a0;
-    reg signed [D*W-1:0] c1a1;
-    reg signed [D*W-1:0] c1a2;
-    reg signed [D*W-1:0] c1a3;
     reg signed [D*W-1:0] c1_out;
     reg c1_out_v;
 
-    assign c1a0 = ac_c0_out_l0;
-    assign c1a1 = ac_c0_out_l1;
-    assign c1a2 = ac_c0_out_l2;
-    assign c1a3 = ac_c0_out_l3;
-
     conv1d #(.W(W), .D(D), .B_VALUES("weights/qconv1")) conv1 (
         .clk(clk), .rst(c1_rst), .apply_relu(1'b1),
-        .packed_a0(c1a0), .packed_a1(c1a1), .packed_a2(c1a2), .packed_a3(c1a3),
+        .packed_a0(ac_c0_out_l0), .packed_a1(ac_c0_out_l1),
+        .packed_a2(ac_c0_out_l2), .packed_a3(ac_c0_out_l3),
         .packed_out(c1_out),
         .out_v(c1_out_v));
 
@@ -185,21 +174,13 @@ module network #(
     // conv 2 block
 
     reg c2_rst = 0;
-    reg signed [D*W-1:0] c2a0;
-    reg signed [D*W-1:0] c2a1;
-    reg signed [D*W-1:0] c2a2;
-    reg signed [D*W-1:0] c2a3;
     reg signed [D*W-1:0] c2_out;
     reg c2_out_v;
 
-    assign c2a0 = ac_c1_out_l0;
-    assign c2a1 = ac_c1_out_l1;
-    assign c2a2 = ac_c1_out_l2;
-    assign c2a3 = ac_c1_out_l3;
-
     conv1d #(.W(W), .D(D), .B_VALUES("weights/qconv2")) conv2 (
         .clk(clk), .rst(c2_rst), .apply_relu(1'b1),
-        .packed_a0(c2a0), .packed_a1(c2a1), .packed_a2(c2a2), .packed_a3(c2a3),
+        .packed_a0(ac_c1_out_l0), .packed_a1(ac_c1_out_l1),
+        .packed_a2(ac_c1_out_l2), .packed_a3(ac_c1_out_l3),
         .packed_out(c2_out),
         .out_v(c2_out_v));
 
@@ -225,21 +206,13 @@ module network #(
     // conv 3 block
 
     reg c3_rst = 0;
-    reg signed [D*W-1:0] c3a0;
-    reg signed [D*W-1:0] c3a1;
-    reg signed [D*W-1:0] c3a2;
-    reg signed [D*W-1:0] c3a3;
     reg signed [D*W-1:0] c3_out;
     reg c3_out_v;
 
-    assign c3a0 = ac_c2_out_l0;
-    assign c3a1 = ac_c2_out_l1;
-    assign c3a2 = ac_c2_out_l2;
-    assign c3a3 = ac_c2_out_l3;
-
     conv1d #(.W(W), .D(D), .B_VALUES("weights/qconv3")) conv3 (
         .clk(clk), .rst(c2_rst), .apply_relu(1'b0),
-        .packed_a0(c3a0), .packed_a1(c3a1), .packed_a2(c3a2), .packed_a3(c3a3),
+        .packed_a0(ac_c2_out_l0), .packed_a1(ac_c2_out_l1),
+        .packed_a2(ac_c2_out_l2), .packed_a3(ac_c2_out_l3),
         .packed_out(c3_out),
         .out_v(c3_out_v));
 
