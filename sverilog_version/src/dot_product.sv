@@ -51,7 +51,7 @@ module dot_product #(
         $readmemh(B_VALUES, b_values);
         out_v <= 0;
     end
-    reg signed [W-1:0] b_values [0:7];
+    reg signed [W-1:0] b_values [0:D-1];
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -80,6 +80,7 @@ module dot_product #(
                     acc0 <= acc0 + product0;
                     product0 <= a[3] * b_values[3];
                     dp_state <= MULT_D4;
+                    // TODO could shortcut here for 4D; dp_state <= D==4 ? FINAL_ADD : MULT_D4;
                 end
                 MULT_D4: begin
                     acc0 <= acc0 + product0;
