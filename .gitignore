@@ -12,3 +12,5 @@ prototyping_notebooks/weights/
 prototyping_notebooks/util.py
 sverilog_version/tests/network/test_x.hex
 keras_weights/
+qkeras_weights
+keras_weights/

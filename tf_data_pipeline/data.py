@@ -5,6 +5,8 @@ import tensorflow as tf
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+raise Exception("SWITCH TO INTERP!")
+
 def parse(fname):
     df_w = pd.read_csv(fname, sep=' ', names=['tri', 'w0', 'w1'])
     df_w['n'] = range(len(df_w))

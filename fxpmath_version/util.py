@@ -1,5 +1,6 @@
 from fxpmath import Fxp
 import numpy as np
+import os
 
 class FxpUtil(object):
 
@@ -75,4 +76,6 @@ class FxpUtil(object):
 # print("b  ", fxp.bits(b))
 # print("ab ", fxp.bits(ab))
 
-
+def ensure_dir_exists(d):
+    if not os.path.exists(d):
+        os.makedirs(d)

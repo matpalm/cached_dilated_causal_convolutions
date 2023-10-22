@@ -85,7 +85,29 @@ def conv_state_to_str(s):
         5: 'SINGLE_W',
         6: 'APPLY_RELU',
         7: 'OUTPUT'
-    }[s]
+    }[int(s)]
+
+def network_state_to_str(s):
+    try:
+        return {
+            0: 'CLK_LSB',
+            1: 'RST_CONV_0',
+            2: 'CONV_0_RUNNING',
+            3: 'CLK_ACT_CACHE_0',
+            4: 'RST_CONV_1',
+            5: 'CONV_1_RUNNING',
+            6: 'CLK_ACT_CACHE_1',
+            7: 'RST_CONV_2',
+            8: 'CONV_2_RUNNING',
+            9: 'CLK_ACT_CACHE_2',
+            10: 'RST_CONV_3',
+            11: 'CONV_3_RUNNING',
+            12: 'OUTPUT'
+        }[int(s)]
+    except ValueError as e:
+        # just the fact dut.state.value not set yet (?)
+        assert 'Unresolvable bit in binary string' in str(e)
+        return "xxx"
 
 
 def dump_dut_values(id_strs, dut_objs, unpack=False,
@@ -128,9 +150,6 @@ async def test_networks(dut):
             test_x_hex_values.append([eval(e) for e in inputs])
     print("READ", len(test_x_hex_values), "INPUTS")
 
-    # fxpmath version is only running 200, so only do 200 here too
-    test_x_hex_values = test_x_hex_values[:200]
-
     def clock_next_sample():
         next_x_vals = test_x_hex_values.pop(0)
         print("!clock_next_sample! next_x_vals", next_x_vals)
@@ -142,40 +161,6 @@ async def test_networks(dut):
 
     clock_next_sample()
 
-    def net_state_to_str():
-        try:
-            if dut.state.value == 0:
-                return "CLK_LSB"
-            elif dut.state.value == 1:
-                return "RST_CONV_0"
-            elif dut.state.value == 2:
-                return "CONV_0_RUNNING"
-            elif dut.state.value == 3:
-                return "CLK_ACT_CACHE_0"
-            elif dut.state.value == 4:
-                return "RST_CONV_1"
-            elif dut.state.value == 5:
-                return "CONV_1_RUNNING"
-            elif dut.state.value == 6:
-                return "CLK_ACT_CACHE_1"
-            elif dut.state.value == 7:
-                return "RST_CONV_2"
-            elif dut.state.value == 8:
-                return "CONV_2_RUNNING"
-            elif dut.state.value == 9:
-                return "CLK_ACT_CACHE_2"
-            elif dut.state.value == 10:
-                return "RST_CONV_3"
-            elif dut.state.value == 11:
-                return "CONV_3_RUNNING"
-            elif dut.state.value == 12:
-                return "OUTPUT"
-            else:
-                raise Exception(f"unknown state [{dut.state.value}]")
-        except ValueError as e:
-            # just the fact dut.state.value not set yet (?)
-            assert 'Unresolvable bit in binary string' in str(e)
-            return "xxx"
 
     for i in range(100000):
 
@@ -192,19 +177,19 @@ async def test_networks(dut):
             assert 'Unresolvable bit in binary string' in str(e)
             pass
 
-        print("===i", i, "state", net_state_to_str(), dut.state.value)
+        print("===i", i, "state", network_state_to_str(dut.state.value), dut.state.value)
 
-        print("dut.sample_in0.value", dut.sample_in0.value, bits_to_hex(dut.sample_in0.value))
-        print("dut.sample_in1.value", dut.sample_in1.value, bits_to_hex(dut.sample_in1.value))
-        print("dut.sample_in2.value", dut.sample_in2.value, bits_to_hex(dut.sample_in2.value))
-        print("dut.sample_in3.value", dut.sample_in3.value, bits_to_hex(dut.sample_in3.value))
+        # print("dut.sample_in0.value", dut.sample_in0.value, bits_to_hex(dut.sample_in0.value))
+        # print("dut.sample_in1.value", dut.sample_in1.value, bits_to_hex(dut.sample_in1.value))
+        # print("dut.sample_in2.value", dut.sample_in2.value, bits_to_hex(dut.sample_in2.value))
+        # print("dut.sample_in3.value", dut.sample_in3.value, bits_to_hex(dut.sample_in3.value))
 
-        print("----------- LSB")
+        # print("----------- LSB")
 
-        lsb_in0 = [dut.lsb_out_in0_0.value, dut.lsb_out_in0_1.value, dut.lsb_out_in0_2.value, dut.lsb_out_in0_3.value]
-        lsb_in1 = [dut.lsb_out_in1_0.value, dut.lsb_out_in1_1.value, dut.lsb_out_in1_2.value, dut.lsb_out_in1_3.value]
-        lsb_in2 = [dut.lsb_out_in2_0.value, dut.lsb_out_in2_1.value, dut.lsb_out_in2_2.value, dut.lsb_out_in2_3.value]
-        lsb_in3 = [dut.lsb_out_in3_0.value, dut.lsb_out_in3_1.value, dut.lsb_out_in3_2.value, dut.lsb_out_in3_3.value]
+        # lsb_in0 = [dut.lsb_out_in0_0.value, dut.lsb_out_in0_1.value, dut.lsb_out_in0_2.value, dut.lsb_out_in0_3.value]
+        # lsb_in1 = [dut.lsb_out_in1_0.value, dut.lsb_out_in1_1.value, dut.lsb_out_in1_2.value, dut.lsb_out_in1_3.value]
+        # lsb_in2 = [dut.lsb_out_in2_0.value, dut.lsb_out_in2_1.value, dut.lsb_out_in2_2.value, dut.lsb_out_in2_3.value]
+        # lsb_in3 = [dut.lsb_out_in3_0.value, dut.lsb_out_in3_1.value, dut.lsb_out_in3_2.value, dut.lsb_out_in3_3.value]
         # print("lsb_in0 bin  ",  lsb_in0)
         # print("lsb_in1 bin  ",  lsb_in1)
         # print("lsb_in2 bin  ",  lsb_in2)

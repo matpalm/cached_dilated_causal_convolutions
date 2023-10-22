@@ -44,7 +44,7 @@ module network #(
     reg signed [W-1:0] shifted_sample_in2;
     reg signed [W-1:0] shifted_sample_in3;
 
-    // NOTE: not shifted for cocotb version!!!
+    // NOTE: not shifted for cocotb version, but >>>2 shifted for eurorack pmod
     assign shifted_sample_in0 = sample_in0;
     assign shifted_sample_in1 = sample_in1;
     assign shifted_sample_in2 = sample_in2;
@@ -224,6 +224,14 @@ module network #(
     logic signed [W-1:0] out2;
     logic signed [W-1:0] out3;
 
+    // keep timing of clk ticks vs num ticks in output
+    // ( since output is the last state and implies head room )
+    logic signed [2*W-1:0] n_clk_ticks;
+    logic signed [2*W-1:0] n_output_ticks;
+
+    logic prev_sample_clk;
+
+
     always @(posedge sample_clk) begin
         // start forward pass of network
         state <= CLK_LSB;
@@ -312,7 +320,7 @@ module network #(
                     end
 
                     OUTPUT: begin
-                        // NOTE: again, for cocotb we DON'T << 2 these
+			 // NOTE: not shifted for cocotb version, but <<2 shifted for eurorack pmod
                         // final net output is last conv output
                         out0 <= c3_out[8*W-1:7*W];
                         out1 <= 0;

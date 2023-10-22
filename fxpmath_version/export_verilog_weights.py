@@ -1,4 +1,6 @@
 from fxpmath_version.fxpmath_model import FxpModel
+import util
+import os
 
 import argparse
 parser = argparse.ArgumentParser(
@@ -8,6 +10,8 @@ opts = parser.parse_args()
 print("opts", opts)
 
 fxp_model = FxpModel(opts.weights)
+
+util.ensure_dir_exists('weights')
 
 for i, qconv_layer in enumerate(fxp_model.qconvs):
     fname = f"weights/qconv{i}"

@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
+#from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
+from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 import tqdm
 import util
 
@@ -12,8 +13,10 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
+parser.add_argument('--data-root-dir', type=str, required=True)
 parser.add_argument('--write-test-x', action='store_true')
 parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
+parser.add_argument('--in-out-d-filter-size', type=int, default=8)
 parser.add_argument('--load-weights', type=str)
 parser.add_argument('--num-test-egs', type=int, default=100)
 opts = parser.parse_args()
@@ -31,21 +34,10 @@ TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
 print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-# if opts.dataset == 'wave_to_wave':
-#     data = WaveToWaveData(
-#         root_dir='datalogger_firmware/data/2d_embed/32kHz',
-#         rescaling_factor=opts.data_rescaling_factor)
-#     raise Exception("will need to change iteration of test")
-# elif opts.dataset == 'embed_2d':
-data = Embed2DWaveFormData(
-    root_dir='datalogger_firmware/data/2d_embed/32kHz',
-    rescaling_factor=opts.data_rescaling_factor)
-# else:
-#     raise Exception("unknown --dataset")
-
-# data = WaveToWaveData(
-#     root_dir='datalogger_firmware/data/2d_embed/32kHz',
-#     rescaling_factor=opts.data_rescaling_factor)
+data = Embed2DInterpolatedWaveFormData(
+    root_dir=opts.data_root_dir,
+    rescaling_factor=opts.data_rescaling_factor,
+    pad_size=opts.in_out_d_filter_size)
 
 fxp = util.FxpUtil()
 
@@ -105,12 +97,12 @@ def process(wave):
     df['y_true'] = y[:,0]
     df['n'] = range(len(y_pred))
     wide_df = pd.melt(df, id_vars=['n'], value_vars=['y_pred', 'y_true'])
-    plt.clf()
     p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
     p.set(ylim=(-2, 2))
     plt_fname = f"fxp_math.y_pred.{wave}.png"
     print("saving plot to", plt_fname)
     plt.savefig(plt_fname)
+    plt.clf()
 
 from multiprocessing import Pool
 waves = ['sine', 'ramp', 'square', 'zigzag']
