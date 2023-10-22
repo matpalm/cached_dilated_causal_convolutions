@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 p.set_ylim((-2, 2))
                 d = "check_y_pred_cb"
                 util.ensure_dir_exists(d)
-                plt_fname = f"{d}/{epoch:03d}_{i}.png"
+                plt_fname = f"{d}/e{epoch:03d}_i{i}.e0_{tx[i,0,1]:0.2f}_e1_{tx[i,0,2]:0.2f}.png"
                 print("saving plot to", plt_fname)
                 plt.savefig(plt_fname)
                 plt.clf()
