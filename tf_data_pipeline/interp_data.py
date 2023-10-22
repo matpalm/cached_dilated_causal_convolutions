@@ -16,11 +16,14 @@ def moving_average(a, n=3):
     ret[n:] = ret[n:] - ret[:-n]
     return ret[n - 1:] / n
 
-def parse(fname, w0n, w1n, w2n):
+def parse(fname, w0n, w1n, w2n, invert_waves=[]):
     df_w = pd.read_csv(fname, sep=' ', names=['tri', w0n, w1n, w2n])
     df_w['n'] = range(len(df_w))
+    for w in invert_waves:
+        df_w[w] *= -1
     #df_l = df_w.melt(id_vars='n', value_vars=['tri', w0n, w1n, w2n])
     return df_w.to_numpy() #, df_l
+
 
 class WaveData(object):
 
@@ -64,15 +67,21 @@ class WaveData(object):
 
         return x, y
 
-    def as_tf_dataset(self, seq_len, max_samples):
+    def as_tf_dataset(self, seq_len, max_samples, interpolated_samples=True):
 
         def gen():
             num_samples_emitted = 0
             while True:
-                yield self.sample(alpha=0.0, seq_len=seq_len)
-                yield self.sample(alpha=1.0, seq_len=seq_len)
-                #yield self.sample(alpha=random.random(), seq_len=seq_len)
-                num_samples_emitted += 3
+
+                yield self.sample(alpha=1.0, seq_len=seq_len)  # wave0
+                num_samples_emitted += 1
+
+                if interpolated_samples:
+                    yield self.sample(alpha=0.0, seq_len=seq_len)  # wave1
+                    yield self.sample(alpha=random.random(), seq_len=seq_len)
+                    yield self.sample(alpha=random.random(), seq_len=seq_len)
+                    num_samples_emitted += 3
+
                 if num_samples_emitted > max_samples:
                     return
 
@@ -89,30 +98,62 @@ class Embed2DInterpolatedWaveFormData(object):
                 rescaling_factor=1,
                 pad_size=8):
 
-        print("JUST ALPHA 0.0 & 1.0, just tzs")
+        # can't explain why, but sometimes these waves were inverted during capture (????)
+        tsrq = parse(f"{root_dir}/tri_sine_ramp_square.ssv", 'sine', 'ramp', 'square')
+        trqz = parse(f"{root_dir}/tri_ramp_square_zigzag.ssv", 'ramp', 'square', 'zigzag', invert_waves=['ramp'])
+        tqzs = parse(f"{root_dir}/tri_square_zigzag_sine.ssv", 'square', 'zigzag', 'sine', invert_waves=['sine', 'square'])
+        tzsr = parse(f"{root_dir}/tri_zigzag_sine_ramp.ssv", 'zigzag', 'sine', 'ramp', invert_waves=['sine', 'zigzag'])
 
-        tsrq_a = parse(f"{root_dir}/tri_sine_ramp_square.ssv", 'sine', 'ramp', 'square')
-        tqzs_a = parse(f"{root_dir}/tri_square_zigzag_sine.ssv", 'square', 'zigzag', 'sine')
+        self.tsrq_sr = WaveData('sine', 'ramp',   tsrq[:,[0,1,2]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+        self.tsrq_rq = WaveData('ramp', 'square', tsrq[:,[0,2,3]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
 
-        self.tsr = WaveData('sine', 'ramp',   tsrq_a[:,[0,1,2]],
-                            pad_to_size=pad_size, rescaling_factor=rescaling_factor)
-        self.trq = WaveData('ramp', 'square', tsrq_a[:,[0,2,3]],
-                            pad_to_size=pad_size, rescaling_factor=rescaling_factor)
-        self.tqz = WaveData('square', 'zigzag', tqzs_a[:,[0,1,2]],
-                            pad_to_size=pad_size, rescaling_factor=rescaling_factor)
-        self.tzs = WaveData('zigzag', 'sine', tqzs_a[:,[0,2,3]],
-                            pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+        self.trqz_rq = WaveData('ramp', 'square',   trqz[:,[0,1,2]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+        self.trqz_qz = WaveData('square', 'zigzag', trqz[:,[0,2,3]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
 
-        self.all_wave_data = [ self.tsr, self.trq, self.tqz, self.tzs ]
-        #self.all_wave_data = [ self.tsr, self.trq, self.tqz ]
+        self.tqzs_qz = WaveData('square', 'zigzag', tqzs[:,[0,1,2]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+        self.tqzs_zs = WaveData('zigzag', 'sine',   tqzs[:,[0,2,3]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
 
-    def tf_dataset_for_split(self, split, seq_len, max_samples, waves=None):
+        self.tzsr_zs = WaveData('zigzag', 'sine', tzsr[:,[0,1,2]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+        self.tzsr_sr = WaveData('sine', 'ramp',   tzsr[:,[0,2,3]],
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
 
-        assert waves == None, "TODO"
 
-        sampled_ds = tf.data.Dataset.sample_from_datasets(
-            [wd.as_tf_dataset(seq_len, max_samples) for wd in self.all_wave_data]
-        )
+        #self.all_wave_data = [ self.tsrq_sr, self.tzsr_sr ]  # 0.1058 LGTM
+        #self.all_wave_data = [ self.tsrq_rq, self.trqz_rq ]  # 0.1777 LGTM
+        #self.all_wave_data = [ self.trqz_qz, self.tqzs_qz ]  # 0.2009 LGTM
+        #self.all_wave_data = [ self.tqzs_zs, self.tzsr_zs ]  # 0.0441 LGTM
+        self.all_wave_data = [ self.tsrq_sr, self.tsrq_rq,
+                               self.trqz_rq, self.trqz_qz,
+                               self.tqzs_qz, self.tqzs_zs,
+                               self.tzsr_zs, self.tzsr_sr ]
+
+    def tf_dataset_for_split(self, split, seq_len, max_samples, specific_wave=None):
+
+        if specific_wave is None:
+            # all waves and interpolations
+            sampled_ds = tf.data.Dataset.sample_from_datasets(
+                [wd.as_tf_dataset(seq_len, max_samples, interpolated_samples=True)
+                 for wd in self.all_wave_data]
+            )
+        else:
+            # just specific wave. assume that each of these is as good as their
+            # "paired" dataset; i.e. tsrq_sr is as good as tzsr_sr
+            if specific_wave == 'sine':
+                dataset = self.tsrq_sr
+            elif specific_wave == 'ramp':
+                dataset = self.tsrq_rq
+            elif specific_wave == 'square':
+                dataset = self.trqz_qz
+            elif specific_wave == 'zigzag':
+                dataset = self.tqzs_zs
+            sampled_ds = dataset.as_tf_dataset(seq_len, max_samples, interpolated_samples=False)
 
         if split == 'train':
             sampled_ds = sampled_ds.shuffle(1000)

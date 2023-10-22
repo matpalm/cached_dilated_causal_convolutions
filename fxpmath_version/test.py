@@ -47,7 +47,7 @@ def process(wave):
     test_ds = data.tf_dataset_for_split('test',
                         seq_len=opts.num_test_egs,
                         max_samples=1,
-                        waves=[wave])
+                        specific_wave=wave)
 
     for x, y in test_ds:
         x, y = x[0].numpy(), y[0].numpy()

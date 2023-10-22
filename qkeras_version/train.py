@@ -68,6 +68,10 @@ if __name__ == '__main__':
         save_weights_only=True
     )
 
+# import warnings
+# with warnings.catch_warnings():
+#     warnings.simplefilter(action='ignore', category=FutureWarning)
+
     class CheckYPred(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             for tx, ty in validate_ds:
@@ -77,21 +81,21 @@ if __name__ == '__main__':
             import pandas as pd
             import seaborn as sns
             import matplotlib.pyplot as plt
-            for i in range(5): #len(tx)):
+            for i in range(20): #len(tx)):
                 df = pd.DataFrame()
-                #df['x'] = tx[i,:,0]
+                df['x'] = tx[i,:,0]
                 df['e0'] = tx[i,:,1]
                 df['e1'] = tx[i,:,2]
                 df['y_true'] = ty[i,:,0]
                 df['y_pred'] = y_pred[i,:,0]
                 df['n'] = range(len(tx[i]))
-                wide_df = pd.melt(df, id_vars=['n'], value_vars=['y_pred', 'y_true', 'e0', 'e1'])
-                plt.figure(figsize=(20, 10))
+                wide_df = pd.melt(df, id_vars=['n'], value_vars=['x', 'y_pred', 'y_true', 'e0', 'e1'])
+                #plt.figure(figsize=(20, 10))
                 p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
                 p.set_ylim((-2, 2))
-                d = "check_y_pred_cb"
+                d = f"check_y_pred_cb/e{epoch:03d}"
                 util.ensure_dir_exists(d)
-                plt_fname = f"{d}/e{epoch:03d}_i{i}.e0_{tx[i,0,1]:0.2f}_e1_{tx[i,0,2]:0.2f}.png"
+                plt_fname = f"{d}/i{i:03d}.e0_{tx[i,0,1]:0.2f}_e1_{tx[i,0,2]:0.2f}.png"
                 print("saving plot to", plt_fname)
                 plt.savefig(plt_fname)
                 plt.clf()
