@@ -27,7 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-train-egs', type=int, default=200_000)
     parser.add_argument('--num-validate-egs', type=int, default=10)
     parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
-    parser.add_argument('--save-weights', type=str, default='qkeras_weights')
+    parser.add_argument('--root-weights-dir', type=str, default='weights')
     opts = parser.parse_args()
     print("opts", opts)
 
@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     # train model
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath='keras_weights/{epoch:03d}-{val_loss:.5f}',
+        filepath=opts.root_weights_dir+'/keras/{epoch:03d}-{val_loss:.5f}',
         save_weights_only=True
     )
 
@@ -100,8 +100,8 @@ if __name__ == '__main__':
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             quantised_weights = model_save_quantized_weights(train_model)
-            util.ensure_dir_exists(opts.save_weights)
-            with open(f"{opts.save_weights}/e{epoch:02d}.pkl", 'wb') as f:
+            util.ensure_dir_exists(opts.root_weights_dir+"/qkeras")
+            with open(f"{opts.root_weights_dir}/qkeras/e{epoch:02d}.pkl", 'wb') as f:
                 pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
     save_quantised_weights_cb = SaveQuantisedWeights()
 
