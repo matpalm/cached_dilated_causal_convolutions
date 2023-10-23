@@ -17,14 +17,14 @@ module conv1d #(
 );
 
     localparam
-        MAT_MUL_RUNNING  = 3'b000,
-        ACCUMULATE       = 3'b001,
-        BIAS_ADD         = 3'b010,
-        CLIP_LOWER       = 3'b011,
-        CLIP_UPPER       = 3'b100,
-        SINGLE_W         = 3'b101,
-        APPLY_RELU       = 3'b110,
-        OUTPUT           = 3'b111;
+        MAT_MUL_RUNNING  = 0,
+        ACCUMULATE       = 1,
+        BIAS_ADD         = 2,
+        CLIP_LOWER       = 3,
+        CLIP_UPPER       = 4,
+        SINGLE_W         = 5,
+        APPLY_RELU       = 6,
+        OUTPUT           = 7;
     reg [2:0] state = MAT_MUL_RUNNING;
 
     reg kernel0_v;

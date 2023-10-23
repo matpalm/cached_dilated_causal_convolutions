@@ -12,8 +12,6 @@ print("opts", opts)
 
 fxp_model = FxpModel(opts.input_weights_pkl)
 
-util.ensure_dir_exists('weights')
-
 for i, qconv_layer in enumerate(fxp_model.qconvs):
     fname = f"{opts.output_weights_dir}/qconv{i}"
     print("exporting qconv", i, "to", fname)

@@ -27,16 +27,16 @@ module dot_product #(
     // state machine for pipelined mulitplies ( in pairs )
     // and accumulation.
     localparam
-        MULT_D0     = 4'b0000,
-        MULT_D1     = 4'b0001,
-        MULT_D2     = 4'b0010,
-        MULT_D3     = 4'b0011,
-        MULT_D4     = 4'b0100,
-        MULT_D5     = 4'b0101,
-        MULT_D6     = 4'b0110,
-        MULT_D7     = 4'b0111,
-        FINAL_ADD   = 4'b1000,
-        DONE        = 4'b1001;
+        MULT_D0     = 0,
+        MULT_D1     = 1,
+        MULT_D2     = 2,
+        MULT_D3     = 3,
+        MULT_D4     = 4,
+        MULT_D5     = 5,
+        MULT_D6     = 6,
+        MULT_D7     = 7,
+        FINAL_ADD   = 8,
+        DONE        = 9;
     reg [3:0] dp_state = MULT_D0;
 
     // see https://projectf.io/posts/fixed-point-numbers-in-verilog/

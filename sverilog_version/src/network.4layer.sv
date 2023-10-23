@@ -19,19 +19,19 @@ module network #(
 );
 
     localparam
-        CLK_LSB         = 4'b0000,
-        RST_CONV_0      = 4'b0001,
-        CONV_0_RUNNING  = 4'b0010,
-        CLK_ACT_CACHE_0 = 4'b0011,
-        RST_CONV_1      = 4'b0100,
-        CONV_1_RUNNING  = 4'b0101,
-        CLK_ACT_CACHE_1 = 4'b0110,
-        RST_CONV_2      = 4'b0111,
-        CONV_2_RUNNING  = 4'b1000,
-        CLK_ACT_CACHE_2 = 4'b1001,
-        RST_CONV_3      = 4'b1010,
-        CONV_3_RUNNING  = 4'b1011,
-        OUTPUT          = 4'b1100;
+        CLK_LSB         = 0,
+        RST_CONV_0      = 1,
+        CONV_0_RUNNING  = 2,
+        CLK_ACT_CACHE_0 = 3,
+        RST_CONV_1      = 4,
+        CONV_1_RUNNING  = 5,
+        CLK_ACT_CACHE_1 = 6,
+        RST_CONV_2      = 7,
+        CONV_2_RUNNING  = 8,
+        CLK_ACT_CACHE_2 = 9,
+        RST_CONV_3      = 10,
+        CONV_3_RUNNING  = 11,
+        OUTPUT          = 12;
 
     reg [3:0] state;
 

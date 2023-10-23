@@ -15,16 +15,25 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
 parser.add_argument('--data-root-dir', type=str, required=True)
-parser.add_argument('--write-test-x', action='store_true')
 parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
 parser.add_argument('--in-out-d-filter-size', type=int, default=8)
 parser.add_argument('--load-weights', type=str)
+parser.add_argument('--write-test-x', action='store_true')
+parser.add_argument('--write-verilog-weights', type=str,
+                    help='if set, export verilog weights')
 parser.add_argument('--num-test-egs', type=int, default=100)
 opts = parser.parse_args()
 print("opts", opts)
 
 # run through fxp_model
 fxp_model = FxpModel(opts.load_weights)
+
+# export weights if requested
+if opts.write_verilog_weights is not None:
+    for i, qconv_layer in enumerate(fxp_model.qconvs):
+        fname = f"{opts.write_verilog_weights}/qconv{i}"
+        print("exporting qconv", i, "to", fname)
+        qconv_layer.export_weights_for_verilog(fname)
 
 IN_OUT_D = FILTER_SIZE = 8
 
