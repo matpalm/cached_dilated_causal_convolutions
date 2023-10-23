@@ -19,41 +19,52 @@ module row_by_matrix_multiply #(
 
     reg col_v [0:D-1];
 
+    // dot product output unpacked. this variable only introduced to
+    // allow a generate block for assign since it uses j in the slicing
+    logic signed [2*W-1:0]  dp_N_out [0:D-1];
+    genvar j;
+    generate
+        for (j=0; j<D; j++) begin
+            localparam a = (D-j)*2*W-1;
+            localparam b = (D-j-1)*2*W;
+            assign packed_out[a:b] = dp_N_out[j];
+        end
+    endgenerate
+
     dot_product #(.B_VALUES({B_VALUES,"/c0.hex"})) col0 (
-        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[8*2*W-1:7*2*W]), .out_v(col_v[0])
+        .clk(clk), .rst(rst),  .packed_a(packed_a), .out(dp_N_out[0]), .out_v(col_v[0])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c1.hex"})) col1 (
-        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[7*2*W-1:6*2*W]), .out_v(col_v[1])
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[1]), .out_v(col_v[1])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c2.hex"})) col2 (
-        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[6*2*W-1:5*2*W]), .out_v(col_v[2])
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[2]), .out_v(col_v[2])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c3.hex"})) col3 (
-        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[5*2*W-1:4*2*W]), .out_v(col_v[3])
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[3]), .out_v(col_v[3])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c4.hex"})) col4 (
-        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[4*2*W-1:3*2*W]), .out_v(col_v[4])
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[4]), .out_v(col_v[4])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c5.hex"})) col5 (
-        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[3*2*W-1:2*2*W]), .out_v(col_v[5])
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[5]), .out_v(col_v[5])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c6.hex"})) col6 (
-        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[2*2*W-1:1*2*W]), .out_v(col_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[6]), .out_v(col_v[6])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c7.hex"})) col7 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[1*2*W-1:0*2*W]), .out_v(col7_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[7]), .out_v(col_v[7])
     );
 
-    assign out_v = col0_v && col1_v && col2_v && col3_v && col4_v && col5_v && col6_v && col7_v;
+    // TODO: is it enough to just check one?
+    assign out_v = col_v[0] && col_v[1] && col_v[2] && col_v[3] && col_v[4] && col_v[5] && col_v[6] && col_v[7];
 
 
 endmodule
