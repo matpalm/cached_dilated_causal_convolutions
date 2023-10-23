@@ -84,12 +84,32 @@ module conv1d #(
     `define relu(a) (a[W-1] == 1 ) ? 0 : a
 
     integer i;
+    genvar j;
 
     // the max value for single precision is 7.999755859375 whereas the min value is -8
     // so to avoid overflow we clip the double width precision
     // value between these bounds _before_ the single precision conversion
     localparam int signed lower_bound = 32'b11111000000000000000000000000000;  // -8
     localparam int signed upper_bound = 32'b00000111111111111111000000000000;  // 7.999755859375
+
+    // kernel output unpacked. this variable only introduced to
+    // allow a generate block for assign since it uses j in the slicing
+    logic signed [2*W-1:0]  kernel_N_out_sum [0:D-1];
+    generate
+        for (j=0; j<D; j++) begin
+            localparam a = (D-j)*2*W-1;
+            localparam b = (D-j-1)*2*W;
+            assign kernel_N_out_sum[j] = kernel0_out[a:b] + kernel1_out[a:b] + kernel2_out[a:b] + kernel3_out[a:b];
+        end
+    endgenerate
+
+    // similarily, since packedout has variable in slicing, we need to
+    // explicitly assign it.
+    generate
+        for (j=0; j<D; j++) begin
+            assign packed_out[(D-j)*W-1:(D-j-1)*W] = result[j];
+        end
+    endgenerate
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -101,15 +121,9 @@ module conv1d #(
                     if (kernel0_v && kernel1_v && kernel2_v && kernel3_v) state = ACCUMULATE;
                 end
                 ACCUMULATE: begin
-                    // TODO: can't do this in a for loop, but maybe in a generate block? nope: see state: OUTPUT
-                    accum[0] <= kernel0_out[8*2*W-1:7*2*W] + kernel1_out[8*2*W-1:7*2*W] + kernel2_out[8*2*W-1:7*2*W] + kernel3_out[8*2*W-1:7*2*W];
-                    accum[1] <= kernel0_out[7*2*W-1:6*2*W] + kernel1_out[7*2*W-1:6*2*W] + kernel2_out[7*2*W-1:6*2*W] + kernel3_out[7*2*W-1:6*2*W];
-                    accum[2] <= kernel0_out[6*2*W-1:5*2*W] + kernel1_out[6*2*W-1:5*2*W] + kernel2_out[6*2*W-1:5*2*W] + kernel3_out[6*2*W-1:5*2*W];
-                    accum[3] <= kernel0_out[5*2*W-1:4*2*W] + kernel1_out[5*2*W-1:4*2*W] + kernel2_out[5*2*W-1:4*2*W] + kernel3_out[5*2*W-1:4*2*W];
-                    accum[4] <= kernel0_out[4*2*W-1:3*2*W] + kernel1_out[4*2*W-1:3*2*W] + kernel2_out[4*2*W-1:3*2*W] + kernel3_out[4*2*W-1:3*2*W];
-                    accum[5] <= kernel0_out[3*2*W-1:2*2*W] + kernel1_out[3*2*W-1:2*2*W] + kernel2_out[3*2*W-1:2*2*W] + kernel3_out[3*2*W-1:2*2*W];
-                    accum[6] <= kernel0_out[2*2*W-1:1*2*W] + kernel1_out[2*2*W-1:1*2*W] + kernel2_out[2*2*W-1:1*2*W] + kernel3_out[2*2*W-1:1*2*W];
-                    accum[7] <= kernel0_out[1*2*W-1:0*2*W] + kernel1_out[1*2*W-1:0*2*W] + kernel2_out[1*2*W-1:0*2*W] + kernel3_out[1*2*W-1:0*2*W];
+                    for (i=0; i<D; i=i+1) begin
+                        accum[i] <= kernel_N_out_sum[i];
+                    end
                     state <= BIAS_ADD;
                 end
                 BIAS_ADD: begin
@@ -143,32 +157,13 @@ module conv1d #(
                     state = OUTPUT;
                 end
                 OUTPUT: begin
-                    // TODO can't do this ?
-                    // for (i=0; i<D; i=i+1) begin
-                    //     packed_out[(D-i)*W-1:(D-i-1)*W] <= result[i];
-                    // end
-
-                    // TODO can't do this either :/
-                    // genvar i;
-                    // generate
-                    //     for (i = 0; i < D; i++) begin
-                    //         packed_out[(D-i)*W-1:(D-i-1)*W] <= result[i];
-                    //     end
-                    // endgenerate
-
-                    packed_out[8*W-1:7*W] <= result[0];
-                    packed_out[7*W-1:6*W] <= result[1];
-                    packed_out[6*W-1:5*W] <= result[2];
-                    packed_out[5*W-1:4*W] <= result[3];
-                    packed_out[4*W-1:3*W] <= result[4];
-                    packed_out[3*W-1:2*W] <= result[5];
-                    packed_out[2*W-1:1*W] <= result[6];
-                    packed_out[1*W-1:0*W] <= result[7];
-
+                    // NOTE: packed_out assigned in generate block from result
                     out_v <= 1;
                 end
             endcase
     end
+
+
 
 endmodule
 
