@@ -26,10 +26,10 @@ async def test_row_by_matrix_multiply(dut):
 
     for i in range(20):
         print("i", i,
-              "col0_v", dut.col0_v.value,
-              "col1_v", dut.col1_v.value,
-              "col2_v", dut.col2_v.value,
-              "col3_v", dut.col3_v.value,
+              "col0_v", dut.col_v[0].value,
+              "col1_v", dut.col_v[1].value,
+              "col2_v", dut.col_v[2].value,
+              "col3_v", dut.col_v[3].value,
               "packed_out", dut.packed_out.value)
         if dut.out_v.value:
             break
@@ -57,10 +57,10 @@ async def test_row_by_matrix_multiply(dut):
 
     for i in range(20):
         print("i", i,
-              "col0_v", dut.col0_v.value,
-              "col1_v", dut.col1_v.value,
-              "col2_v", dut.col2_v.value,
-              "col3_v", dut.col3_v.value)
+              "col0_v", dut.col_v[0].value,
+              "col1_v", dut.col_v[1].value,
+              "col2_v", dut.col_v[2].value,
+              "col3_v", dut.col_v[3].value)
         if dut.out_v.value:
             break
         await RisingEdge(dut.clk)
