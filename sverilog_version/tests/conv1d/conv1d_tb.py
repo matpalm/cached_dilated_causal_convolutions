@@ -21,10 +21,11 @@ async def test_conv1d(dut):
 
     dut.apply_relu.value = 0
 
-    dut.packed_a0.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000
-    dut.packed_a1.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000
-    dut.packed_a2.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000
-    dut.packed_a3.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000
+    #                       0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
+    dut.packed_a0.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000_0000_0000_0000_0000_0000_0000_0000_0000
+    dut.packed_a1.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000_0000_0000_0000_0000_0000_0000_0000_0000
+    dut.packed_a2.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000_0000_0000_0000_0000_0000_0000_0000_0000
+    dut.packed_a3.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000_0000_0000_0000_0000_0000_0000_0000_0000
 
     dut.rst.value = 1
     await RisingEdge(dut.clk)
@@ -40,7 +41,8 @@ async def test_conv1d(dut):
         await RisingEdge(dut.clk)
 
     assert dut.out_v.value == 1
-    assert dut.packed_out.value == 0x16e5_febf_1642_f8e9_0ba3_1ca9_076e_11c3
+    #                                0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
+    assert dut.packed_out.value == 0x16e5_febf_1642_f8e9_0ba3_1ca9_076e_11c3_0000_0000_0000_0000_0000_0000_0000_0000
 
     # same again with RELU
 
@@ -57,4 +59,5 @@ async def test_conv1d(dut):
         await RisingEdge(dut.clk)
 
     assert dut.out_v.value == 1
-    assert dut.packed_out.value == 0x16e5_0000_1642_0000_0ba3_1ca9_076e_11c3
+    #                                0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
+    assert dut.packed_out.value == 0x16e5_0000_1642_0000_0ba3_1ca9_076e_11c3_0000_0000_0000_0000_0000_0000_0000_0000
