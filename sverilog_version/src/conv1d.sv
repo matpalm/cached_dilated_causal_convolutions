@@ -40,16 +40,16 @@ module conv1d #(
     reg signed [2*D*W-1:0]  kernel3_out;
 
     // double width accumulator
-    reg signed [2*W-1:0]  accum [0:7];
+    reg signed [2*W-1:0]  accum [0:D-1];
 
     // single width final result
-    reg signed [W-1:0]  result [0:7];
+    reg signed [W-1:0]  result [0:D-1];
 
     // bias values
     initial begin
         $readmemh({B_VALUES,"/bias.hex"}, bias_values);
     end
-    reg signed [2*W-1:0] bias_values [0:7];
+    reg signed [2*W-1:0] bias_values [0:D-1];
 
     // 4 kernel mat muls
 
