@@ -29,20 +29,14 @@ async def test_row_by_matrix_multiply(dut):
               "col0_v", dut.col0_v.value,
               "col1_v", dut.col1_v.value,
               "col2_v", dut.col2_v.value,
-              "col3_v", dut.col3_v.value)
+              "col3_v", dut.col3_v.value,
+              "packed_out", dut.packed_out.value)
         if dut.out_v.value:
             break
         await RisingEdge(dut.clk)
 
     assert dut.out_v.value == 1
-    assert dut.out_d0.value == 0
-    assert dut.out_d1.value == 0
-    assert dut.out_d2.value == 0
-    assert dut.out_d3.value == 0
-    assert dut.out_d4.value == 0
-    assert dut.out_d5.value == 0
-    assert dut.out_d6.value == 0
-    assert dut.out_d7.value == 0
+    assert dut.packed_out.value == 0
 
     # set new values for a
     # dut.a_d0.value = 0x0400   # 0000.010000000000 0.25
@@ -74,11 +68,6 @@ async def test_row_by_matrix_multiply(dut):
     # should be valid
     assert dut.out_v.value == 1
 
-    assert dut.out_d0.value == 0b11111101010111101000001010110100
-    assert dut.out_d1.value == 0b11111110111000000100000000000000
-    assert dut.out_d2.value == 0b11111101010111101000001010110100
-    assert dut.out_d3.value == 0            # col3 weights are all zeros
-    assert dut.out_d4.value == 0            # col3 weights are all zeros
-    assert dut.out_d5.value == 0            # col3 weights are all zeros
-    assert dut.out_d6.value == 0            # col3 weights are all zeros
-    assert dut.out_d7.value == 0            # col3 weights are all zeros
+    #                              d0         d1       d2       d3       d4       d5       d6       d7
+    assert dut.packed_out.value == 0xfd5e82b4_fee04000_fd5e82b4_00000000_00000000_00000000_00000000_00000000
+

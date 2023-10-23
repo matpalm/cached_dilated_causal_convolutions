@@ -32,7 +32,7 @@ async def test_conv1d(dut):
     await RisingEdge(dut.clk)
 
     for i in range(30):
-        print("i", i, "c1d_state", dut.c1d_state.value)
+        print("i", i, "state", dut.state.value)
         print("accum      ", dut.accum.value)
         print("result     ", dut.result.value)
         if dut.out_v.value:
