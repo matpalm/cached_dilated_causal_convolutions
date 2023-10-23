@@ -34,15 +34,12 @@ module row_by_matrix_multiply #(
     dot_product #(.B_VALUES({B_VALUES,"/c0.hex"})) col0 (
         .clk(clk), .rst(rst),  .packed_a(packed_a), .out(dp_N_out[0]), .out_v(col_v[0])
     );
-
     dot_product #(.B_VALUES({B_VALUES,"/c1.hex"})) col1 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[1]), .out_v(col_v[1])
     );
-
     dot_product #(.B_VALUES({B_VALUES,"/c2.hex"})) col2 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[2]), .out_v(col_v[2])
     );
-
     dot_product #(.B_VALUES({B_VALUES,"/c3.hex"})) col3 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[3]), .out_v(col_v[3])
     );
@@ -50,17 +47,40 @@ module row_by_matrix_multiply #(
     dot_product #(.B_VALUES({B_VALUES,"/c4.hex"})) col4 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[4]), .out_v(col_v[4])
     );
-
     dot_product #(.B_VALUES({B_VALUES,"/c5.hex"})) col5 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[5]), .out_v(col_v[5])
     );
-
     dot_product #(.B_VALUES({B_VALUES,"/c6.hex"})) col6 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[6]), .out_v(col_v[6])
     );
-
     dot_product #(.B_VALUES({B_VALUES,"/c7.hex"})) col7 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[7]), .out_v(col_v[7])
+    );
+
+    dot_product #(.B_VALUES({B_VALUES,"/c8.hex"})) col8 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[8]), .out_v(col_v[8])
+    );
+    dot_product #(.B_VALUES({B_VALUES,"/c9.hex"})) col9 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[9]), .out_v(col_v[9])
+    );
+    dot_product #(.B_VALUES({B_VALUES,"/c10.hex"})) col10 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[10]), .out_v(col_v[10])
+    );
+    dot_product #(.B_VALUES({B_VALUES,"/c11.hex"})) col11 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[11]), .out_v(col_v[11])
+    );
+
+    dot_product #(.B_VALUES({B_VALUES,"/c12.hex"})) col12 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[12]), .out_v(col_v[12])
+    );
+    dot_product #(.B_VALUES({B_VALUES,"/c13.hex"})) col13 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[13]), .out_v(col_v[13])
+    );
+    dot_product #(.B_VALUES({B_VALUES,"/c14.hex"})) col14 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[14]), .out_v(col_v[14])
+    );
+    dot_product #(.B_VALUES({B_VALUES,"/c15.hex"})) col15 (
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[15]), .out_v(col_v[15])
     );
 
     // TODO: is it enough to just check one?

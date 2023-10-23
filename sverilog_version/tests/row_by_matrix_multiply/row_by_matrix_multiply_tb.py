@@ -62,7 +62,8 @@ async def test_row_by_matrix_multiply(dut):
               "col0_v", dut.col_v[0].value,
               "col1_v", dut.col_v[1].value,
               "col2_v", dut.col_v[2].value,
-              "col3_v", dut.col_v[3].value)
+              "col3_v", dut.col_v[3].value,
+              "packed_out", dut.packed_out.value)
         if dut.out_v.value:
             break
         await RisingEdge(dut.clk)
@@ -71,5 +72,5 @@ async def test_row_by_matrix_multiply(dut):
     assert dut.out_v.value == 1
 
     #                              d0         d1       d2       d3       d4       d5       d6       d7       d8       d9       d10      d11      d12      d13      d14      d15
-    assert dut.packed_out.value == 0xfd5e82b4_fee04000_fd5e82b4_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000
+    assert dut.packed_out.value == 0xfe5e82b4_fee04000_fd5e82b4_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00100000
 
