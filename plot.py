@@ -4,6 +4,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import sys
+import warnings
 
 import argparse
 parser = argparse.ArgumentParser(
@@ -18,6 +19,8 @@ df = pd.DataFrame()
 df['value'] = values
 df['n'] = range(len(values))
 
-p = sns.lineplot(df, x='n', y='value')
-p.set(ylim=(-2, 2))
-plt.savefig(opts.plot_png)
+with warnings.catch_warnings():
+    warnings.simplefilter(action='ignore', category=FutureWarning)
+    p = sns.lineplot(df, x='n', y='value')
+    p.set(ylim=(-2, 2))
+    plt.savefig(opts.plot_png)

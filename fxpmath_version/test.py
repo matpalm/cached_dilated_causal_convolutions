@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 import tqdm
 import util
+import warnings
 
 import argparse
 parser = argparse.ArgumentParser(
@@ -97,12 +98,14 @@ def process(wave):
     df['y_true'] = y[:,0]
     df['n'] = range(len(y_pred))
     wide_df = pd.melt(df, id_vars=['n'], value_vars=['y_pred', 'y_true'])
-    p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
-    p.set(ylim=(-2, 2))
-    plt_fname = f"fxp_math.y_pred.{wave}.png"
-    print("saving plot to", plt_fname)
-    plt.savefig(plt_fname)
-    plt.clf()
+    with warnings.catch_warnings():
+        warnings.simplefilter(action='ignore', category=FutureWarning)
+        p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
+        p.set(ylim=(-2, 2))
+        plt_fname = f"fxp_math.y_pred.{wave}.png"
+        print("saving plot to", plt_fname)
+        plt.savefig(plt_fname)
+        plt.clf()
 
 from multiprocessing import Pool
 waves = ['sine', 'ramp', 'square', 'zigzag']
