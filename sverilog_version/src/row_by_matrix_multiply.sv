@@ -7,7 +7,7 @@
 
 module row_by_matrix_multiply #(
     parameter W=16,  // width for each element
-    parameter D=8,   // size of packed port arrays
+    parameter D=16,  // size of packed port arrays
     parameter B_VALUES="test_matrix"
 )(
   input                          clk,
@@ -17,55 +17,34 @@ module row_by_matrix_multiply #(
   output reg                     out_v
 );
 
-    reg col0_v;
-    reg col1_v;
-    reg col2_v;
-    reg col3_v;
-    reg col4_v;
-    reg col5_v;
-    reg col6_v;
-    reg col7_v;
+    reg col_v [0:D-1];
 
     dot_product #(.B_VALUES({B_VALUES,"/c0.hex"})) col0 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[8*2*W-1:7*2*W]), .out_v(col0_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[8*2*W-1:7*2*W]), .out_v(col_v[0])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c1.hex"})) col1 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[7*2*W-1:6*2*W]), .out_v(col1_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[7*2*W-1:6*2*W]), .out_v(col_v[1])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c2.hex"})) col2 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[6*2*W-1:5*2*W]), .out_v(col2_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[6*2*W-1:5*2*W]), .out_v(col_v[2])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c3.hex"})) col3 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[5*2*W-1:4*2*W]), .out_v(col3_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[5*2*W-1:4*2*W]), .out_v(col_v[3])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c4.hex"})) col4 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[4*2*W-1:3*2*W]), .out_v(col4_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[4*2*W-1:3*2*W]), .out_v(col_v[4])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c5.hex"})) col5 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[3*2*W-1:2*2*W]), .out_v(col5_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[3*2*W-1:2*2*W]), .out_v(col_v[5])
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c6.hex"})) col6 (
-        .clk(clk), .rst(rst),
-        .packed_a(packed_a),
-        .out(packed_out[2*2*W-1:1*2*W]), .out_v(col6_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a), .out(packed_out[2*2*W-1:1*2*W]), .out_v(col_v)
     );
 
     dot_product #(.B_VALUES({B_VALUES,"/c7.hex"})) col7 (

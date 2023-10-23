@@ -25,7 +25,9 @@ async def test_1d_dot_product_low_values(dut):
     # dut.a_d5.value = 0
     # dut.a_d6.value = 0xF000   # 1111.000000000000 -1.0
     # dut.a_d7.value = 0x1000   # 0001.010000000000 1.0
-    dut.packed_a.value = 0x0400_FDFC_0506_F000_1000_0000_F000_1000
+
+    #                      0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
+    dut.packed_a.value = 0x0400_FDFC_0506_F000_1000_0000_F000_1000_0000_0000_0000_0000_0000_0000_0000_1000
 
     dut.rst.value = 1
     await RisingEdge(dut.clk)
@@ -36,10 +38,16 @@ async def test_1d_dot_product_low_values(dut):
 
     print("unpacked a?", dut.a.value)
 
-    for i in range(10):
+    for i in range(20):
         if dut.out_v.value:
             break
         print("i", i, "waiting", dut.dp_state.value)
+        print("dp.i    ", dut.i.value)
+        try:
+            print("dp.a[i] ", dut.a.value[dut.i.value])
+            print("dp.b[i] ", dut.b_values.value[dut.i.value])
+        except IndexError:
+            pass
         print("acc0    ", dut.acc0.value)
         #print("acc1    ", dut.acc1.value)
         print("product0", dut.product0.value)
@@ -49,8 +57,4 @@ async def test_1d_dot_product_low_values(dut):
     # should be valid
     assert dut.out_v.value == 1
 
-    # for i in range(8):
-    #     print("B_values", i, dut.b_values[i])
-
-    # required some minor rounding
-    assert dut.out.value == 0b11111101111011001100000101011010
+    assert dut.out.value == 0xfe_ecc15a

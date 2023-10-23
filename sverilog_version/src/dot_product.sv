@@ -1,11 +1,10 @@
 `default_nettype none
 
 // a . b_values -> out
-// (8,) . (8,) -> (1,)
 
 module dot_product #(
     parameter W=16,   // width for each element
-    parameter D=8,    // size of packed port arrays
+    parameter D=16,   // size of packed port arrays
     parameter B_VALUES="test_b_values.hex"
 )(
   input                        clk,

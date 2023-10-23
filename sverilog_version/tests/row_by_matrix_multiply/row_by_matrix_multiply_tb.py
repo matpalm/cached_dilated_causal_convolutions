@@ -47,7 +47,9 @@ async def test_row_by_matrix_multiply(dut):
     # dut.a_d5.value = 0xFDFC   # 1111.110111111100 -0.1259765625
     # dut.a_d6.value = 0x0506   # 0000.010100000110 0.31396484375
     # dut.a_d7.value = 0xF000   # 1111.000000000000 -1.0
-    dut.packed_a.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000
+
+    #                      0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
+    dut.packed_a.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000_0000_0000_0000_0000_0000_0000_0000_1000
 
     # trigger new run
     dut.rst.value = 1
@@ -68,6 +70,6 @@ async def test_row_by_matrix_multiply(dut):
     # should be valid
     assert dut.out_v.value == 1
 
-    #                              d0         d1       d2       d3       d4       d5       d6       d7
-    assert dut.packed_out.value == 0xfd5e82b4_fee04000_fd5e82b4_00000000_00000000_00000000_00000000_00000000
+    #                              d0         d1       d2       d3       d4       d5       d6       d7       d8       d9       d10      d11      d12      d13      d14      d15
+    assert dut.packed_out.value == 0xfd5e82b4_fee04000_fd5e82b4_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000
 
