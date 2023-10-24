@@ -2,7 +2,7 @@
 
 module network #(
     parameter W = 16,  // width for each element
-    parameter D = 8    // size of packed port arrays
+    parameter D = 16   // size of packed port arrays
 )(
     input rst,
     input clk,
@@ -107,12 +107,12 @@ module network #(
     reg signed [D*W-1:0] c0_out;
     reg c0_out_v;
 
-    // concat W elements, and then left shift them another 4, to make them
+    // concat W elements, and then left shift them another D-W, to make them
     // effectively the first 4 elements in an 8D array
-    assign c0a0 = {lsb_out_in0_0, lsb_out_in1_0, lsb_out_in2_0, lsb_out_in3_0} << 4*W;
-    assign c0a1 = {lsb_out_in0_1, lsb_out_in1_1, lsb_out_in2_1, lsb_out_in3_1} << 4*W;
-    assign c0a2 = {lsb_out_in0_2, lsb_out_in1_2, lsb_out_in2_2, lsb_out_in3_2} << 4*W;
-    assign c0a3 = {lsb_out_in0_3, lsb_out_in1_3, lsb_out_in2_3, lsb_out_in3_3} << 4*W;
+    assign c0a0 = {lsb_out_in0_0, lsb_out_in1_0, lsb_out_in2_0, lsb_out_in3_0} << (D-4)*W;
+    assign c0a1 = {lsb_out_in0_1, lsb_out_in1_1, lsb_out_in2_1, lsb_out_in3_1} << (D-4)*W;
+    assign c0a2 = {lsb_out_in0_2, lsb_out_in1_2, lsb_out_in2_2, lsb_out_in3_2} << (D-4)*W;
+    assign c0a3 = {lsb_out_in0_3, lsb_out_in1_3, lsb_out_in2_3, lsb_out_in3_3} << (D-4)*W;
 
     conv1d #(.W(W), .D(D), .B_VALUES("weights/qconv0")) conv0 (
         .clk(clk), .rst(c0_rst), .apply_relu(1'b1),
@@ -270,7 +270,7 @@ module network #(
                     OUTPUT: begin
                         // NOTE: not shifted for cocotb version, but <<2 shifted for eurorack pmod
                         // final net output is last conv output
-                        out0 <= c2_out[8*W-1:7*W];
+                        out0 <= c2_out[D*W-1:(D-1)*W];
                         out1 <= 0;
                         out2 <= 0;
                         out3 <= 0;

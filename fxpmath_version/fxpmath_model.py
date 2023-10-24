@@ -86,13 +86,13 @@ class FxpModel(object):
             is_last_layer = layer_id == self.num_layers - 1
             if not is_last_layer:
                 y_pred = self.qconvs[layer_id].apply(y_pred, relu=True)
-                if VERBOSE: print("post qconv y_pred", list(y_pred))
+                if VERBOSE: print("qconv", layer_id, "y_pred", list(y_pred))
                 self.activation_caches[layer_id].add(y_pred)
                 y_pred = self.activation_caches[layer_id].cached_dilated_values()
-                if VERBOSE: print("post activation_cache y_pred", list(y_pred))
+                #if VERBOSE: print("post activation_cache y_pred", list(y_pred))
             else:
                 y_pred = self.qconvs[layer_id].apply(y_pred, relu=False)
-                if VERBOSE: print("post (last) qconv y_pred", list(y_pred))
+                if VERBOSE: print("qconv", layer_id, "y_pred", list(y_pred))
 
         if VERBOSE: print("y_pred", list(y_pred))
         return y_pred

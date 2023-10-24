@@ -145,6 +145,7 @@ module conv1d #(
                     state <= SINGLE_W;
                 end
                 SINGLE_W: begin
+                    // TODO: constants 12 and 27 won't work for other W :/
                     for (i=0; i<D; i=i+1) begin
                         result[i] <= accum[i][27:12];
                     end

@@ -62,8 +62,10 @@ def bits_to_hex(value):
         return f"{value:04x}"
     elif value_len == 32:
         return f"{value:08x}"
+    elif value_len == 64:
+        return f"{value:16x}"
     else:
-        raise Exception(value_len)
+        raise Exception(f"unexpected length {value_len}")
 
 def unpack_binary(values, W=16):
     values = str(values)
@@ -161,7 +163,6 @@ async def test_networks(dut):
 
     clock_next_sample()
 
-
     for i in range(100000):
 
         print("|test_x_hex_values|=", len(test_x_hex_values))
@@ -216,8 +217,8 @@ async def test_networks(dut):
         print("----------- conv0")
 
         print("c0_rst", dut.c0_rst.value)
-        print("c0d_state", dut.conv0.state.value, conv_state_to_str(int(dut.conv0.state.value)))
-        print("c0_out_v", dut.c0_out_v.value)
+        print("c0_out_v", dut.c0_out_v.value, "state", conv_state_to_str(int(dut.conv0.state.value)))
+        dump_dut_values( ['c0_out'], [dut.c0_out], unpack=True )
 
         # dump_dut_values(
         #     ['c0a0', 'c0a1', 'c0a2', 'c0a3'],
@@ -226,46 +227,22 @@ async def test_networks(dut):
         # )
 
         # dump_dut_values(
-        #     ['c0 kernel0_out', 'c0 kernel1_out',
-        #      'c0 kernel2_out', 'c0 kernel3_out'],
-        #     [dut.conv0.kernel0_out, dut.conv0.kernel1_out,
-        #      dut.conv0.kernel2_out, dut.conv0.kernel3_out],
+        #     ['c0 kernel0_out', 'c0 kernel1_out', 'c0 kernel2_out', 'c0 kernel3_out'],
+        #     [dut.conv0.kernel0_out, dut.conv0.kernel1_out, dut.conv0.kernel2_out, dut.conv0.kernel3_out],
         #      emit_dec=False
         # )
-
-        # c0biases_h = list(map(bits_to_hex, dut.conv0.bias_values.value))
-        # print("c0bias hex ", c0biases_h)
-
-        # c0_accum_b = dut.conv0.accum.value
-        # # print("c0_accum b  ", c0_accum_b)
-        # c0_accum_h = list(map(bits_to_hex, c0_accum_b))
-        # print("c0_accum h  ", c0_accum_h)
-
-        dump_dut_values(['c0_result'], [dut.conv0.result])
-
-        #c0_result_b = dut.conv0.result.value
-        # print("c0_result b ", c0_result_b)
-        #c0_result_h = list(map(bits_to_hex, c0_result_b))
-        # print("c0_result h ", c0_result_h)
-        #c0_result_d = list(map(hex_fp_value_to_decimal, c0_result_h))
-        #print("c0_result d ", c0_result_d)
-
-        # c0_out_bin_values = unpack_binary(dut.c0_out.value)
-        # # print("c0_out  bin", c0_out_bin_values)
-        # c0_out_hex = list(map(bits_to_hex, c0_out_bin_values))
-        # # print("c0_out  hex", c0_out_hex)
-        # c0_out_dec = list(map(hex_fp_value_to_decimal, c0_out_hex))
-        # print("c0_out  dec", c0_out_dec)
-
-        # print("----------- ac0")
-
-        # print("ac_c0_clk", dut.ac_c0_clk.value)
 
         print("----------- conv1")
 
         print("c1_rst", dut.c1_rst.value)
-        print("c1 state", dut.conv1.state.value, conv_state_to_str(int(dut.conv1.state.value)))
-        print("c1_out_v", dut.c1_out_v.value)
+        print("c1_out_v", dut.c1_out_v.value, "state", conv_state_to_str(int(dut.conv1.state.value)))
+        print("c1_out", dut.c1_out.value)
+
+        print("----------- conv2")
+
+        print("c2_rst", dut.c2_rst.value)
+        print("c2_out_v", dut.c2_out_v.value, "state", conv_state_to_str(int(dut.conv2.state.value)))
+        print("c2_out", dut.c2_out.value)
 
         # dump_dut_values(
         #     ['c1a0', 'c1a1', 'c1a2', 'c1a3'],

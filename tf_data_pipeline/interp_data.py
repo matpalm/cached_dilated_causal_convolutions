@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 import random
+import time
 
 def wave_to_embed_pt(w):
     return {
@@ -27,7 +28,7 @@ def parse(fname, w0n, w1n, w2n, invert_waves=[]):
 
 class WaveData(object):
 
-    def __init__(self, wave0, wave1, data, pad_to_size, rescaling_factor):
+    def __init__(self, wave0, wave1, data, pad_to_size, rescaling_factor, seed):
         assert data.shape[1] == 3  # triangle + 2 waves
         self.wave0 = wave0
         self.wave1 = wave1
@@ -36,12 +37,13 @@ class WaveData(object):
         self.data = data
         self.pad_to_size = pad_to_size
         self.rescaling_factor = rescaling_factor
+        self.rng = random.Random(seed)
 
     def sample(self, alpha, seq_len):
 
         # sample rows
         max_offset = len(self.data) - seq_len - 1
-        random_offset = random.randint(0, max_offset)
+        random_offset = self.rng.randint(0, max_offset)
         sample = self.data[random_offset:(random_offset+seq_len)]
 
         # interpolate sample
@@ -78,8 +80,8 @@ class WaveData(object):
 
                 if interpolated_samples:
                     yield self.sample(alpha=0.0, seq_len=seq_len)  # wave1
-                    yield self.sample(alpha=random.random(), seq_len=seq_len)
-                    yield self.sample(alpha=random.random(), seq_len=seq_len)
+                    yield self.sample(alpha=self.rng.random(), seq_len=seq_len)
+                    yield self.sample(alpha=self.rng.random(), seq_len=seq_len)
                     num_samples_emitted += 3
 
                 if num_samples_emitted > max_samples:
@@ -95,8 +97,12 @@ class Embed2DInterpolatedWaveFormData(object):
 
     def __init__(self,
                 root_dir,
+                seed=None,
                 rescaling_factor=1,
                 pad_size=8):
+
+        if seed is None:
+            seed = int(time.time())
 
         # can't explain why, but sometimes these waves were inverted during capture (????)
         tsrq = parse(f"{root_dir}/tri_sine_ramp_square.ssv", 'sine', 'ramp', 'square')
@@ -105,30 +111,25 @@ class Embed2DInterpolatedWaveFormData(object):
         tzsr = parse(f"{root_dir}/tri_zigzag_sine_ramp.ssv", 'zigzag', 'sine', 'ramp', invert_waves=['sine', 'zigzag'])
 
         self.tsrq_sr = WaveData('sine', 'ramp',   tsrq[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
         self.tsrq_rq = WaveData('ramp', 'square', tsrq[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
 
         self.trqz_rq = WaveData('ramp', 'square',   trqz[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
         self.trqz_qz = WaveData('square', 'zigzag', trqz[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
 
         self.tqzs_qz = WaveData('square', 'zigzag', tqzs[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
         self.tqzs_zs = WaveData('zigzag', 'sine',   tqzs[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
 
         self.tzsr_zs = WaveData('zigzag', 'sine', tzsr[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
         self.tzsr_sr = WaveData('sine', 'ramp',   tzsr[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor)
+                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
 
-
-        #self.all_wave_data = [ self.tsrq_sr, self.tzsr_sr ]  # 0.1058 LGTM
-        #self.all_wave_data = [ self.tsrq_rq, self.trqz_rq ]  # 0.1777 LGTM
-        #self.all_wave_data = [ self.trqz_qz, self.tqzs_qz ]  # 0.2009 LGTM
-        #self.all_wave_data = [ self.tqzs_zs, self.tzsr_zs ]  # 0.0441 LGTM
         self.all_wave_data = [ self.tsrq_sr, self.tsrq_rq,
                                self.trqz_rq, self.trqz_qz,
                                self.tqzs_qz, self.tqzs_zs,

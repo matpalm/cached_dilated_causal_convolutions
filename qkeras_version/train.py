@@ -35,7 +35,8 @@ if __name__ == '__main__':
     data = Embed2DInterpolatedWaveFormData(
         root_dir=opts.data_root_dir,
         rescaling_factor=opts.data_rescaling_factor,
-        pad_size=opts.in_out_d_filter_size)
+        pad_size=opts.in_out_d_filter_size,
+        seed=456)
 
     filter_column_idx = 0
 

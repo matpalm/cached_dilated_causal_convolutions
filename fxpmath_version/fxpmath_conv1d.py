@@ -65,6 +65,9 @@ class FxpMathConv1D(object):
         assert x.shape[0] == 4  # K
         assert x.shape[1] == self.in_d
 
+        # TODO: this has diverged a bit from how the actual verilog version
+        #       works but its probably not a problem..
+
         # prepare initial accumulators for each kernsl and biases
         accum0 = [self.fxp.double_width(0) for _ in range(self.out_d)]
         accum1 = [self.fxp.double_width(0) for _ in range(self.out_d)]
@@ -79,7 +82,7 @@ class FxpMathConv1D(object):
             print("cNa2 ", x[2])
             print("cNa3 ", x[3])
 
-        # step 1; run each kernel; can be in parallel
+        # run each kernel; can be in parallel
         self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
         self.row_by_matrix_multiply(x[1], self.weights[1], accum1)
         self.row_by_matrix_multiply(x[2], self.weights[2], accum2)
@@ -92,34 +95,28 @@ class FxpMathConv1D(object):
             print("kernel_2 ", list(map(to_hex, accum2)))
             print("kernel_3 ", list(map(to_hex, accum3)))
 
-        # step 2; hierarchical add, 1 of 2
-        # TODO: is overflow a concern here? or is the double width
-        # enough.
-        self.fxp.vector_add(accum0, accum1)  # 0+1 -> 0
-        self.fxp.vector_add(accum2, accum3)  # 2+3 -> 2
+        # sum accumulators ( all into accum0 )
+        self.fxp.vector_add(accum0, accum1)
+        self.fxp.vector_add(accum0, accum2)
+        self.fxp.vector_add(accum0, accum3)
 
-        # step 3; hierarchical add, 2 of 2
-        self.fxp.vector_add(accum0, accum2)  # 0+2 -> 0
-
-        # step 4; add biases
+        # add biases
         self.fxp.vector_add(accum0, double_width_biases)
 
-        # step 5; resize down from double to single for output
-        # print("double width result h ", list(map(to_hex, accum0)))
-        # print("double width result d ", list(np.array(accum0)))
+        # resize down from double to single for output
         for i in range(self.out_d):
             self.fxp.resize_single_width(accum0[i])
-        # print("single width result h ", list(map(to_hex, accum0)))
-        # print("single width result d ", list(np.array(accum0)))
 
         # check for example under/overflow
+        # NOTE: this are handled with clip on the double width values in verilog version
+        #
         for a in accum0:
             if a < -7.99:
                 self.num_underflows += 1
             elif a > 7.99:
                 self.num_overflows += 1
 
-        # step 6; apply relu, if configured
+        # apply relu, if configured
         if relu:
             for i in range(self.out_d):
                 if accum0[i] < 0:
