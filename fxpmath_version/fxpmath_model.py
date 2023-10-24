@@ -24,25 +24,24 @@ class FxpModel(object):
         self.num_layers = len(self.weights)
         print("|layers|", self.num_layers)
 
-        # use first conv to derive in/out size
-        # recall; for now we assume in==out
-        # and all other convs are the same sized
-        self.in_out_d = None
+        # scan each conv to derive in/out size
+        in_ds = []
+        out_ds = []
         for key in self.weights.keys():
             weights = self.weights[key]['weights'][0]
-            num_kernels, out_d, in_d = weights.shape
+            num_kernels, in_d, out_d = weights.shape
+            in_ds.append(in_d)
+            out_ds.append(out_d)
             assert num_kernels == 4
-            assert out_d == in_d
-            if self.in_out_d == None:
-                self.in_out_d = in_d
-            else:
-                assert self.in_out_d == in_d
+        print(f"in_ds={in_ds} & out_ds={out_ds}")
+        if in_ds[0] != out_ds[-1]:
+            raise Exception(f"expected first in_d to be same as last out_d but was in_ds={in_ds} out_ds={out_ds}")
 
         # general fxp util
         self.fxp = FxpUtil()
 
         # buffer for layer0 input
-        self.input = np.zeros((K, self.in_out_d), dtype=np.float32)
+        self.input = np.zeros((K, in_ds[0]), dtype=np.float32)
 
         self.qconvs = []
         self.activation_caches = []
@@ -56,7 +55,7 @@ class FxpModel(object):
             is_last_layer = layer_id == self.num_layers - 1
             if not is_last_layer:
                 self.activation_caches.append(ActivationCache(
-                    depth=self.in_out_d, dilation=K**(layer_id+1), kernel_size=K
+                    depth=out_ds[layer_id], dilation=K**(layer_id+1), kernel_size=K
                 ))
 
     def under_and_overflow_counts(self):
@@ -96,5 +95,6 @@ class FxpModel(object):
 
         if VERBOSE: print("y_pred", list(y_pred))
         return y_pred
+
 
 

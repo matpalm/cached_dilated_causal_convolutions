@@ -66,16 +66,20 @@ def create_dilated_model(seq_len: int,
 
     collected_outputs = []
     for i in range(num_layers):
-        last_layer = QConv1D(name=f"qconv_{i}", filters=filter_size,
-                           kernel_size=K, padding='causal',
-                           dilation_rate=K**i,
-                           kernel_quantizer=quantiser(),
-                           bias_quantizer=quantiser(),
-                           kernel_regularizer=regularizers.L2(l2),
-                           bias_regularizer=regularizers.L2(l2))(last_layer)
+
+        is_last_layer = i == num_layers-1
+
+        last_layer = QConv1D(name=f"qconv_{i}",
+                            filters=in_out_d if is_last_layer else filter_size,
+                            kernel_size=K, padding='causal',
+                            dilation_rate=K**i,
+                            kernel_quantizer=quantiser(),
+                            bias_quantizer=quantiser(),
+                            kernel_regularizer=regularizers.L2(l2),
+                            bias_regularizer=regularizers.L2(l2))(last_layer)
         collected_outputs.append(last_layer)
 
-        if i != num_layers-1:
+        if not is_last_layer:
             last_layer = QActivation(quant_relu(), name=f"qrelu_{i}")(last_layer)
             collected_outputs.append(last_layer)
 

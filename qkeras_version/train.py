@@ -24,7 +24,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-layers', type=int, default=4)
     parser.add_argument('--l2', type=float, default=0.0)
-    parser.add_argument('--in-out-d-filter-size', type=int, default=8)
+    parser.add_argument('--in-out-d', type=int, required=True)
+    parser.add_argument('--filter-size', type=int, required=True)
     parser.add_argument('--num-train-egs', type=int, default=200_000)
     parser.add_argument('--num-validate-egs', type=int, default=10)
     parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
@@ -35,7 +36,7 @@ if __name__ == '__main__':
     data = Embed2DInterpolatedWaveFormData(
         root_dir=opts.data_root_dir,
         rescaling_factor=opts.data_rescaling_factor,
-        pad_size=opts.in_out_d_filter_size,
+        pad_size=opts.in_out_d,
         seed=456)
 
     filter_column_idx = 0
@@ -53,9 +54,9 @@ if __name__ == '__main__':
 
     # make model
     train_model = create_dilated_model(TRAIN_SEQ_LEN,
-            in_out_d=opts.in_out_d_filter_size,
+            in_out_d=opts.in_out_d,
             num_layers=opts.num_layers,
-            filter_size=opts.in_out_d_filter_size,
+            filter_size=opts.filter_size,
             l2=opts.l2,
             all_outputs=False)
     print(train_model.summary())
@@ -69,7 +70,6 @@ if __name__ == '__main__':
         filepath=opts.root_weights_dir+'/keras/{epoch:03d}-{val_loss:.5f}',
         save_weights_only=True
     )
-
 
     class CheckYPred(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):

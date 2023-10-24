@@ -16,7 +16,8 @@ parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
 parser.add_argument('--data-root-dir', type=str, required=True)
 parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
-parser.add_argument('--in-out-d-filter-size', type=int, default=8)
+parser.add_argument('--in-out-d', type=int, required=True)
+parser.add_argument('--filter-size', type=int, required=True)
 parser.add_argument('--load-weights', type=str)
 parser.add_argument('--write-test-x', action='store_true')
 parser.add_argument('--write-verilog-weights', type=str,
@@ -35,8 +36,6 @@ if opts.write_verilog_weights is not None:
         print("exporting qconv", i, "to", fname)
         qconv_layer.export_weights_for_verilog(fname)
 
-IN_OUT_D = FILTER_SIZE = 8
-
 print("|layers|=", fxp_model.num_layers)
 K = 4
 RECEPTIVE_FIELD_SIZE = K**fxp_model.num_layers
@@ -47,7 +46,7 @@ print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 data = Embed2DInterpolatedWaveFormData(
     root_dir=opts.data_root_dir,
     rescaling_factor=opts.data_rescaling_factor,
-    pad_size=opts.in_out_d_filter_size,
+    pad_size=opts.in_out_d,
     seed=123)
 
 fxp = util.FxpUtil()
@@ -62,9 +61,8 @@ def process(wave):
 
     for x, y in test_ds:
         x, y = x[0].numpy(), y[0].numpy()
-        IN_OUT_D = x.shape[1]
-        assert x.shape == (opts.num_test_egs, IN_OUT_D), x.shape
-        assert y.shape == (opts.num_test_egs, IN_OUT_D), y.shape
+        assert x.shape == (opts.num_test_egs, opts.in_out_d), x.shape
+        assert y.shape == (opts.num_test_egs, opts.in_out_d), y.shape
         break
 
     # also write to file, if configured
