@@ -1,7 +1,6 @@
 `default_nettype none
 
 // a . b_values -> out
-// (1, 8) . (8, 8) -> (1, 8)
 
 // TODO: could pack out as well?
 
