@@ -46,16 +46,7 @@ def create_dilated_model(seq_len: int,
                          l2: float=0.0,
                          all_outputs: bool=False):
 
-    if in_out_d != filter_size:
-        print("WARNING! in_out_d != filter_size")
-
-    # TODO: generalise code to support convs for each of....
-    #   in_out_d -> filter_size     ( for first layer )
-    #   filter_size -> filter_size  ( for internal layers )
-    #   filter_size -> in_out_d     ( for last layer )
-
     # creates a qkeras model
-
     inp = Input((seq_len, in_out_d))
     last_layer = inp
 
