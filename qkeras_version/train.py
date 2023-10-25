@@ -39,12 +39,13 @@ if __name__ == '__main__':
         pad_size=opts.in_out_d,
         seed=456)
 
+    # we only care about the loss of the _first_ element of the output
     filter_column_idx = 0
 
+    # all convolutions use K=4
     K = 4
 
     # note: kernel size and implied dilation rate always assumed K
-
     RECEPTIVE_FIELD_SIZE = K**opts.num_layers
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 10
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-    # make model
+    # construct model
     train_model = create_dilated_model(TRAIN_SEQ_LEN,
             in_out_d=opts.in_out_d,
             num_layers=opts.num_layers,
@@ -65,12 +66,16 @@ if __name__ == '__main__':
     train_ds = data.tf_dataset_for_split('train', TRAIN_SEQ_LEN, opts.num_train_egs)
     validate_ds = data.tf_dataset_for_split('validate', TRAIN_SEQ_LEN, opts.num_validate_egs)
 
-    # train model
+    # construct some callbacks...
+
+    # 1) a callback for checkpointing raw keras weights
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
         filepath=opts.root_weights_dir+'/keras/{epoch:03d}-{val_loss:.5f}',
         save_weights_only=True
     )
 
+    # 2) a callback to plot the result from a validation sample on epoch end
+    # TODO: this code has been cutnpaste elsewhere so could move into a util
     class CheckYPred(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             for tx, ty in validate_ds:
@@ -100,6 +105,7 @@ if __name__ == '__main__':
                     plt.clf()
     check_y_pred_cb = CheckYPred()
 
+    # 3) a callback to export qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             quantised_weights = model_save_quantized_weights(train_model)
@@ -108,6 +114,7 @@ if __name__ == '__main__':
                 pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
     save_quantised_weights_cb = SaveQuantisedWeights()
 
+    # compile and train
     train_model.compile(Adam(opts.learning_rate),
                         loss=masked_mse(RECEPTIVE_FIELD_SIZE, filter_column_idx))
     train_model.fit(train_ds,

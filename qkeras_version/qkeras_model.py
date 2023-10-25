@@ -13,16 +13,28 @@ N_INT = 4
 N_FRAC = 12
 assert N_WORD == N_INT + N_FRAC
 
-# qkeras quantiser for all tests weights, kernels and biases
+# qkeras quantiser for all convolution kernels and biases
 def quantiser():
     return quantized_bits(bits=N_WORD, integer=N_INT, alpha=1)
 
-# qkeras quantiser for activation
+# qkeras quantiser for all convolution activations
 def quant_relu():
     return f"quantized_relu({N_WORD},{N_INT})"
 
 
 def masked_mse(receptive_field_size, filter_column_idx=None):
+    '''
+    Calculates masked version of mean square error
+
+    Parameters:
+        receptive_field_size: the number of leading elements to ignore in loss as
+                              these are "polluted" by the 0 padding during training.
+        filter_column_idx: only calculate loss w.r.t this column in output. done since
+                           the output has 4 outs, but we might only care about one.
+    Returns:
+        keras loss function
+    '''
+
     def loss_fn(y_true, y_pred):
         assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
         if filter_column_idx is not None:
@@ -45,16 +57,25 @@ def create_dilated_model(seq_len: int,
                          filter_size: int,
                          l2: float=0.0,
                          all_outputs: bool=False):
+    '''
+    create a qkeras model with a stack of dilation 1d convolutions
 
-    # creates a qkeras model
+    Parameters:
+        seq_len: the length of the input sequence.
+        in_out_d: the feature dim of both the input and the output)
+        num_layers: number of 1d convolution to stack, each with an increasing dilation
+        filter_size: kernel size for each convolution
+        l2: l2 penality for convolution kerne & bias
+        all_outputs: if true return a model that outputs all layers for debugging.
+                     otherwise just return the final output
+    Returns:
+        qkeras model
+    '''
+
     inp = Input((seq_len, in_out_d))
     last_layer = inp
 
-    # TODO: first conv should be in_out_d -> filter_size
-    #  but for now assuming they are the same size.
-
     K = 4
-
     collected_outputs = []
     for i in range(num_layers):
 
@@ -74,11 +95,6 @@ def create_dilated_model(seq_len: int,
             last_layer = QActivation(quant_relu(), name=f"qrelu_{i}")(last_layer)
             collected_outputs.append(last_layer)
 
-    # TODO: y_pred qconv1d with filter_size -> in_out_d
-    # y_pred = Conv1D(name='y_pred', filters=filter_size,
-    #                 kernel_size=1, strides=1,
-    #                 activation=None)(last_layer)
-    # collected_outputs.append(y_pred)
     y_pred = last_layer
 
     if all_outputs:
