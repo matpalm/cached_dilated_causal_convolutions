@@ -3,6 +3,9 @@ import numpy as np
 import tensorflow as tf
 import random
 import time
+import math
+
+HALF_PI = math.pi / 2
 
 def wave_to_embed_pt(w):
     return {
@@ -46,17 +49,30 @@ class WaveData(object):
         random_offset = self.rng.randint(0, max_offset)
         sample = self.data[random_offset:(random_offset+seq_len)]
 
-        # interpolate sample
-        interpolated_sample = (alpha * sample[:, 1]) + ((1-alpha) * sample[:, 2])
+        if alpha == 1.0:
+            interpolated_sample = sample[:, 1]
+        elif alpha == 0.0:
+            interpolated_sample = sample[:, 2]
+        else:
+            # interpolate sample ( constant power cross fade interpolation)
+            s1 = math.sin(alpha * HALF_PI)
+            s2 = math.sin((1-alpha) * HALF_PI)
+            interpolated_sample = (s1 * sample[:, 1]) + (s2 * sample[:, 2])
 
         # smooth with rolling average; can have some sharp boundaries
-        # note: we need to pad to restore length ( do so with first element )
+        # note1: we need to pad to restore length ( do so with first element )
+        # note2: even though alpha=0 or 1 doesn't need it, we do it anyways for consistency across time
         N = 10
         interpolated_sample = moving_average(interpolated_sample, n=N)
         interpolated_sample = np.concatenate([[interpolated_sample[0]] * (N-1), interpolated_sample])
 
-        # interpolate the embed points with the same alphas
-        interpolated_embed_pt = ( alpha * self.embed_pt0) + ((1-alpha) * self.embed_pt1)
+        # interpolate the embed points with the same alphas ( linear interpolation )
+        if alpha == 1.0:
+            interpolated_embed_pt = self.embed_pt0
+        elif alpha == 0.0:
+            interpolated_embed_pt = self.embed_pt1
+        else:
+            interpolated_embed_pt = ( alpha * self.embed_pt0) + ((1-alpha) * self.embed_pt1)
         interpolated_e0, interpolated_e1 = interpolated_embed_pt
 
         x = np.zeros((len(sample), self.pad_to_size), dtype=float)
@@ -73,7 +89,7 @@ class WaveData(object):
 
         def gen():
             num_samples_emitted = 0
-            while True:
+            while num_samples_emitted < max_samples:
 
                 yield self.sample(alpha=1.0, seq_len=seq_len)  # wave0
                 num_samples_emitted += 1
@@ -84,8 +100,7 @@ class WaveData(object):
                     yield self.sample(alpha=self.rng.random(), seq_len=seq_len)
                     num_samples_emitted += 3
 
-                if num_samples_emitted > max_samples:
-                    return
+                print("num_samples_emitted", num_samples_emitted, "max_samples", max_samples)
 
         return tf.data.Dataset.from_generator(
             gen, output_signature=(
@@ -162,3 +177,48 @@ class Embed2DInterpolatedWaveFormData(object):
         sampled_ds = sampled_ds.batch(1 if split=='test' else 64)
 
         return sampled_ds.prefetch(tf.data.AUTOTUNE)
+
+
+if __name__ == '__main__':
+    import pandas as pd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import warnings
+    import os
+
+    data = Embed2DInterpolatedWaveFormData(
+        root_dir='datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz',
+        rescaling_factor=1,
+        pad_size=4,
+        seed=123
+    )
+
+    test_ds = data.tf_dataset_for_split(
+        split='train',
+        seq_len=400,
+        max_samples=10)
+
+    D = 'interp_data_egs'
+    if not os.path.exists(D):
+        os.makedirs(D)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter(action='ignore', category=FutureWarning)
+
+        for i, (bx, by) in enumerate(test_ds):
+            bx, by = bx.numpy(), by.numpy()
+            print("shape", bx.shape, by.shape)
+            for b in range(len(bx)):
+                x, y = bx[b], by[b]
+                df = pd.DataFrame()
+                df['x'] = x[:, 0]
+                df['y_true'] = y[:, 0]
+                df['n'] = range(len(x))
+                e0, e1 = x[0, 1], x[0, 2]
+                wide_df = pd.melt(df, id_vars=['n'], value_vars=['x', 'y_true'])
+                p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
+                p.set(ylim=(-2, 2))
+                plt_fname = f"{D}/{i:03d}_{b:02d}.{e0}_{e1}.png"
+                print(plt_fname)
+                plt.savefig(plt_fname)
+                plt.clf()
