@@ -100,8 +100,6 @@ class WaveData(object):
                     yield self.sample(alpha=self.rng.random(), seq_len=seq_len)
                     num_samples_emitted += 3
 
-                print("num_samples_emitted", num_samples_emitted, "max_samples", max_samples)
-
         return tf.data.Dataset.from_generator(
             gen, output_signature=(
                 tf.TensorSpec(shape=(seq_len, self.pad_to_size), dtype=tf.float32),
