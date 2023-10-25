@@ -18,7 +18,7 @@ popd
 
 # generate plot
 cat sverilog_version/tests/network/net.$WAVE.out \
- | grep "^OUT dec" | grep -v xxxx | cut -f3 -d' ' | uniq \
+ | grep "^OUT dec" | cut -f3 -d' ' | grep -v xxxx | uniq \
  > y_pred.sverilog.$WAVE.txt
 ./plot.py --plot-png verilog.y_pred.$WAVE.png < y_pred.sverilog.$WAVE.txt
 rm y_pred.sverilog.$WAVE.txt

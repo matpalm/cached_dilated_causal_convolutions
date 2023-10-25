@@ -208,8 +208,11 @@ module network #(
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
+            prev_sample_clk <= 0;
+            n_clk_ticks <= 0;
+            n_output_ticks <= 0;
             state <= CLK_LSB;
-        end else
+        end else begin
                 case(state)
 
                     CLK_LSB: begin
@@ -273,13 +276,15 @@ module network #(
                         // NOTE: not shifted for cocotb version, but <<2 shifted for eurorack pmod
                         // final net output is last conv output
                         out0 <= c2_out[IN_OUT_D*W-1:(IN_OUT_D-1)*W];
-                        out1 <= 0;
-                        out2 <= 0;
+                        out1 <= n_clk_ticks >> W;
+                        out2 <= n_output_ticks >> W;
                         out3 <= 0;
+                        n_output_ticks <= n_output_ticks + 1;
                     end
 
                 endcase
-
+                n_clk_ticks <= n_clk_ticks + 1;
+            end
     end
 
     assign sample_out0 = out0;

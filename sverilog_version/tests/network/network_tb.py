@@ -218,7 +218,7 @@ async def test_networks(dut):
 
         print("c0_rst", dut.c0_rst.value)
         print("c0_out_v", dut.c0_out_v.value, "state", conv_state_to_str(int(dut.conv0.state.value)))
-        dump_dut_values( ['c0_out'], [dut.c0_out], unpack=True )
+        #dump_dut_values( ['c0_out'], [dut.c0_out], unpack=True )
 
         # dump_dut_values(
         #     ['c0a0', 'c0a1', 'c0a2', 'c0a3'],
@@ -236,36 +236,20 @@ async def test_networks(dut):
 
         print("c1_rst", dut.c1_rst.value)
         print("c1_out_v", dut.c1_out_v.value, "state", conv_state_to_str(int(dut.conv1.state.value)))
-        print("c1_out", dut.c1_out.value)
+        #print("c1_out", dut.c1_out.value)
 
         print("----------- conv2")
 
         print("c2_rst", dut.c2_rst.value)
         print("c2_out_v", dut.c2_out_v.value, "state", conv_state_to_str(int(dut.conv2.state.value)))
-        print("c2_out", dut.c2_out.value)
-
-        # dump_dut_values(
-        #     ['c1a0', 'c1a1', 'c1a2', 'c1a3'],
-        #     [dut.c1a0, dut.c1a1, dut.c1a2, dut.c1a3],
-        #     unpack=True
-        # )
-
-        # dump_dut_values(
-        #     ['c1 kernel0_out', 'c1 kernel1_out',
-        #      'c1 kernel2_out', 'c1 kernel3_out'],
-        #     [dut.conv1.kernel0_out, dut.conv1.kernel1_out,
-        #      dut.conv1.kernel2_out, dut.conv1.kernel3_out],
-        #      unpack=False, emit_dec=False
-        # )
-
-        dump_dut_values(['c1_result'], [dut.conv1.result])
+        #print("c2_out", dut.c2_out.value)
 
         print("----------- final output")
 
         out_bin = [dut.sample_out0.value, dut.sample_out1.value, dut.sample_out2.value, dut.sample_out3.value]
-        print("OUT  bin", out_bin)
+        #print("OUT  bin", out_bin)
         out_hex = list(map(bits_to_hex, out_bin))
-        print("OUT  hex", out_hex)
+        #print("OUT  hex", out_hex)
         out_dec = list(map(hex_fp_value_to_decimal, out_hex))
         print("OUT dec", " ".join(map(str, out_dec)))
 
