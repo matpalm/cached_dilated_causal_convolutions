@@ -3,15 +3,13 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 import pickle, os
-import warnings
 
 #from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 
 from qkeras.utils import model_save_quantized_weights
 
-import util
-
+from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import create_dilated_model, masked_mse
 
 if __name__ == '__main__':
@@ -20,6 +18,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--data-root-dir', type=str, required=True)
+    parser.add_argument('--run', type=str, required=True)
     parser.add_argument('--learning-rate', type=float, default=1e-3)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-layers', type=int, default=4)
@@ -29,9 +28,14 @@ if __name__ == '__main__':
     parser.add_argument('--num-train-egs', type=int, default=200_000)
     parser.add_argument('--num-validate-egs', type=int, default=10)
     parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
-    parser.add_argument('--root-weights-dir', type=str, default='weights')
+    #parser.add_argument('--root-weights-dir', type=str, default='weights')
+    #parser.add_argument('--tb-dir', type=str, default='tb', help='tensorboard logs')
     opts = parser.parse_args()
     print("opts", opts)
+
+    ensure_dir_exists(f"runs/{opts.run}/")
+    for w in ['keras', 'qkeras', 'verilog']:
+        ensure_dir_exists(f"runs/{opts.run}/weights/{w}")
 
     data = Embed2DInterpolatedWaveFormData(
         root_dir=opts.data_root_dir,
@@ -68,49 +72,25 @@ if __name__ == '__main__':
 
     # construct some callbacks...
 
-    # 1) a callback for checkpointing raw keras weights
+    ## tensorboard
+    tensorboard_dir = f"runs/{opts.run}/tb"
+    tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
+
+    ## checkpointing raw keras weights
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath=opts.root_weights_dir+'/keras/{epoch:03d}-{val_loss:.5f}',
+        filepath=f"runs/{opts.run}/weights/keras/" + "{epoch:03d}-{val_loss:.5f}",
         save_weights_only=True
     )
 
-    # 2) a callback to plot the result from a validation sample on epoch end
-    # TODO: this code has been cutnpaste elsewhere so could move into a util
-    class CheckYPred(tf.keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            for tx, ty in validate_ds:
-                break
-            y_pred = train_model(tx)
-            import pandas as pd
-            import seaborn as sns
-            import matplotlib.pyplot as plt
-            for i in range(20): #len(tx)):
-                df = pd.DataFrame()
-                df['x'] = tx[i,:,0]
-                df['e0'] = tx[i,:,1]
-                df['e1'] = tx[i,:,2]
-                df['y_true'] = ty[i,:,0]
-                df['y_pred'] = y_pred[i,:,0]
-                df['n'] = range(len(tx[i]))
-                wide_df = pd.melt(df, id_vars=['n'], value_vars=['x', 'y_pred', 'y_true', 'e0', 'e1'])
-                with warnings.catch_warnings():
-                    warnings.simplefilter(action='ignore', category=FutureWarning)
-                    #plt.figure(figsize=(20, 10))
-                    p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
-                    p.set_ylim((-2, 2))
-                    d = f"check_y_pred_cb/e{epoch:03d}"
-                    util.ensure_dir_exists(d)
-                    plt_fname = f"{d}/i{i:03d}.e0_{tx[i,0,1]:0.2f}_e1_{tx[i,0,2]:0.2f}.png"
-                    plt.savefig(plt_fname)
-                    plt.clf()
-    check_y_pred_cb = CheckYPred()
+    ## plotting examples of validation data ( in tensorboard )
+    check_y_pred_cb = CheckYPred(
+        tb_dir=tensorboard_dir, dataset=validate_ds, model=train_model)
 
-    # 3) a callback to export qkeras quantised weights
+    ## exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             quantised_weights = model_save_quantized_weights(train_model)
-            util.ensure_dir_exists(opts.root_weights_dir+"/qkeras")
-            with open(f"{opts.root_weights_dir}/qkeras/e{epoch:02d}.pkl", 'wb') as f:
+            with open(f"runs/{opts.run}/weights/qkeras/e{epoch:02d}.pkl", 'wb') as f:
                 pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
     save_quantised_weights_cb = SaveQuantisedWeights()
 
@@ -119,6 +99,7 @@ if __name__ == '__main__':
                         loss=masked_mse(RECEPTIVE_FIELD_SIZE, filter_column_idx))
     train_model.fit(train_ds,
                     validation_data=validate_ds,
-                    callbacks=[checkpoint_cb, save_quantised_weights_cb, check_y_pred_cb],
+                    callbacks=[tensorboard_cb, checkpoint_cb,
+                               check_y_pred_cb, save_quantised_weights_cb],
                     epochs=opts.epochs)
 
