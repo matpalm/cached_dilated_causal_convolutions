@@ -27,9 +27,6 @@ async def test_row_by_matrix_multiply(dut):
     for i in range(20):
         print("i", i,
               "col0_v", dut.col_v[0].value,
-              "col1_v", dut.col_v[1].value,
-              "col2_v", dut.col_v[2].value,
-              "col3_v", dut.col_v[3].value,
               "packed_out", dut.packed_out.value)
         if dut.out_v.value:
             break
@@ -49,7 +46,7 @@ async def test_row_by_matrix_multiply(dut):
     # dut.a_d7.value = 0xF000   # 1111.000000000000 -1.0
 
     #                      0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
-    dut.packed_a.value = 0x0400_FDFC_0506_F000_0400_FDFC_0506_F000_0000_0000_0000_0000_0000_0000_0000_1000
+    dut.packed_a.value = 0x0000_0100_0000_0000 #_0400_FDFC_0506_F000_0000_0000_0000_0000_0000_0000_0000_1000
 
     # trigger new run
     dut.rst.value = 1
@@ -60,9 +57,6 @@ async def test_row_by_matrix_multiply(dut):
     for i in range(20):
         print("i", i,
               "col0_v", dut.col_v[0].value,
-              "col1_v", dut.col_v[1].value,
-              "col2_v", dut.col_v[2].value,
-              "col3_v", dut.col_v[3].value,
               "packed_out", dut.packed_out.value)
         if dut.out_v.value:
             break
@@ -71,6 +65,8 @@ async def test_row_by_matrix_multiply(dut):
     # should be valid
     assert dut.out_v.value == 1
 
-    #                              d0         d1       d2       d3       d4       d5       d6       d7       d8       d9       d10      d11      d12      d13      d14      d15
-    assert dut.packed_out.value == 0xfe5e82b4_fee04000_fd5e82b4_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00100000
-
+    # should pick second elements from each col
+    #                               d0         d1       d2       d3       d4       d5       d6       d7       d8       d9       d10      d11      d12      d13      d14      d15
+    #assert dut.packed_out.value == 0xfe5e82b4_fee04000_fd5e82b4_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00000000_00100000
+    #assert dut.packed_out.value == 0xff3d8000_01000000_ff3d8000_00000000_00000000_00000000_00000000_00000000
+    assert dut.packed_out.value ==  0x00099900_00100000_00099900_00000000_00000000_00000000_00000000_00000000

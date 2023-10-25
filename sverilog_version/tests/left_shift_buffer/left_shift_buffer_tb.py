@@ -18,10 +18,10 @@ async def test_left_shift_buffer(dut):
     for i in range(10):
         dut.inp.value = i
         await RisingEdge(dut.clk)
-        print("i", dut.out_d0.value, dut.out_d1.value,
-                   dut.out_d2.value, dut.out_d3.value)
+        print("i", dut.out_0.value, dut.out_1.value,
+                   dut.out_2.value, dut.out_3.value)
 
-    assert dut.out_d0.value == 5
-    assert dut.out_d1.value == 6
-    assert dut.out_d2.value == 7
-    assert dut.out_d3.value == 8
+    assert dut.out_0.value == 5
+    assert dut.out_1.value == 6
+    assert dut.out_2.value == 7
+    assert dut.out_3.value == 8

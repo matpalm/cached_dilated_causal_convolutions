@@ -41,7 +41,7 @@ async def test_1d_dot_product_low_values(dut):
     for i in range(20):
         if dut.out_v.value:
             break
-        print("i", i, "waiting", dut.dp_state.value)
+        print("i", i, "waiting", dut.state.value)
         print("dp.i    ", dut.i.value)
         try:
             print("dp.a[i] ", dut.a.value[dut.i.value])
