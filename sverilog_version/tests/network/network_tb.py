@@ -214,7 +214,7 @@ async def test_networks(dut):
         # print("lsb_in2 dec  ",  lsb_in2_dec)
         # print("lsb_in3 dec  ",  lsb_in3_dec)
 
-        print("----------- conv0")
+        #print("----------- conv0")
 
         print("c0_rst", dut.c0_rst.value)
         print("c0_out_v", dut.c0_out_v.value, "state", conv_state_to_str(int(dut.conv0.state.value)))
@@ -232,13 +232,13 @@ async def test_networks(dut):
         #      emit_dec=False
         # )
 
-        print("----------- conv1")
+        #print("----------- conv1")
 
         print("c1_rst", dut.c1_rst.value)
         print("c1_out_v", dut.c1_out_v.value, "state", conv_state_to_str(int(dut.conv1.state.value)))
         #print("c1_out", dut.c1_out.value)
 
-        print("----------- conv2")
+        #print("----------- conv2")
 
         print("c2_rst", dut.c2_rst.value)
         print("c2_out_v", dut.c2_out_v.value, "state", conv_state_to_str(int(dut.conv2.state.value)))
