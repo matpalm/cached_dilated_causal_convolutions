@@ -19,7 +19,8 @@ parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
 parser.add_argument('--in-out-d', type=int, required=True)
 parser.add_argument('--filter-size', type=int, required=True)
 parser.add_argument('--load-weights', type=str)
-parser.add_argument('--write-test-x', action='store_true')
+parser.add_argument('--test-x-dir', type=str, default=".")
+parser.add_argument('--plot-dir', type=str, default=".")
 parser.add_argument('--write-verilog-weights', type=str,
                     help='if set, export verilog weights')
 parser.add_argument('--num-test-egs', type=int, default=100)
@@ -67,8 +68,9 @@ def process(wave):
 
     # also write to file, if configured
     test_x_hex_f = None
-    if opts.write_test_x:
-        fname = f"test_x.{wave}.hex"
+    if opts.test_x_dir is not None:
+        util.ensure_dir_exists(opts.test_x_dir)
+        fname = f"{opts.test_x_dir}/test_x.{wave}.hex"
         print("writing to", fname)
         test_x_hex_f = open(fname, 'w')
     else:
@@ -110,7 +112,8 @@ def process(wave):
         warnings.simplefilter(action='ignore', category=FutureWarning)
         p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
         p.set(ylim=(-2, 2))
-        plt_fname = f"fxp_math.y_pred.{wave}.png"
+        util.ensure_dir_exists(opts.plot_dir)
+        plt_fname = f"{opts.plot_dir}/fxp_math.y_pred.{wave}.png"
         print("saving plot to", plt_fname)
         plt.savefig(plt_fname)
         plt.clf()
