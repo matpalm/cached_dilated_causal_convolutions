@@ -3,6 +3,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 import pickle, os
+import contextlib
 
 #from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
@@ -23,13 +24,12 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-layers', type=int, default=4)
     parser.add_argument('--l2', type=float, default=0.0)
-    parser.add_argument('--in-out-d', type=int, required=True)
+    parser.add_argument('--in-out-d', type=int, default=4)
     parser.add_argument('--filter-size', type=int, required=True)
+    parser.add_argument('--po2-filter-size', type=int, default=None)
     parser.add_argument('--num-train-egs', type=int, default=200_000)
     parser.add_argument('--num-validate-egs', type=int, default=100)
     parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
-    #parser.add_argument('--root-weights-dir', type=str, default='weights')
-    #parser.add_argument('--tb-dir', type=str, default='tb', help='tensorboard logs')
     opts = parser.parse_args()
     print("opts", opts)
 
@@ -62,9 +62,12 @@ if __name__ == '__main__':
             in_out_d=opts.in_out_d,
             num_layers=opts.num_layers,
             filter_size=opts.filter_size,
-            l2=opts.l2,
-            all_outputs=False)
-    print(train_model.summary())
+            po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
+            l2=opts.l2)
+    train_model.summary()
+    with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
+        with contextlib.redirect_stdout(f):
+            train_model.summary()
 
     # make tf datasets
     train_ds = data.tf_dataset_for_split('train', TRAIN_SEQ_LEN, opts.num_train_egs)
