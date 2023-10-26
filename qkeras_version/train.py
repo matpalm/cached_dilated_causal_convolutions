@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('--in-out-d', type=int, required=True)
     parser.add_argument('--filter-size', type=int, required=True)
     parser.add_argument('--num-train-egs', type=int, default=200_000)
-    parser.add_argument('--num-validate-egs', type=int, default=10)
+    parser.add_argument('--num-validate-egs', type=int, default=100)
     parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
     #parser.add_argument('--root-weights-dir', type=str, default='weights')
     #parser.add_argument('--tb-dir', type=str, default='tb', help='tensorboard logs')
