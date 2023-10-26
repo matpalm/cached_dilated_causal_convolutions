@@ -28,7 +28,7 @@ class CheckYPred(tf.keras.callbacks.Callback):
         print("CheckYPred x.shape", x.shape, "y.shape", y.shape)
 
         # tb pagination dft is 12
-        self.num_imgs_to_plot = min(12, len(self.x))
+        self.num_imgs_to_plot = min(24, len(self.x))
 
     def _plot_as_numpy(self, x, y_true, y_pred):
         df = pd.DataFrame()

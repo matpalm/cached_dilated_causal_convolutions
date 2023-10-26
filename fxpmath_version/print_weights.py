@@ -12,21 +12,24 @@ opts = parser.parse_args()
 if not((opts.file is None) ^ (opts.dir is None)):
     raise Exception("need to set one of --file or --dir")
 
-def print_value_and_log(v):
-    if v == 0:
-        print(v, v)
-    else:
-        print(v, np.log2(abs(v)))
+def print_elements(a, a_str_id):
+    it = np.nditer(a, flags=['multi_index'])
+    for v in it:
+        safe_log2 = "-" if v == 0 else np.log2(abs(v))
+        print("\t".join(map(str, [a_str_id, it.multi_index, v, safe_log2])))
 
 def write_weights_range(f):
     all_weights = pickle.load(open(f, 'rb'))
     for conv_id in all_weights.keys():
-        weights = all_weights[conv_id]['weights'][0]
-        biases = all_weights[conv_id]['weights'][1]
-        for w in weights.flatten():
-            print_value_and_log(w)
-        for b in biases.flatten():
-            print_value_and_log(b)
+        print_elements(
+            all_weights[conv_id]['weights'][0],  # weights
+            f"{conv_id}_w"
+        )
+        print_elements(
+            all_weights[conv_id]['weights'][1],  # biases
+            f"{conv_id}_b"
+        )
+
 
 if opts.file is not None:
     write_weights_range(opts.file)

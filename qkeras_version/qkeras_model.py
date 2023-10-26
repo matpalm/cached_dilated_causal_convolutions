@@ -14,15 +14,16 @@ N_FRAC = 12
 assert N_WORD == N_INT + N_FRAC
 
 # qkeras quantiser for all convolution kernels and biases
-def quantiser(po2):
+def quantiser(po2=False):
     if po2:
         return quantized_po2(bits=N_WORD, max_value=2**N_INT)
     else:
         return quantized_bits(bits=N_WORD, integer=N_INT, alpha=1)
 
 # qkeras quantiser for all convolution activations
-def quant_relu(po2):
+def quant_relu(po2=False):
     if po2:
+        assert False, "never need to use this?"
         return f"quantized_po2({N_WORD}, {2**N_INT})"
     else:
         return f"quantized_relu({N_WORD},{N_INT})"
@@ -86,43 +87,43 @@ def create_dilated_model(seq_len: int,
                         filters=16,
                         kernel_size=K, padding='causal',
                         dilation_rate=K**0,
-                        kernel_quantizer=quantiser(po2=False),
-                        bias_quantizer=quantiser(po2=False),
+                        kernel_quantizer=quantiser(),
+                        bias_quantizer=quantiser(),
                         kernel_regularizer=regularizers.L2(l2),
                         bias_regularizer=regularizers.L2(l2))(inp)
-    y_pred = QActivation(quant_relu(po2=False), name=f"qrelu_0")(y_pred)
+    y_pred = QActivation(quant_relu(), name=f"qrelu_0")(y_pred)
 
     y_pred = QConv1D(name=f"qconv_1a",
-                        filters=256,
+                        filters=512,
                         kernel_size=K, padding='causal',
                         dilation_rate=K**1,
                         kernel_quantizer=quantiser(po2=True),
-                        bias_quantizer=quantiser(po2=True))(y_pred)
+                        bias_quantizer=quantiser())(y_pred)
     y_pred = QConv1D(name=f"qconv_1b",
                         filters=16,
                         kernel_size=1,
                         kernel_quantizer=quantiser(po2=True),
-                        bias_quantizer=quantiser(po2=True))(y_pred)
-    y_pred = QActivation(quant_relu(po2=False), name=f"qrelu_1a")(y_pred)
+                        bias_quantizer=quantiser())(y_pred)
+    y_pred = QActivation(quant_relu(), name=f"qrelu_1a")(y_pred)
 
     y_pred = QConv1D(name=f"qconv_1c",
-                        filters=256,
+                        filters=512,
                         kernel_size=1,
                         kernel_quantizer=quantiser(po2=True),
-                        bias_quantizer=quantiser(po2=True))(y_pred)
+                        bias_quantizer=quantiser())(y_pred)
     y_pred = QConv1D(name=f"qconv_1d",
                         filters=16,
                         kernel_size=1,
                         kernel_quantizer=quantiser(po2=True),
-                        bias_quantizer=quantiser(po2=True))(y_pred)
-    y_pred = QActivation(quant_relu(po2=False), name=f"qrelu_1b")(y_pred)
+                        bias_quantizer=quantiser())(y_pred)
+    y_pred = QActivation(quant_relu(), name=f"qrelu_1b")(y_pred)
 
     y_pred = QConv1D(name=f"qconv_2",
                         filters=4,
                         kernel_size=K, padding='causal',
                         dilation_rate=K**2,
-                        kernel_quantizer=quantiser(po2=False),
-                        bias_quantizer=quantiser(po2=False),
+                        kernel_quantizer=quantiser(),
+                        bias_quantizer=quantiser(),
                         kernel_regularizer=regularizers.L2(l2),
                         bias_regularizer=regularizers.L2(l2))(y_pred)
 
