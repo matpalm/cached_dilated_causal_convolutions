@@ -13,7 +13,7 @@ module row_by_matrix_multiply #(
   output reg                         out_v
 );
 
-    reg col_v [0:OUT_D-1];
+    reg [0:OUT_D-1] col_v;
 
     // dot product output unpacked. this variable only introduced to
     // allow a generate block for assign since it uses j in the slicing
@@ -91,8 +91,7 @@ module row_by_matrix_multiply #(
         end
     endgenerate
 
-    // TODO: is it enough to just check one?
-    assign out_v = col_v[0];
+    assign out_v = (col_v == '1);
 
 
 endmodule
