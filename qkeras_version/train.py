@@ -97,14 +97,14 @@ if __name__ == '__main__':
                 pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
     save_quantised_weights_cb = SaveQuantisedWeights()
 
-    def lr_schedule(epoch, lr):
-        if epoch <= 40:
-            print(epoch, "1e-4")
-            return 1e-4
-        else:
-            print(epoch, "1e-5")
-            return 1e-5
-    lr_cb = tf.keras.callbacks.LearningRateScheduler(lr_schedule)
+    # def lr_schedule(epoch, lr):
+    #     if epoch <= 40:
+    #         print(epoch, "1e-4")
+    #         return 1e-4
+    #     else:
+    #         print(epoch, "1e-5")
+    #         return 1e-5
+    # lr_cb = tf.keras.callbacks.LearningRateScheduler(lr_schedule)
 
     # compile and train
     train_model.compile(Adam(opts.learning_rate),
@@ -112,6 +112,6 @@ if __name__ == '__main__':
     train_model.fit(train_ds,
                     validation_data=validate_ds,
                     callbacks=[tensorboard_cb, checkpoint_cb,
-                               check_y_pred_cb, save_quantised_weights_cb, lr_cb],
+                               check_y_pred_cb, save_quantised_weights_cb], #, lr_cb],
                     epochs=opts.epochs)
 

@@ -18,44 +18,52 @@ class FxpModel(object):
         with open(weights_file, 'rb') as f:
             self.weights = pickle.load(f)
 
-        for weight_id in self.weights.keys():
+        weight_ids = list(self.weights.keys())
+        assert sorted(weight_ids) == weight_ids, "review what to do if this assumption breaks..."
+
+        for weight_id in weight_ids:
             assert weight_id.startswith('qconv_'), weight_id
 
-        self.num_layers = len(self.weights)
+        self.num_layers = len(weight_ids)
         print("|layers|", self.num_layers)
 
         # scan each conv to derive in/out size
-        in_ds = []
-        out_ds = []
-        for key in self.weights.keys():
-            weights = self.weights[key]['weights'][0]
+        in_ds = {}
+        out_ds = {}
+        for weight_id in weight_ids:
+            weights = self.weights[weight_id]['weights'][0]
             num_kernels, in_d, out_d = weights.shape
-            in_ds.append(in_d)
-            out_ds.append(out_d)
+            print("weight_id", weight_id, "num_kernels, in_d, out_d", num_kernels, in_d, out_d)
+            in_ds[weight_id] = in_d
+            out_ds[weight_id] = out_d
             assert num_kernels == 4
         print(f"in_ds={in_ds} & out_ds={out_ds}")
-        if in_ds[0] != out_ds[-1]:
-            raise Exception(f"expected first in_d to be same as last out_d but was in_ds={in_ds} out_ds={out_ds}")
+        if in_ds[weight_ids[0]] != out_ds[weight_ids[-1]]:
+            raise Exception(f"expected first layer in_d to be same as last layer out_d"
+                            f" but was in_ds={in_ds} out_ds={out_ds}")
 
         # general fxp util
         self.fxp = FxpUtil()
 
         # buffer for layer0 input
-        self.input = np.zeros((K, in_ds[0]), dtype=np.float32)
+        self.input = np.zeros((K, in_ds[weight_ids[0]]), dtype=np.float32)
 
         self.qconvs = []
         self.activation_caches = []
 
-        for layer_id in range(self.num_layers):
+        for layer_number, weight_id in enumerate(weight_ids):
+            assert weight_id.startswith('qconv_qb'), "TODO: support qconv_po2!!"
             self.qconvs.append(FxpMathConv1D(
                 self.fxp,
-                weights=self.weights[f"qconv_{layer_id}"]['weights'][0],
-                biases=self.weights[f"qconv_{layer_id}"]['weights'][1]
+                weights=self.weights[weight_id]['weights'][0],
+                biases=self.weights[weight_id]['weights'][1]
                 ))
-            is_last_layer = layer_id == self.num_layers - 1
+            is_last_layer = layer_number == self.num_layers - 1
             if not is_last_layer:
                 self.activation_caches.append(ActivationCache(
-                    depth=out_ds[layer_id], dilation=K**(layer_id+1), kernel_size=K
+                    depth=out_ds[weight_id],
+                    dilation=K**(layer_number+1),
+                    kernel_size=K
                 ))
 
     def under_and_overflow_counts(self):
