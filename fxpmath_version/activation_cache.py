@@ -12,7 +12,7 @@ class ActivationCache(object):
             raise Exception(f"dilation ({dilation}) should be a power of kernel_size ({kernel_size})")
 
         self.num_entries = dilation * kernel_size
-        print(f">RollingCache depth={depth} dilation={dilation}"
+        print(f">ActivationCache depth={depth} dilation={dilation}"
               f" kernel_size={kernel_size} => num_entries={self.num_entries}")
         self.depth = depth
         self.dilation = dilation

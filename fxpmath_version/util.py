@@ -25,11 +25,21 @@ class FxpUtil(object):
     def resize_double_width(self, v):
         v.resize(signed=True, n_word=self.n_word*2, n_frac=self.n_frac*2)
 
+    def check_all_log2(self, a):
+        it = np.nditer(np.abs(a), flags=['multi_index'])
+        for v in it:
+            log2_v = np.log2(v)
+            if int(log2_v) != log2_v:
+                raise Exception(f"value {v} [{it.multi_index}] not negative power of 2"
+                                f" log2_v={log2_v}")
+
     def check_all_qIF(self, a):
-        for v in a.flatten():
+        it = np.nditer(a, flags=['multi_index'])
+        for v in it:
             q_val = float(self.single_width(v))
             if v != q_val:
-                raise Exception(f"value {v} not representable in QI.F; it converted to {q_val}")
+                raise Exception(f"value {v} [{it.multi_index}] not representable in"
+                                f" QI.F; it converted to {q_val}")
 
     def bits(self, v):
         return v.bin(frac_dot=True)

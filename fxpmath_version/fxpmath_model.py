@@ -80,20 +80,27 @@ class FxpModel(object):
                     dilation += 1
 
             elif weight_id.startswith('qconv_po2_'):
+                assert (weight_id.endswith('1a') or weight_id.endswith('1b') or
+                        weight_id.endswith('2a') or weight_id.endswith('2b')), weight_id
+
+                # the last layer can only be a qconv_qb_ back down to outputs
                 assert not is_last_layer
-                raise Exception("TODO")
-                # self.layers.append(FxpMathConv1DPO2Block(
-                # self.qconvs.append(FxpMathConv1DPO2Block(
-                #     self.fxp,
-                #     weights=self.weights[weight_id]['weights'][0],
-                #     biases=self.weights[weight_id]['weights'][1],
-                #     apply_relu=True,
-                #     ))
-                # self.activation_caches.append(ActivationCache(
-                #     depth=out_ds[weight_id],
-                #     dilation=K**(layer_number+1),
-                #     kernel_size=K
-                # ))
+
+                self.layers.append(FxpMathConv1DPO2Block(
+                    self.fxp,
+                    weights=self.weights[weight_id]['weights'][0],
+                    biases=self.weights[weight_id]['weights'][1],
+                    apply_relu=weight_id.endswith('b'),
+                    verbose=self.verbose
+                ))
+
+                if weight_id.endswith('2b'):
+                    self.layers.append(ActivationCache(
+                        depth=out_ds[weight_id],
+                        dilation=K**dilation,
+                        kernel_size=K
+                    ))
+                    dilation += 1
 
 
     def under_and_overflow_counts(self):
@@ -121,17 +128,6 @@ class FxpModel(object):
         for layer in self.layers:
             if self.verbose: print("layer", layer)
             y_pred = layer.apply(y_pred)
-            # if self.verbose: print("layer_id", layer_id)
-            # #is_last_layer = layer_id == self.num_layers - 1
-            # if not is_last_layer:
-            #     y_pred = self.qconvs[layer_id].apply(y_pred) #, relu=True)
-            #     if self.verbose: print("qconv", layer_id, "y_pred", list(y_pred))
-            #     self.activation_caches[layer_id].add(y_pred)
-            #     y_pred = self.activation_caches[layer_id].cached_dilated_values()
-            #     #if self.verbose: print("post activation_cache y_pred", list(y_pred))
-            # else:
-            #     y_pred = self.qconvs[layer_id].apply(y_pred) #, relu=False)
-            #     if self.verbose: print("qconv", layer_id, "y_pred", list(y_pred))
 
         if self.verbose: print("y_pred", list(y_pred))
         return y_pred

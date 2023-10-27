@@ -8,6 +8,11 @@ class FxpMathConv1DQuantisedBitsBlock(object):
     def __init__(self, fxp_util, weights, biases, apply_relu):
         self.fxp = fxp_util
 
+        print(">FxpMathConv1DQuantisedBitsBlock",
+              f" weights={weights.shape}",
+              f" biases={biases.shape}",
+              f" apply_relu={apply_relu}")
+
         self.fxp.check_all_qIF(weights)
         self.fxp.check_all_qIF(biases)
 
