@@ -12,10 +12,18 @@ fi
 set -x
 rm -rf sverilog_version/tests/network/{net.out,test_x.hex} y_pred.sverilog.txt verilog.y_pred.png
 
-set -e
+# copy test files
 cp runs/$RUN/test_x_files/test_x*hex sverilog_version/tests/network/
 
+# symlink to latest weights
+R=`pwd`
+pushd sverilog_version/tests/network/
+rm weights/
+ln -s $R/runs/$RUN/weights/verilog/latest weights
+popd
+
 # run iverilog sim
+set -e
 pushd sverilog_version/tests/network
 ln -s test_x.$WAVE.hex test_x.hex
 make | tee net.$WAVE.out

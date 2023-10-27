@@ -216,8 +216,10 @@ async def test_networks(dut):
 
         #print("----------- conv0")
 
-        print("c0_rst", dut.c0_rst.value)
-        print("c0_out_v", dut.c0_out_v.value, "state", conv_state_to_str(int(dut.conv0.state.value)))
+        print("c0 rst", dut.c0_rst.value,
+               "out_v", dut.c0_out_v.value,
+               "state", conv_state_to_str(int(dut.conv0.state.value)))
+
         #dump_dut_values( ['c0_out'], [dut.c0_out], unpack=True )
 
         # dump_dut_values(
@@ -234,14 +236,18 @@ async def test_networks(dut):
 
         #print("----------- conv1")
 
-        print("c1_rst", dut.c1_rst.value)
-        print("c1_out_v", dut.c1_out_v.value, "state", conv_state_to_str(int(dut.conv1.state.value)))
+        print("c1 rst", dut.c1_rst.value,
+              "out_v", dut.c1_out_v.value,
+              "state", conv_state_to_str(int(dut.conv1.state.value)))
+
         #print("c1_out", dut.c1_out.value)
 
         #print("----------- conv2")
 
-        print("c2_rst", dut.c2_rst.value)
-        print("c2_out_v", dut.c2_out_v.value, "state", conv_state_to_str(int(dut.conv2.state.value)))
+        print("c2 rst", dut.c2_rst.value,
+              "out_v", dut.c2_out_v.value,
+              "state", conv_state_to_str(int(dut.conv2.state.value)))
+
         #print("c2_out", dut.c2_out.value)
 
         print("----------- final output")
