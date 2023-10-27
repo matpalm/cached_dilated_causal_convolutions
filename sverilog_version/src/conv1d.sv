@@ -28,17 +28,12 @@ module conv1d #(
         OUTPUT           = 7;
     reg [2:0] state = MAT_MUL_RUNNING;
 
-    reg kernel0_v;
-    reg kernel1_v;
-    reg kernel2_v;
-    reg kernel3_v;
+    reg [3:0] kernel_v;
 
     // for whatever reason these don't have a valid value (just xxx ) during accumulation
-    // but _can_ access kernel0.out (?)
-    reg signed [2*OUT_D*W-1:0]  kernel0_out;
-    reg signed [2*OUT_D*W-1:0]  kernel1_out;
-    reg signed [2*OUT_D*W-1:0]  kernel2_out;
-    reg signed [2*OUT_D*W-1:0]  kernel3_out;
+    // but _can_ access kernel0.out (?). also we don't put these into a single 4 element
+    // port array because of how they are later accessed
+    reg signed [2*OUT_D*W-1:0]  kernel_out [0:3];
 
     // double width accumulator
     reg signed [2*W-1:0]  accum [0:OUT_D-1];
@@ -55,19 +50,19 @@ module conv1d #(
     // 4 kernel mat muls
 
     row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k0"})) kernel0 (
-        .clk(clk), .rst(rst), .packed_a(packed_a0), .packed_out(kernel0_out), .out_v(kernel0_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a0), .packed_out(kernel_out[0]), .out_v(kernel_v[0])
     );
 
     row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k1"})) kernel1 (
-        .clk(clk), .rst(rst), .packed_a(packed_a1), .packed_out(kernel1_out), .out_v(kernel1_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a1), .packed_out(kernel_out[1]), .out_v(kernel_v[1])
     );
 
     row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k2"})) kernel2 (
-        .clk(clk), .rst(rst), .packed_a(packed_a2), .packed_out(kernel2_out), .out_v(kernel2_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a2), .packed_out(kernel_out[2]), .out_v(kernel_v[2])
     );
 
     row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k3"})) kernel3 (
-        .clk(clk), .rst(rst), .packed_a(packed_a3), .packed_out(kernel3_out), .out_v(kernel3_v)
+        .clk(clk), .rst(rst), .packed_a(packed_a3), .packed_out(kernel_out[3]), .out_v(kernel_v[3])
     );
 
     `define relu(a) (a[W-1] == 1 ) ? 0 : a
@@ -88,7 +83,7 @@ module conv1d #(
         for (j=0; j<OUT_D; j++) begin
             localparam a = (OUT_D-j)*2*W-1;
             localparam b = (OUT_D-j-1)*2*W;
-            assign kernel_N_out_sum[j] = kernel0_out[a:b] + kernel1_out[a:b] + kernel2_out[a:b] + kernel3_out[a:b];
+            assign kernel_N_out_sum[j] = kernel_out[0][a:b] + kernel_out[1][a:b] + kernel_out[2][a:b] + kernel_out[3][a:b];
         end
     endgenerate
 
@@ -107,7 +102,7 @@ module conv1d #(
         end else
             case(state)
                 MAT_MUL_RUNNING: begin
-                    if (kernel0_v && kernel1_v && kernel2_v && kernel3_v) state = ACCUMULATE;
+                    if (kernel_v == '1) state = ACCUMULATE;
                 end
                 ACCUMULATE: begin
                     for (i=0; i<OUT_D; i=i+1) begin
