@@ -4,25 +4,25 @@ import numpy as np
 
 np.set_printoptions(precision=16)
 
-from .fxpmath_conv1d import FxpMathConv1D
+from .fxpmath_conv1d_qb import FxpMathConv1DQuantisedBitsBlock
+from .fxpmath_conv1d_po2 import FxpMathConv1DPO2Block
 from .util import FxpUtil
 from .activation_cache import ActivationCache
 
 K = 4
-VERBOSE = False
 
 class FxpModel(object):
 
-    def __init__(self, weights_file):
+    def __init__(self, weights_file, verbose):
 
         with open(weights_file, 'rb') as f:
             self.weights = pickle.load(f)
 
         weight_ids = list(self.weights.keys())
-        assert sorted(weight_ids) == weight_ids, "review what to do if this assumption breaks..."
-
+        print("weight_ids", weight_ids)
+        self.weight_ids = weight_ids
         for weight_id in weight_ids:
-            assert weight_id.startswith('qconv_'), weight_id
+            assert (weight_id.startswith('qconv_qb_') or weight_id.startswith('qconv_po2')) , weight_id
 
         self.num_layers = len(weight_ids)
         print("|layers|", self.num_layers)
@@ -36,7 +36,11 @@ class FxpModel(object):
             print("weight_id", weight_id, "num_kernels, in_d, out_d", num_kernels, in_d, out_d)
             in_ds[weight_id] = in_d
             out_ds[weight_id] = out_d
-            assert num_kernels == 4
+            if weight_id.startswith('qconv_qb_'):
+                assert num_kernels == 4
+            elif weight_id.startswith('qconv_po2'):
+                assert num_kernels in [1, 4]
+
         print(f"in_ds={in_ds} & out_ds={out_ds}")
         if in_ds[weight_ids[0]] != out_ds[weight_ids[-1]]:
             raise Exception(f"expected first layer in_d to be same as last layer out_d"
@@ -46,37 +50,63 @@ class FxpModel(object):
         self.fxp = FxpUtil()
 
         # buffer for layer0 input
-        self.input = np.zeros((K, in_ds[weight_ids[0]]), dtype=np.float32)
+        self.in_dim = in_ds[weight_ids[0]]
+        self.input = np.zeros((K, self.in_dim), dtype=np.float32)
 
-        self.qconvs = []
-        self.activation_caches = []
+        self.verbose = verbose
 
-        for layer_number, weight_id in enumerate(weight_ids):
-            assert weight_id.startswith('qconv_qb'), "TODO: support qconv_po2!!"
-            self.qconvs.append(FxpMathConv1D(
-                self.fxp,
-                weights=self.weights[weight_id]['weights'][0],
-                biases=self.weights[weight_id]['weights'][1]
-                ))
-            is_last_layer = layer_number == self.num_layers - 1
-            if not is_last_layer:
-                self.activation_caches.append(ActivationCache(
-                    depth=out_ds[weight_id],
-                    dilation=K**(layer_number+1),
-                    kernel_size=K
-                ))
+        #self.qconvs = []
+        #self.activation_caches = []
+
+        self.layers = []
+        dilation = 1
+        for weight_id in weight_ids:
+
+            is_last_layer = (weight_id == weight_ids[-1])
+
+            if weight_id.startswith('qconv_qb_'):
+                self.layers.append(FxpMathConv1DQuantisedBitsBlock(
+                    self.fxp,
+                    weights=self.weights[weight_id]['weights'][0],
+                    biases=self.weights[weight_id]['weights'][1],
+                    apply_relu=(not is_last_layer)
+                    ))
+                if not is_last_layer:
+                    self.layers.append(ActivationCache(
+                        depth=out_ds[weight_id],
+                        dilation=K**dilation,
+                        kernel_size=K
+                    ))
+                    dilation += 1
+
+            elif weight_id.startswith('qconv_po2_'):
+                assert not is_last_layer
+                raise Exception("TODO")
+                # self.layers.append(FxpMathConv1DPO2Block(
+                # self.qconvs.append(FxpMathConv1DPO2Block(
+                #     self.fxp,
+                #     weights=self.weights[weight_id]['weights'][0],
+                #     biases=self.weights[weight_id]['weights'][1],
+                #     apply_relu=True,
+                #     ))
+                # self.activation_caches.append(ActivationCache(
+                #     depth=out_ds[weight_id],
+                #     dilation=K**(layer_number+1),
+                #     kernel_size=K
+                # ))
+
 
     def under_and_overflow_counts(self):
         return {
-            'num_underflows': sum([q.num_underflows for q in self.qconvs]),
-            'num_overflows': sum([q.num_overflows for q in self.qconvs])
+            'num_underflows': sum([q.num_underflows() for q in self.layers]),
+            'num_overflows': sum([q.num_overflows() for q in self.layers])
         }
 
     def predict(self, x):
 
         # convert to near fixed point numbers and back to floats
         x = self.fxp.nparray_to_fixed_point_floats(x)
-        if VERBOSE:
+        if self.verbose:
             print("==============")
             print("next_x", list(x))
 
@@ -84,24 +114,26 @@ class FxpModel(object):
         for i in range(K-1):
             self.input[i] = self.input[i+1]
         self.input[K-1] = x
-        if VERBOSE: print("lsb", self.input)
+        if self.verbose: print("lsb", self.input)
 
         y_pred = self.input
 
-        for layer_id in range(self.num_layers):
-            if VERBOSE: print("layer_id", layer_id)
-            is_last_layer = layer_id == self.num_layers - 1
-            if not is_last_layer:
-                y_pred = self.qconvs[layer_id].apply(y_pred, relu=True)
-                if VERBOSE: print("qconv", layer_id, "y_pred", list(y_pred))
-                self.activation_caches[layer_id].add(y_pred)
-                y_pred = self.activation_caches[layer_id].cached_dilated_values()
-                #if VERBOSE: print("post activation_cache y_pred", list(y_pred))
-            else:
-                y_pred = self.qconvs[layer_id].apply(y_pred, relu=False)
-                if VERBOSE: print("qconv", layer_id, "y_pred", list(y_pred))
+        for layer in self.layers:
+            if self.verbose: print("layer", layer)
+            y_pred = layer.apply(y_pred)
+            # if self.verbose: print("layer_id", layer_id)
+            # #is_last_layer = layer_id == self.num_layers - 1
+            # if not is_last_layer:
+            #     y_pred = self.qconvs[layer_id].apply(y_pred) #, relu=True)
+            #     if self.verbose: print("qconv", layer_id, "y_pred", list(y_pred))
+            #     self.activation_caches[layer_id].add(y_pred)
+            #     y_pred = self.activation_caches[layer_id].cached_dilated_values()
+            #     #if self.verbose: print("post activation_cache y_pred", list(y_pred))
+            # else:
+            #     y_pred = self.qconvs[layer_id].apply(y_pred) #, relu=False)
+            #     if self.verbose: print("qconv", layer_id, "y_pred", list(y_pred))
 
-        if VERBOSE: print("y_pred", list(y_pred))
+        if self.verbose: print("y_pred", list(y_pred))
         return y_pred
 
 

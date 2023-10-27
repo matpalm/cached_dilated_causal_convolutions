@@ -3,9 +3,9 @@ import os
 
 VERBOSE = False
 
-class FxpMathConv1D(object):
+class FxpMathConv1DQuantisedBitsBlock(object):
 
-    def __init__(self, fxp_util, weights, biases):
+    def __init__(self, fxp_util, weights, biases, apply_relu):
         self.fxp = fxp_util
 
         self.fxp.check_all_qIF(weights)
@@ -26,11 +26,12 @@ class FxpMathConv1D(object):
 
         self.weights = weights
         self.biases = biases
+        self.apply_relu = apply_relu
 
         # keep count of stats of under/overflows w.r.t double to single precision
         # conversion. these are OK, but too many means something wrong
-        self.num_underflows = 0
-        self.num_overflows = 0
+        self._num_underflows = 0
+        self._num_overflows = 0
 
     def dot_product(self, x, weights, accumulator):
         # this loop represents what could be in the state machine
@@ -51,7 +52,7 @@ class FxpMathConv1D(object):
             self.dot_product(x, weights[column], accumulators[column])
 
 
-    def apply(self, x, relu):
+    def apply(self, x):
 
         def to_hex(v):
             bin_str = str(v.bin())
@@ -112,12 +113,12 @@ class FxpMathConv1D(object):
         #
         for a in accum0:
             if a < -7.99:
-                self.num_underflows += 1
+                self._num_underflows += 1
             elif a > 7.99:
-                self.num_overflows += 1
+                self._num_overflows += 1
 
         # apply relu, if configured
-        if relu:
+        if self.apply_relu:
             for i in range(self.out_d):
                 if accum0[i] < 0:
                     accum0[i] = self.fxp.double_width(0)
@@ -125,6 +126,11 @@ class FxpMathConv1D(object):
         # return as np array,
         return np.array(accum0)
 
+    def num_underflows(self):
+        return self._num_underflows
+
+    def num_overflows(self):
+        return self._num_overflows
 
     def export_weights_for_verilog(self, root_dir):
         # export weights for this conv1d in format

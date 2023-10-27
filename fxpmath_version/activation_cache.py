@@ -39,3 +39,13 @@ class ActivationCache(object):
             lookup_idx -= 1
             cache_idx = (cache_idx - self.dilation) % self.num_entries
         return lookup
+
+    def apply(self, y_pred):
+        self.add(y_pred)
+        return self.cached_dilated_values()
+
+    def num_underflows(self):
+        return 0
+
+    def num_overflows(self):
+        return 0

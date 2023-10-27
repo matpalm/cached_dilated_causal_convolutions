@@ -16,8 +16,6 @@ parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
 parser.add_argument('--data-root-dir', type=str, required=True)
 parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
-parser.add_argument('--in-out-d', type=int, required=True)
-parser.add_argument('--filter-size', type=int, required=True)
 parser.add_argument('--load-weights', type=str)
 parser.add_argument('--test-x-dir', type=str, default=".")
 parser.add_argument('--plot-dir', type=str, default=".")
@@ -28,7 +26,7 @@ opts = parser.parse_args()
 print("opts", opts)
 
 # run through fxp_model
-fxp_model = FxpModel(opts.load_weights)
+fxp_model = FxpModel(opts.load_weights, verbose=True)
 
 # export weights if requested
 if opts.write_verilog_weights is not None:
@@ -47,7 +45,7 @@ print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 data = Embed2DInterpolatedWaveFormData(
     root_dir=opts.data_root_dir,
     rescaling_factor=opts.data_rescaling_factor,
-    pad_size=opts.in_out_d,
+    pad_size=fxp_model.in_dim,
     seed=123)
 
 fxp = util.FxpUtil()
@@ -62,8 +60,8 @@ def process(wave):
 
     for x, y in test_ds:
         x, y = x[0].numpy(), y[0].numpy()
-        assert x.shape == (opts.num_test_egs, opts.in_out_d), x.shape
-        assert y.shape == (opts.num_test_egs, opts.in_out_d), y.shape
+        assert x.shape == (opts.num_test_egs, fxp_model.in_dim), x.shape
+        assert y.shape == (opts.num_test_egs, fxp_model.in_dim), y.shape
         break
 
     # also write to file, if configured
