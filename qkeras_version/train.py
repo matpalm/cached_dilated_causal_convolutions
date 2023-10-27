@@ -92,9 +92,17 @@ if __name__ == '__main__':
     ## exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
+            # save quantised weights dict pickled
             quantised_weights = model_save_quantized_weights(train_model)
             with open(f"runs/{opts.run}/weights/qkeras/e{epoch:02d}.pkl", 'wb') as f:
                 pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
+            #  add a latest symlink
+            latest_symlink_fname = f"runs/{opts.run}/weights/qkeras/latest.pkl"
+            try:
+                os.remove(latest_symlink_fname)
+            except FileNotFoundError:
+                pass
+            os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
     save_quantised_weights_cb = SaveQuantisedWeights()
 
     # def lr_schedule(epoch, lr):

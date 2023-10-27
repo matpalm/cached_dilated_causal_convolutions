@@ -159,7 +159,7 @@ async def test_networks(dut):
         dut.sample_in1.value = next_x_vals[1]
         dut.sample_in2.value = next_x_vals[2]
         dut.sample_in3.value = next_x_vals[3]
-        dut.sample_clk = 1
+        dut.sample_clk.value = 1
 
     clock_next_sample()
 
@@ -261,4 +261,4 @@ async def test_networks(dut):
 
         await RisingEdge(dut.clk)
 
-        dut.sample_clk = 0
+        dut.sample_clk.value = 0

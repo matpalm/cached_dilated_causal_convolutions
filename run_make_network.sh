@@ -10,29 +10,23 @@ if [[ -z "$RUN" ]]; then
 fi
 
 set -x
-rm -rf sverilog_version/tests/network/{net.out,test_x.hex} y_pred.sverilog.txt verilog.y_pred.png
 
-# copy test files
-cp runs/$RUN/test_x_files/test_x*hex sverilog_version/tests/network/
+RUN_DIR=`pwd`/runs/$RUN/
 
-# symlink to latest weights
-R=`pwd`
+# link in assets
 pushd sverilog_version/tests/network/
-rm weights/
-ln -s $R/runs/$RUN/weights/verilog/latest weights
-popd
 
 # run iverilog sim
-set -e
-pushd sverilog_version/tests/network
-ln -s test_x.$WAVE.hex test_x.hex
-make | tee net.$WAVE.out
+rm test_x.hex
+ln -s $RUN_DIR/test_x_files/test_x.$WAVE.hex test_x.hex
+rm -r weights
+ln -s $RUN_DIR/weights/verilog/latest/ weights
+make > $RUN_DIR/net.$WAVE.out
 popd
 
 # generate plot
-mv sverilog_version/tests/network/net.$WAVE.out runs/$RUN/
-cat runs/$RUN/net.$WAVE.out \
+cat $RUN_DIR/net.$WAVE.out \
  | grep "^OUT dec" | cut -f3 -d' ' | grep -v xxxx | uniq \
  > /tmp/$$.y_pred.sverilog.$WAVE.txt
-./plot.py --plot-png runs/$RUN/verilog.y_pred.$WAVE.png < /tmp/$$.y_pred.sverilog.$WAVE.txt
+./plot.py --plot-png $RUN_DIR/verilog.y_pred.$WAVE.png < /tmp/$$.y_pred.sverilog.$WAVE.txt
 rm /tmp/$$.y_pred.sverilog.$WAVE.txt

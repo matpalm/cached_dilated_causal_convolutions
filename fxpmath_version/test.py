@@ -22,17 +22,16 @@ parser.add_argument('--plot-dir', type=str, default=".")
 parser.add_argument('--write-verilog-weights', type=str,
                     help='if set, export verilog weights')
 parser.add_argument('--num-test-egs', type=int, default=100)
+parser.add_argument('--verbose', action='store_true')
 opts = parser.parse_args()
 print("opts", opts)
 
 # run through fxp_model
-fxp_model = FxpModel(opts.load_weights, verbose=True)
+fxp_model = FxpModel(opts.load_weights, verbose=opts.verbose)
 
 # export weights if requested
 if opts.write_verilog_weights is not None:
     fxp_model.export_weights_for_verilog(root_dir=opts.write_verilog_weights)
-
-exit()
 
 print("|layers|=", fxp_model.num_layers)
 K = 4
