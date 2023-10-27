@@ -1,15 +1,18 @@
 import numpy as np
 import os
 import math
+from .util import ensure_dir_exists
 
 VERBOSE = False
 DP_COUNT = 0
 
 class FxpMathConv1DPO2Block(object):
 
-    def __init__(self, fxp_util, weights, biases, apply_relu, verbose):
+    def __init__(self, fxp_util, layer_name, weights, biases, apply_relu, verbose):
         self.fxp = fxp_util
+        self.layer_name = layer_name
         self.verbose = verbose
+        self.apply_relu = apply_relu
 
         self.fxp.check_all_log2(weights)
         self.fxp.check_all_qIF(biases)
@@ -57,21 +60,17 @@ class FxpMathConv1DPO2Block(object):
                     fp_v *= -1
                 assert fp_v > 0
                 weight_log2 = math.log2(fp_v)
-                #print("fp_v", fp_v, "weight_log2", weight_log2)
                 if weight_log2 != int(weight_log2):
                     raise Exception(f"there was a weight with a non int log 2 value {idx}")
                 weight_log2 = int(-weight_log2)
                 assert weight_log2 >= 0
                 self.weights_log2[idx] = weight_log2
 
-
         # TODO remove once working with neg weights etc!
         self.weights = weights
 
         # biases are always FP trained with quantised_bits
         self.biases = biases
-
-        self.apply_relu = apply_relu
 
         # keep count of stats of under/overflows w.r.t double to single precision
         # conversion. these are OK, but too many means something wrong
@@ -84,24 +83,9 @@ class FxpMathConv1DPO2Block(object):
               f" apply_relu={apply_relu} K={self.K}")
 
 
-    # def dot_product(self, x, negative_weights, weights_log2, accumulator):
-    #     # this loop represents what could be in the state machine
-    #     # but can be pipelined
-    #     for i in range(self.in_d):
-    #         x_i = self.fxp.single_width(x[i])
-    #         w_i = self.fxp.single_width(weights[i])
-    #         prod = x_i * w_i  # will be double width
-    #         print(f"i={i:2d} x_i={x_i} w_i={w_i} => prod={prod}")
-    #         accumulator.set_val(accumulator + prod)
-    #         # keep accumulator double width. by dft a+b => +1 for int part
-    #         self.fxp.resize_double_width(accumulator)
-
-
     def dot_product(self, x, weights, negative_weights, weights_log2, zero_weights, accumulator):
 
         global DP_COUNT
-
-        VERSION = 'NEW'
 
         # this loop represents what could be in the state machine
         # but can be pipelined
@@ -109,24 +93,16 @@ class FxpMathConv1DPO2Block(object):
 
             x_i = self.fxp.single_width(x[i])
 
-            if VERSION == 'OLD':
-                w_i = self.fxp.single_width(weights[i])
-                if w_i == 0.0: print("0 from weights[i]", i, weights[i])
-                prod = x_i * w_i  # will be double width
-                print(f"dp={DP_COUNT:10d} i={i:2d} x_i={x_i} w_i={w_i} => prod={prod}")
-            elif VERSION == 'NEW':
-                # check for zero case
-                if zero_weights[i]:
-                    print("OVERRIDE ZERO")
-                    prod = self.fxp.single_width(0)
-                else:
-                    # negate and shift
-                    prod = -x_i if negative_weights[i] else x_i
-                    prod >>= weights_log2[i]
-                print(f"dp={DP_COUNT:10d} i={i:2d} x_i={x_i} nw_i={negative_weights[i]}"
-                    f" w_log2_i={weights_log2[i]} zw_i={zero_weights[i]} => prod={prod}")
+            # check for zero case
+            if zero_weights[i]:
+                print("OVERRIDE ZERO")
+                prod = self.fxp.single_width(0)
             else:
-                assert False
+                # negate and shift
+                prod = -x_i if negative_weights[i] else x_i
+                prod >>= weights_log2[i]
+            print(f"dp={DP_COUNT:10d} i={i:2d} x_i={x_i} nw_i={negative_weights[i]}"
+                f" w_log2_i={weights_log2[i]} zw_i={zero_weights[i]} => prod={prod}")
 
             # add to accumulator
             print(f"adding prod {prod} {self.fxp.bits(prod)} to"
@@ -139,13 +115,13 @@ class FxpMathConv1DPO2Block(object):
             DP_COUNT += 1
 
 
-    def row_by_matrix_multiply(self, x, weights, negative_weights, weights_log2, zero_weights, accumulators):
+    def row_by_matrix_multiply(self, x, negative_weights, weights_log2, zero_weights, accumulators):
         # this loop represents what could be in the state machine
         # but can be pipelined
         for column in range(self.out_d):
-            self.dot_product(
-                x, weights[column],
-                negative_weights[column], weights_log2[column], zero_weights[column], accumulators[column])
+            self.dot_product(x, negative_weights[column],
+                weights_log2[column], zero_weights[column],
+                accumulators[column])
 
 
     def apply(self, x):
@@ -192,10 +168,8 @@ class FxpMathConv1DPO2Block(object):
 
         # run each kernel; can be in parallel
         for i in range(self.K):
-            self.row_by_matrix_multiply(
-                x[i], self.weights[i],
-                self.negative_weights[i], self.weights_log2[i], self.zero_weights[i],
-                accums[i])
+            self.row_by_matrix_multiply(x[i], self.negative_weights[i], self.weights_log2[i],
+                self.zero_weights[i], accums[i])
 
         if self.verbose:
             print("KERNEL OUTPUTS")
@@ -239,50 +213,27 @@ class FxpMathConv1DPO2Block(object):
     def num_overflows(self):
         return self._num_overflows
 
-
     def export_weights_for_verilog(self, root_dir):
-        assert False
+        root_dir = f"{root_dir}/{self.layer_name}"
 
+        print(">>>> root_dir", root_dir)
 
-        # export weights for this conv1d in format
-        # for loading in verilog with $readmemh
+        num_k, out_d, in_d = self.negative_weights.shape
+        print("num_k", num_k, "out_d", out_d, "in_d", in_d)
 
-        # def single_width_hex_representation(w):
-        #     w_fp = self.fxp.single_width(w)
-        #     if w != float(w_fp):
-        #         raise Exception(f"??? value {k},{o},{i} ({w}) failed FP double check")
-        #     hex_string_without_0x = w_fp.hex()[2:]
-        #     assert len(hex_string_without_0x) == 4
-        #     return hex_string_without_0x
+        for k in range(num_k):
+            d = f"{root_dir}/k{k}"
+            ensure_dir_exists(d)
+            for o in range(out_d):
 
-        # def double_width_hex_representation(w):
-        #     w_fp = self.fxp.double_width(w)
-        #     if w != float(w_fp):
-        #         raise Exception(f"??? value {k},{o},{i} ({w}) failed FP double check")
-        #     hex_string_without_0x = w_fp.hex()[2:]
-        #     assert len(hex_string_without_0x) == 8
-        #     return hex_string_without_0x
+                # write pow2 weights
+                with open(f"{d}/w_l2_{o:02d}.hex", 'w') as f:
+                    for i in range(in_d):
+                        v = self.weights_log2[k, o, i]
+                        print(hex(v)[2:], file=f)
 
-        # def ensure_dir_exists(d):
-        #     if not os.path.exists(d):
-        #         os.makedirs(d)
+                # TODO: decide how to write negative_weights and zero_weights bits
 
-        # assert len(self.weights.shape) == 3
-        # num_k, out_d, in_d = self.weights.shape
-
-        # for k in range(num_k):
-        #     d = f"{root_dir}/k{k}"
-        #     ensure_dir_exists(d)
-        #     for o in range(out_d):
-        #         with open(f"{d}/c{o}.hex", 'w') as f:
-        #             for i in range(in_d):
-        #                 f.write(single_width_hex_representation(self.weights[k, o, i]))
-        #                 f.write(f" // {self.weights[k, o, i]}\n")
-
-        # with open(f"{root_dir}/bias.hex", 'w') as f:
-        #     for o in range(out_d):
-        #         f.write(double_width_hex_representation(self.biases[o]))
-        #         f.write(f" // {self.biases[o]}\n")
-
-
-
+        print("self.negative_weights", self.negative_weights.shape)
+        print("self.weights_log2", self.weights_log2.shape)
+        print("self.zero_weights", self.zero_weights.shape)

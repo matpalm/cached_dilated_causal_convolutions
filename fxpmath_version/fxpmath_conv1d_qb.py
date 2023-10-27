@@ -1,12 +1,15 @@
 import numpy as np
 import os
+from .util import ensure_dir_exists
 
 VERBOSE = False
 
 class FxpMathConv1DQuantisedBitsBlock(object):
 
-    def __init__(self, fxp_util, weights, biases, apply_relu):
+    def __init__(self, fxp_util, layer_name, weights, biases, apply_relu):
         self.fxp = fxp_util
+        self.layer_name = layer_name
+        self.apply_relu = apply_relu
 
         print(">FxpMathConv1DQuantisedBitsBlock",
               f" weights={weights.shape}",
@@ -31,7 +34,7 @@ class FxpMathConv1DQuantisedBitsBlock(object):
 
         self.weights = weights
         self.biases = biases
-        self.apply_relu = apply_relu
+
 
         # keep count of stats of under/overflows w.r.t double to single precision
         # conversion. these are OK, but too many means something wrong
@@ -141,6 +144,8 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         # export weights for this conv1d in format
         # for loading in verilog with $readmemh
 
+        root_dir = root_dir + "/" + self.layer_name
+
         def single_width_hex_representation(w):
             w_fp = self.fxp.single_width(w)
             if w != float(w_fp):
@@ -157,10 +162,6 @@ class FxpMathConv1DQuantisedBitsBlock(object):
             assert len(hex_string_without_0x) == 8
             return hex_string_without_0x
 
-        def ensure_dir_exists(d):
-            if not os.path.exists(d):
-                os.makedirs(d)
-
         assert len(self.weights.shape) == 3
         num_k, out_d, in_d = self.weights.shape
 
@@ -168,7 +169,7 @@ class FxpMathConv1DQuantisedBitsBlock(object):
             d = f"{root_dir}/k{k}"
             ensure_dir_exists(d)
             for o in range(out_d):
-                with open(f"{d}/c{o}.hex", 'w') as f:
+                with open(f"{d}/c{o:02d}.hex", 'w') as f:
                     for i in range(in_d):
                         f.write(single_width_hex_representation(self.weights[k, o, i]))
                         f.write(f" // {self.weights[k, o, i]}\n")

@@ -32,31 +32,31 @@ module row_by_matrix_multiply #(
 
     // as is we now have a clumsy example where we support either 4, 8 or 16 :/
 
-    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c0.hex"})) col0 (
+    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c00.hex"})) col0 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[0]), .out_v(col_v[0])
     );
-    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c1.hex"})) col1 (
+    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c01.hex"})) col1 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[1]), .out_v(col_v[1])
     );
-    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c2.hex"})) col2 (
+    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c02.hex"})) col2 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[2]), .out_v(col_v[2])
     );
-    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c3.hex"})) col3 (
+    dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c03.hex"})) col3 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[3]), .out_v(col_v[3])
     );
 
     generate
         if (OUT_D >=8 ) begin
-            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c4.hex"})) col4 (
+            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c04.hex"})) col4 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[4]), .out_v(col_v[4])
             );
-            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c5.hex"})) col5 (
+            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c05.hex"})) col5 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[5]), .out_v(col_v[5])
             );
-            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c6.hex"})) col6 (
+            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c06.hex"})) col6 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[6]), .out_v(col_v[6])
             );
-            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c7.hex"})) col7 (
+            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c07.hex"})) col7 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[7]), .out_v(col_v[7])
             );
         end
@@ -64,10 +64,10 @@ module row_by_matrix_multiply #(
 
     generate
         if (OUT_D == 16) begin
-            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c8.hex"})) col8 (
+            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c08.hex"})) col8 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[8]), .out_v(col_v[8])
             );
-            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c9.hex"})) col9 (
+            dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c09.hex"})) col9 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[9]), .out_v(col_v[9])
             );
             dot_product #(.W(W), .D(IN_D), .B_VALUES({B_VALUES,"/c10.hex"})) col10 (

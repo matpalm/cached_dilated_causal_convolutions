@@ -30,10 +30,9 @@ fxp_model = FxpModel(opts.load_weights, verbose=True)
 
 # export weights if requested
 if opts.write_verilog_weights is not None:
-    for i, qconv_layer in enumerate(fxp_model.qconvs):
-        fname = f"{opts.write_verilog_weights}/qconv{i}"
-        print("exporting qconv", i, "to", fname)
-        qconv_layer.export_weights_for_verilog(fname)
+    fxp_model.export_weights_for_verilog(root_dir=opts.write_verilog_weights)
+
+exit()
 
 print("|layers|=", fxp_model.num_layers)
 K = 4

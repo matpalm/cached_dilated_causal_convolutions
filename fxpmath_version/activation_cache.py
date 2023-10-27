@@ -49,3 +49,6 @@ class ActivationCache(object):
 
     def num_overflows(self):
         return 0
+
+    def export_weights_for_verilog(self, root_dir):
+        pass

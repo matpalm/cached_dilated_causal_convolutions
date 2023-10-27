@@ -67,6 +67,7 @@ class FxpModel(object):
             if weight_id.startswith('qconv_qb_'):
                 self.layers.append(FxpMathConv1DQuantisedBitsBlock(
                     self.fxp,
+                    layer_name=weight_id,
                     weights=self.weights[weight_id]['weights'][0],
                     biases=self.weights[weight_id]['weights'][1],
                     apply_relu=(not is_last_layer)
@@ -88,6 +89,7 @@ class FxpModel(object):
 
                 self.layers.append(FxpMathConv1DPO2Block(
                     self.fxp,
+                    layer_name=weight_id,
                     weights=self.weights[weight_id]['weights'][0],
                     biases=self.weights[weight_id]['weights'][1],
                     apply_relu=weight_id.endswith('b'),
@@ -132,5 +134,6 @@ class FxpModel(object):
         if self.verbose: print("y_pred", list(y_pred))
         return y_pred
 
-
-
+    def export_weights_for_verilog(self, root_dir):
+        for layer in self.layers:
+            layer.export_weights_for_verilog(root_dir)
