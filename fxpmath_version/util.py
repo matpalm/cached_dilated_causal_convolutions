@@ -76,16 +76,14 @@ class FxpUtil(object):
         fractional_value = fractional_bits / float(2**12)
         return integer_value + fractional_value
 
-
-# fxp = FxpUtil()
-# a = fxp.single_width(3)
-# b = fxp.single_width(4)
-# ab = a + b
-# fxp.resize_single_width(ab)
-# print("a  ", fxp.bits(a))
-# print("b  ", fxp.bits(b))
-# print("ab ", fxp.bits(ab))
-
 def ensure_dir_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
+
+
+if __name__ == '__main__':
+    fxp = FxpUtil()
+    a = fxp.single_width(0.234)
+    print("a", a, fxp.bits(a))
+    a >>= 0
+    print("a", a, fxp.bits(a))

@@ -1,7 +1,9 @@
 import numpy as np
 import os
+import math
 
 VERBOSE = False
+DP_COUNT = 0
 
 class FxpMathConv1DPO2Block(object):
 
@@ -35,16 +37,35 @@ class FxpMathConv1DPO2Block(object):
         if weights.max() > 1:
             raise Exception(f"no po2 weight value should be > +1  {weights.shape}")
 
-        # calculate which weights are negative
-        self.negative_weights = weights < 0  # dtype bool
+        # keep track of three things about the weights;
+        # 1) which are negative
+        # 2) log2 of FP number
+        # 3) which, after FP conversion, became zero ( even though this shouldn't be )
+        self.negative_weights = np.zeros_like(weights, dtype=bool)
+        self.weights_log2 = np.zeros_like(weights, dtype=int)
+        self.zero_weights = np.zeros_like(weights, dtype=bool)
 
-        # calculate log2 of weights, ensuring these are always an int
-        self.weights_log2 = np.log2(np.abs(weights))
-        if not np.all(np.equal(self.weights_log2, self.weights_log2.astype(int))):
-            raise Exception("there was a weight with a non int log 2 value")
-        self.weights_log2 = self.weights_log2.astype(int)
+        for idx in np.ndindex(weights.shape):
+            # do conversion to FP first since it handles weird corner cases of
+            # FXP math better.
+            fp_v = self.fxp.single_width(weights[idx])
+            if fp_v == 0:
+                self.zero_weights[idx] = True
+            else:
+                if fp_v < 0:
+                    self.negative_weights[idx] = True
+                    fp_v *= -1
+                assert fp_v > 0
+                weight_log2 = math.log2(fp_v)
+                #print("fp_v", fp_v, "weight_log2", weight_log2)
+                if weight_log2 != int(weight_log2):
+                    raise Exception(f"there was a weight with a non int log 2 value {idx}")
+                weight_log2 = int(-weight_log2)
+                assert weight_log2 >= 0
+                self.weights_log2[idx] = weight_log2
 
 
+        # TODO remove once working with neg weights etc!
         self.weights = weights
 
         # biases are always FP trained with quantised_bits
@@ -58,35 +79,79 @@ class FxpMathConv1DPO2Block(object):
         self._num_overflows = 0
 
         print(">FxpMathConv1DPO2Block",
-              f" weights={weights.shape}",
+              f" weights={self.negative_weights.shape}",
               f" biases={biases.shape}",
               f" apply_relu={apply_relu} K={self.K}")
 
 
-    def dot_product(self, x, weights, accumulator):
+    # def dot_product(self, x, negative_weights, weights_log2, accumulator):
+    #     # this loop represents what could be in the state machine
+    #     # but can be pipelined
+    #     for i in range(self.in_d):
+    #         x_i = self.fxp.single_width(x[i])
+    #         w_i = self.fxp.single_width(weights[i])
+    #         prod = x_i * w_i  # will be double width
+    #         print(f"i={i:2d} x_i={x_i} w_i={w_i} => prod={prod}")
+    #         accumulator.set_val(accumulator + prod)
+    #         # keep accumulator double width. by dft a+b => +1 for int part
+    #         self.fxp.resize_double_width(accumulator)
+
+
+    def dot_product(self, x, weights, negative_weights, weights_log2, zero_weights, accumulator):
+
+        global DP_COUNT
+
+        VERSION = 'NEW'
+
         # this loop represents what could be in the state machine
         # but can be pipelined
         for i in range(self.in_d):
+
             x_i = self.fxp.single_width(x[i])
-            w_i = self.fxp.single_width(weights[i])
-            prod = x_i * w_i  # will be double width
-            print(f"i={i:2d} x_i={x_i} w_i={w_i} => prod={prod}")
+
+            if VERSION == 'OLD':
+                w_i = self.fxp.single_width(weights[i])
+                if w_i == 0.0: print("0 from weights[i]", i, weights[i])
+                prod = x_i * w_i  # will be double width
+                print(f"dp={DP_COUNT:10d} i={i:2d} x_i={x_i} w_i={w_i} => prod={prod}")
+            elif VERSION == 'NEW':
+                # check for zero case
+                if zero_weights[i]:
+                    print("OVERRIDE ZERO")
+                    prod = self.fxp.single_width(0)
+                else:
+                    # negate and shift
+                    prod = -x_i if negative_weights[i] else x_i
+                    prod >>= weights_log2[i]
+                print(f"dp={DP_COUNT:10d} i={i:2d} x_i={x_i} nw_i={negative_weights[i]}"
+                    f" w_log2_i={weights_log2[i]} zw_i={zero_weights[i]} => prod={prod}")
+            else:
+                assert False
+
+            # add to accumulator
+            print(f"adding prod {prod} {self.fxp.bits(prod)} to"
+                  f" accumulator {accumulator} {self.fxp.bits(accumulator)}")
             accumulator.set_val(accumulator + prod)
+
             # keep accumulator double width. by dft a+b => +1 for int part
             self.fxp.resize_double_width(accumulator)
 
+            DP_COUNT += 1
 
-    def row_by_matrix_multiply(self, x, weights, accumulators):
+
+    def row_by_matrix_multiply(self, x, weights, negative_weights, weights_log2, zero_weights, accumulators):
         # this loop represents what could be in the state machine
         # but can be pipelined
         for column in range(self.out_d):
-            self.dot_product(x, weights[column], accumulators[column])
+            self.dot_product(
+                x, weights[column],
+                negative_weights[column], weights_log2[column], zero_weights[column], accumulators[column])
 
 
     def apply(self, x):
 
         print(">apply x", x.shape, "K", self.K)
-        print("w", self.weights.shape,
+        print("w", self.negative_weights.shape,
               "b",self.biases.shape,
               "apply_relu", self.apply_relu)
 
@@ -127,7 +192,10 @@ class FxpMathConv1DPO2Block(object):
 
         # run each kernel; can be in parallel
         for i in range(self.K):
-            self.row_by_matrix_multiply(x[i], self.weights[i], accums[i])
+            self.row_by_matrix_multiply(
+                x[i], self.weights[i],
+                self.negative_weights[i], self.weights_log2[i], self.zero_weights[i],
+                accums[i])
 
         if self.verbose:
             print("KERNEL OUTPUTS")
@@ -215,5 +283,6 @@ class FxpMathConv1DPO2Block(object):
         #     for o in range(out_d):
         #         f.write(double_width_hex_representation(self.biases[o]))
         #         f.write(f" // {self.biases[o]}\n")
+
 
 
