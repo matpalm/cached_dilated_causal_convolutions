@@ -2,14 +2,14 @@ import numpy as np
 import os
 from .util import ensure_dir_exists
 
-VERBOSE = False
-
 class FxpMathConv1DQuantisedBitsBlock(object):
 
-    def __init__(self, fxp_util, layer_name, weights, biases, apply_relu):
+    def __init__(self, fxp_util, layer_name, weights, biases, apply_relu, verbose):
         self.fxp = fxp_util
         self.layer_name = layer_name
+        self.verbose = verbose
         self.apply_relu = apply_relu
+        self.K = 4
 
         print(">FxpMathConv1DQuantisedBitsBlock",
               f" weights={weights.shape}",
@@ -25,7 +25,7 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         weights = weights.transpose(0, 2, 1)
 
         assert len(weights.shape) == 3
-        assert weights.shape[0] == 4  # K
+        assert weights.shape[0] == self.K
         self.out_d = weights.shape[1]
         self.in_d = weights.shape[2]
 
@@ -70,56 +70,49 @@ class FxpMathConv1DQuantisedBitsBlock(object):
             padding = "0" * (target_padded_width - len(hex_str))
             return padding + hex_str
 
-        assert len(x.shape) == 2
-        assert x.shape[0] == 4  # K
-        assert x.shape[1] == self.in_d
+        assert x.shape == (self.K, self.in_d)
 
         # TODO: this has diverged a bit from how the actual verilog version
         #       works but its probably not a problem..
 
-        # prepare initial accumulators for each kernsl and biases
-        accum0 = [self.fxp.double_width(0) for _ in range(self.out_d)]
-        accum1 = [self.fxp.double_width(0) for _ in range(self.out_d)]
-        accum2 = [self.fxp.double_width(0) for _ in range(self.out_d)]
-        accum3 = [self.fxp.double_width(0) for _ in range(self.out_d)]
+        # prepare initial accumulators for each kernels and biases
+        # note: this might be 4 accumulators ( for dilated conv ) or might
+        # just be 1 accum ( for the 1x1s )
+        accums = []
+        for _ in range(self.K):
+            accums.append([self.fxp.double_width(0) for _ in range(self.out_d)])
         double_width_biases = [self.fxp.double_width(b) for b in self.biases]
 
-        if VERBOSE:
+        if self.verbose:
             print("row_by_matrix_multiply inputs")
-            print("cNa0 ", x[0])
-            print("cNa1 ", x[1])
-            print("cNa2 ", x[2])
-            print("cNa3 ", x[3])
+            for i in range(self.K):
+                print(f"cNaI i={i} {x[i].shape} {x[i]}")
 
         # run each kernel; can be in parallel
-        self.row_by_matrix_multiply(x[0], self.weights[0], accum0)
-        self.row_by_matrix_multiply(x[1], self.weights[1], accum1)
-        self.row_by_matrix_multiply(x[2], self.weights[2], accum2)
-        self.row_by_matrix_multiply(x[3], self.weights[3], accum3)
+        for i in range(self.K):
+            self.row_by_matrix_multiply(x[i], self.weights[i], accums[i])
 
-        if VERBOSE:
+        if self.verbose:
             print("KERNEL OUTPUTS")
-            print("kernel_0 ", list(map(to_hex, accum0)))
-            print("kernel_1 ", list(map(to_hex, accum1)))
-            print("kernel_2 ", list(map(to_hex, accum2)))
-            print("kernel_3 ", list(map(to_hex, accum3)))
+            for i in range(self.K):
+                print(f"kernel i={i} {list(map(to_hex, accums[i]))}")
 
         # sum accumulators ( all into accum0 )
-        self.fxp.vector_add(accum0, accum1)
-        self.fxp.vector_add(accum0, accum2)
-        self.fxp.vector_add(accum0, accum3)
+        for i in range(self.K):
+            if i != 0:
+                self.fxp.vector_add(accums[0], accums[i])
 
         # add biases
-        self.fxp.vector_add(accum0, double_width_biases)
+        self.fxp.vector_add(accums[0], double_width_biases)
 
         # resize down from double to single for output
         for i in range(self.out_d):
-            self.fxp.resize_single_width(accum0[i])
+            self.fxp.resize_single_width(accums[0][i])
 
         # check for example under/overflow
         # NOTE: this are handled with clip on the double width values in verilog version
         #
-        for a in accum0:
+        for a in accums[0]:
             if a < -7.99:
                 self._num_underflows += 1
             elif a > 7.99:
@@ -128,11 +121,12 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         # apply relu, if configured
         if self.apply_relu:
             for i in range(self.out_d):
-                if accum0[i] < 0:
-                    accum0[i] = self.fxp.double_width(0)
+                if accums[0][i] < 0:
+                    accums[0][i] = self.fxp.double_width(0)
 
         # return as np array,
-        return np.array(accum0)
+        return np.array(accums[0])
+
 
     def num_underflows(self):
         return self._num_underflows

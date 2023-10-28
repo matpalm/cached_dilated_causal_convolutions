@@ -3,7 +3,6 @@ import os
 import math
 from .util import ensure_dir_exists
 
-VERBOSE = False
 DP_COUNT = 0
 
 class FxpMathConv1DPO2Block(object):
@@ -95,7 +94,6 @@ class FxpMathConv1DPO2Block(object):
 
             # check for zero case
             if zero_weights[i]:
-                print("OVERRIDE ZERO")
                 prod = self.fxp.single_width(0)
             else:
                 # negate and shift
@@ -126,12 +124,13 @@ class FxpMathConv1DPO2Block(object):
 
     def apply(self, x):
 
-        print(">apply x", x.shape, "K", self.K)
-        print("w", self.negative_weights.shape,
-              "b",self.biases.shape,
-              "apply_relu", self.apply_relu)
-
-        assert self.K in [1, 4]
+        def to_hex(v):
+            bin_str = str(v.bin())
+            assert len(bin_str) % 4 == 0
+            hex_str = f"{int(bin_str, 2):x}"
+            target_padded_width = len(bin_str) // 4
+            padding = "0" * (target_padded_width - len(hex_str))
+            return padding + hex_str
 
         if self.K == 1:
             # expect a vector (D,), so turn into a (1, D)
@@ -141,14 +140,6 @@ class FxpMathConv1DPO2Block(object):
         assert len(x.shape) == 2
         assert x.shape[0] == self.K
         assert x.shape[1] == self.in_d
-
-        def to_hex(v):
-            bin_str = str(v.bin())
-            assert len(bin_str) % 4 == 0
-            hex_str = f"{int(bin_str, 2):x}"
-            target_padded_width = len(bin_str) // 4
-            padding = "0" * (target_padded_width - len(hex_str))
-            return padding + hex_str
 
         # TODO: this has diverged a bit from how the actual verilog version
         #       works but its probably not a problem..
@@ -216,8 +207,6 @@ class FxpMathConv1DPO2Block(object):
 
     def export_weights_for_verilog(self, root_dir):
         root_dir = f"{root_dir}/{self.layer_name}"
-
-        print(">>>> root_dir", root_dir)
 
         num_k, out_d, in_d = self.negative_weights.shape
         print("num_k", num_k, "out_d", out_d, "in_d", in_d)

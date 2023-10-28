@@ -70,7 +70,8 @@ class FxpModel(object):
                     layer_name=weight_id,
                     weights=self.weights[weight_id]['weights'][0],
                     biases=self.weights[weight_id]['weights'][1],
-                    apply_relu=(not is_last_layer)
+                    apply_relu=(not is_last_layer),
+                    verbose=self.verbose
                     ))
                 if not is_last_layer:
                     self.layers.append(ActivationCache(
