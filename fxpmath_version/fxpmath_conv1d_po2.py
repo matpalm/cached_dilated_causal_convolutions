@@ -83,7 +83,7 @@ class FxpMathConv1DPO2Block(object):
               f" apply_relu={apply_relu} K={self.K}")
 
 
-    def dot_product(self, x, weights, negative_weights, weights_log2, zero_weights, accumulator):
+    def dot_product(self, x, negative_weights, weights_log2, zero_weights, accumulator):
 
         global DP_COUNT
 
@@ -119,8 +119,8 @@ class FxpMathConv1DPO2Block(object):
         # this loop represents what could be in the state machine
         # but can be pipelined
         for column in range(self.out_d):
-            self.dot_product(x, negative_weights[column],
-                weights_log2[column], zero_weights[column],
+            self.dot_product(x,
+                negative_weights[column], weights_log2[column], zero_weights[column],
                 accumulators[column])
 
 
@@ -168,8 +168,9 @@ class FxpMathConv1DPO2Block(object):
 
         # run each kernel; can be in parallel
         for i in range(self.K):
-            self.row_by_matrix_multiply(x[i], self.negative_weights[i], self.weights_log2[i],
-                self.zero_weights[i], accums[i])
+            self.row_by_matrix_multiply(x[i],
+                self.negative_weights[i], self.weights_log2[i], self.zero_weights[i],
+                accums[i])
 
         if self.verbose:
             print("KERNEL OUTPUTS")
