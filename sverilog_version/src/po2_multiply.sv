@@ -20,17 +20,22 @@ module po2_multiply #(
         DONE                = 4;
     reg [3:0] state;
 
-    // padding "constants" for zero padding single width input to double width
-    reg [I-1:0] LEFT_PAD = 0;
-    reg [(W-I)-1:0] RIGHT_PAD = 0;
+    // padding for conversion from single to double width.
+    // i.e. add this to RHS then right shift >>> by W
+    // this ensures we keep the same sign
+    reg [I-1:0] LEFT_PAD;
+    reg [W-I-1:0] RIGHT_PAD = '0;
 
     // temp storage for (possibly) having to negate the input
-    reg [I+I-1:0] negated_integer_part;
+    reg [I-1:0] negated_integer_part;
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             result_v <= 0;
             state <= negative_weight ? NEGATE_1 : PAD_TO_DOUBLE_WIDTH;
+            // decide left padding based on whether the result will be negative,
+            // in which we want 1 padding for 2s comp, otherwise pad with 0
+            LEFT_PAD <= (negative_weight ^ (inp < 0)) ? '1 : 0;
         end else
             case(state)
                 NEGATE_1: begin
@@ -40,10 +45,10 @@ module po2_multiply #(
                     state <= NEGATE_2;
                 end
                 NEGATE_2: begin
-                    // add negated integer part back to fractional part
-                    // and convert to double width
+                    // add negated integer part back to fractional part and convert to double width
+                    // by appropriate left and right padding
                     // TODO: THIS IGNORES OVERFLOW with the prior +1!!! we should work in double width from start
-                    result <= {LEFT_PAD, negated_integer_part, inp[W-I-1:0], RIGHT_PAD};
+                    result <= { LEFT_PAD, negated_integer_part, inp[W-I-1:0], RIGHT_PAD };
                     state <= SHIFT;
                 end
                 PAD_TO_DOUBLE_WIDTH: begin
