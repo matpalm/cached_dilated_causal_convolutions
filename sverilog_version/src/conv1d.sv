@@ -2,9 +2,9 @@
 
 module conv1d #(
     parameter W=16,     // width for each element
-    parameter IN_D=4,   // size of packed port arrays
-    parameter OUT_D=8,  // size of packed port arrays
-    parameter B_VALUES="qconv0_weights"
+    parameter IN_D,     // size of packed port arrays
+    parameter OUT_D,    // size of packed port arrays
+    parameter B_VALUES
 )(
   input                            clk,
   input                            rst,

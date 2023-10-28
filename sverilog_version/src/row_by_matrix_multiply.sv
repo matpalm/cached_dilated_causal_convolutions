@@ -2,9 +2,9 @@
 
 module row_by_matrix_multiply #(
     parameter W=16,       // width for each element
-    parameter IN_D=4,     // size of packed port arrays for a input
-    parameter OUT_D=8,    // size of packed port arrays for output
-    parameter B_VALUES="test_matrix"
+    parameter IN_D,       // size of packed port arrays for a input
+    parameter OUT_D,      // size of packed port arrays for output
+    parameter B_VALUES
 )(
   input                              clk,
   input                              rst,

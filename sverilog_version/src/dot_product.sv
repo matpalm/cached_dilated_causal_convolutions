@@ -3,9 +3,9 @@
 // a . b_values -> out
 
 module dot_product #(
-    parameter W=16,   // width for each element
-    parameter D=16,   // size of packed port arrays
-    parameter B_VALUES="test_b_values.hex"
+    parameter W=16,     // width for each element
+    parameter D,        // size of packed port arrays
+    parameter B_VALUES
 )(
   input                        clk,
   input                        rst,
