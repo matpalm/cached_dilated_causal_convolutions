@@ -2,7 +2,7 @@
 
 module network #(
     parameter W = 16,        // width for each element
-    parameter FILTER_D = 16  // size of packed port arrays for filters
+    parameter FILTER_D       // size of packed port arrays for filters
 )(
     input rst,
     input clk,

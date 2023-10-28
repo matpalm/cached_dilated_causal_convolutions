@@ -9,4 +9,6 @@ VERILOG_SOURCES += ../../src/activation_cache.sv
 TOPLEVEL = network
 MODULE = network_tb
 
+COMPILE_ARGS += -Pnetwork.FILTER_D=8
+
 include $(shell cocotb-config --makefiles)/Makefile.sim
