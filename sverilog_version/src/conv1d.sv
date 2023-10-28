@@ -42,10 +42,10 @@ module conv1d #(
     reg signed [W-1:0]  result [0:OUT_D-1];
 
     // bias values
+    reg signed [2*W-1:0] bias_values [0:OUT_D-1];
     initial begin
         $readmemh({B_VALUES,"/bias.hex"}, bias_values);
     end
-    reg signed [2*W-1:0] bias_values [0:OUT_D-1];
 
     // 4 kernel mat muls
 
