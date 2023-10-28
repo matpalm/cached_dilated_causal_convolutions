@@ -1,12 +1,10 @@
 
-n_int = 4
-
-def _bit_not(n):
+def _bit_not(n, n_int):
     return (1 << n_int) - 1 - n
 
-def _twos_comp_to_signed(n):
+def _twos_comp_to_signed(n, n_int):
     if (1 << (n_int-1) & n) > 0:
-        return -int(_bit_not(n) + 1)
+        return -int(_bit_not(n, n_int) + 1)
     else:
         return int(n)
 
@@ -35,15 +33,14 @@ def hex_fp_value_to_decimal(hex_fp_str):
     if len(hex_fp_str) == 4:
         # single width
         integer_bits = value >> 12
-        integer_value = _twos_comp_to_signed(integer_bits)
+        integer_value = _twos_comp_to_signed(integer_bits, n_int=4)
         fractional_bits = value & 0xFFF
         fractional_value = fractional_bits / float(2**12)
         return integer_value + fractional_value
     elif len(hex_fp_str) == 8:
         # double width
-        raise Exception("Fix this! not working for double width signed")
         integer_bits = value >> 24
-        integer_value = _twos_comp_to_signed(integer_bits)
+        integer_value = _twos_comp_to_signed(integer_bits, n_int=8)
         fractional_bits = value & 0xFFFFFF
         fractional_value = fractional_bits / float(2**24)
         return integer_value + fractional_value
