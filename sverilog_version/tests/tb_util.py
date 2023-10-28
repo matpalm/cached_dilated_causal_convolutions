@@ -26,6 +26,16 @@ def bits_to_hex(value):
     else:
         raise Exception(f"unexpected length {value_len}")
 
+def unpack_binary(values, W=16):
+    values = str(values)
+    if no_value_yet(values): return values
+    assert len(values) >= W and len(values) % W == 0
+    results = []
+    while len(values) > 0:
+        results.append(values[:W])
+        values = values[W:]
+    return results
+
 def hex_fp_value_to_decimal(hex_fp_str):
     if no_value_yet(hex_fp_str): return hex_fp_str
     assert type(hex_fp_str) == str

@@ -4,78 +4,15 @@ from cocotb.clock import Clock
 from cocotb.triggers import Timer, FallingEdge, RisingEdge, ClockCycles
 from cocotb.handle import Force, Release
 
-# add .. to path so we can import a common test 'util'
-#import sys, os
-#sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-#from util import *
+#add .. to path so we can import a common test 'util'
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from tb_util import *
 
 # ported from https://github.com/apfelaudio/eurorack-pmod/blob/master/gateware/sim/vca/tb_vca.py
 
 # pull these here from fxputil since can't import fxputil when
 # running under cocotb test ( different python env :/ )
-
-n_int = 4
-
-def _bit_not(n):
-    return (1 << n_int) - 1 - n
-
-def _twos_comp_to_signed(n):
-    if (1 << (n_int-1) & n) > 0:
-        return -int(_bit_not(n) + 1)
-    else:
-        return int(n)
-
-def no_value_yet(s):
-    s = str(s)
-    return 'x' in s or 'z' in s
-
-def hex_fp_value_to_decimal(hex_fp_str):
-    if no_value_yet(hex_fp_str): return hex_fp_str
-    assert type(hex_fp_str) == str
-    value = int(hex_fp_str, 16)
-    if len(hex_fp_str) == 4:
-        integer_bits = value >> 12
-        integer_value = _twos_comp_to_signed(integer_bits)
-        fractional_bits = value & 0xFFF
-        fractional_value = fractional_bits / float(2**12)
-        return integer_value + fractional_value
-    elif len(hex_fp_str) == 8:
-        raise Exception("Fix this! not working for signed")
-        integer_bits = value >> 24
-        integer_value = _twos_comp_to_signed(integer_bits)
-        fractional_bits = value & 0xFFFFFF
-        fractional_value = fractional_bits / float(2**24)
-        return integer_value + fractional_value
-    else:
-        raise Exception(len(hex_fp_str))
-
-# def fixed_point_array_to_decimals(a):
-#     if no_value_yet(a): return a
-#     return [fixed_point_to_decimal(v) for v in a]
-
-def bits_to_hex(value):
-    value = str(value)
-    if no_value_yet(value): return value
-    value_len = len(value)
-    value = int(value, 2)
-    if value_len == 16:
-        return f"{value:04x}"
-    elif value_len == 32:
-        return f"{value:08x}"
-    elif value_len == 64:
-        return f"{value:16x}"
-    else:
-        raise Exception(f"unexpected length {value_len}")
-
-def unpack_binary(values, W=16):
-    values = str(values)
-    if no_value_yet(values): return values
-    assert len(values) >= W and len(values) % W == 0
-    results = []
-    while len(values) > 0:
-        results.append(values[:W])
-        values = values[W:]
-    return results
 
 def conv_state_to_str(s):
     return {

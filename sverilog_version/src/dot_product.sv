@@ -29,11 +29,8 @@ module dot_product #(
         DONE                 = 2;
     reg [2:0] state = MULTIPLY_ELEMENT;
 
-    // see https://projectf.io/posts/fixed-point-numbers-in-verilog/
     reg signed [2*W-1:0] acc0;
     reg signed [2*W-1:0] product0;
-    //reg signed [2*W-1:0] acc1;
-    //reg signed [2*W-1:0] product1;
 
     // b values for dot product are network weights and are
     // provided by B_VALUES module level param
