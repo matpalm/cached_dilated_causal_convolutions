@@ -24,7 +24,7 @@ async def test(dut, input, negative_weight, log2_weight, expected_result):
     for i in range(10):
         print("state", dut.state.value)
         print("result_v", dut.result_v.value)
-        print("result", dut.result.value, hex_and_dec_from_bin(dut.result.value))
+        print("result", convert_dut_var(dut.result))
         if dut.result_v.value == 1: break
         await RisingEdge(dut.clk)
 

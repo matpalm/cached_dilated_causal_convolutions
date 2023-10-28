@@ -1,4 +1,32 @@
 
+from cocotb.handle import BinaryValue, ModifiableObject, NonHierarchyIndexableObject
+
+def convert_dut_var(v):
+    if type(v) == BinaryValue:
+        h = bits_to_hex(v)
+        d = hex_fp_value_to_decimal(h)
+        return v, h, d
+    if type(v) == ModifiableObject:
+        # need to call .value to make a BinaryValue
+        return convert_dut_var(v.value)
+    elif type(v) == NonHierarchyIndexableObject:
+        # basically an array of values; recall on each
+        return [convert_dut_var(e) for e in v.value]
+    else:
+        raise Exception("unsupported type", type(v))
+
+def unpack_binary(values, W=16):
+    values = str(values)
+    if no_value_yet(values): return values
+    assert len(values) >= W and len(values) % W == 0
+    results = []
+    while len(values) > 0:
+        results.append(values[:W])
+        values = values[W:]
+    return results
+
+
+
 def _bit_not(n, n_int):
     return (1 << n_int) - 1 - n
 
@@ -26,16 +54,6 @@ def bits_to_hex(value):
     else:
         raise Exception(f"unexpected length {value_len}")
 
-def unpack_binary(values, W=16):
-    values = str(values)
-    if no_value_yet(values): return values
-    assert len(values) >= W and len(values) % W == 0
-    results = []
-    while len(values) > 0:
-        results.append(values[:W])
-        values = values[W:]
-    return results
-
 def hex_fp_value_to_decimal(hex_fp_str):
     if no_value_yet(hex_fp_str): return hex_fp_str
     assert type(hex_fp_str) == str
@@ -56,8 +74,3 @@ def hex_fp_value_to_decimal(hex_fp_str):
         return integer_value + fractional_value
     else:
         raise Exception(len(hex_fp_str))
-
-def hex_and_dec_from_bin(b):
-    h = bits_to_hex(b)
-    d = hex_fp_value_to_decimal(h)
-    return h, d

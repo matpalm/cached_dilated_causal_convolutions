@@ -5,11 +5,9 @@ from cocotb.triggers import Timer, FallingEdge, RisingEdge, ClockCycles
 from cocotb.handle import Force, Release
 
 # add .. to path so we can import a common test 'util'
-#import sys, os
-#sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-#from util import *
-
-# ported from https://github.com/apfelaudio/eurorack-pmod/blob/master/gateware/sim/vca/tb_vca.py
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from tb_util import *
 
 @cocotb.test()
 async def test_conv1d(dut):
@@ -38,7 +36,7 @@ async def test_conv1d(dut):
 
     for i in range(30):
         print("i", i, "state", dut.state.value)
-        print("accum      ", dut.accum.value)
+        print("accum      ", convert_dut_var(dut.accum))
         print("result     ", dut.result.value)
         if dut.out_v.value:
             break
