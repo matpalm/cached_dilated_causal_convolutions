@@ -4,7 +4,7 @@ module conv1d #(
     parameter W=16,     // width for each element
     parameter IN_D,     // size of packed port arrays
     parameter OUT_D,    // size of packed port arrays
-    parameter B_VALUES
+    parameter WEIGHTS   // root dir for weight hex files
 )(
   input                            clk,
   input                            rst,
@@ -44,24 +44,24 @@ module conv1d #(
     // bias values
     reg signed [2*W-1:0] bias_values [0:OUT_D-1];
     initial begin
-        $readmemh({B_VALUES,"/bias.hex"}, bias_values);
+        $readmemh({WEIGHTS,"/bias.hex"}, bias_values);
     end
 
     // 4 kernel mat muls
 
-    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k0"})) kernel0 (
+    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .WEIGHTS({WEIGHTS,"/k0"})) kernel0 (
         .clk(clk), .rst(rst), .packed_a(packed_a0), .packed_out(kernel_out[0]), .out_v(kernel_v[0])
     );
 
-    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k1"})) kernel1 (
+    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .WEIGHTS({WEIGHTS,"/k1"})) kernel1 (
         .clk(clk), .rst(rst), .packed_a(packed_a1), .packed_out(kernel_out[1]), .out_v(kernel_v[1])
     );
 
-    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k2"})) kernel2 (
+    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .WEIGHTS({WEIGHTS,"/k2"})) kernel2 (
         .clk(clk), .rst(rst), .packed_a(packed_a2), .packed_out(kernel_out[2]), .out_v(kernel_v[2])
     );
 
-    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .B_VALUES({B_VALUES,"/k3"})) kernel3 (
+    row_by_matrix_multiply #(.W(W), .IN_D(IN_D), .OUT_D(OUT_D), .WEIGHTS({WEIGHTS,"/k3"})) kernel3 (
         .clk(clk), .rst(rst), .packed_a(packed_a3), .packed_out(kernel_out[3]), .out_v(kernel_v[3])
     );
 

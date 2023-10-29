@@ -4,7 +4,7 @@
 
 module po2_dot_product #(
     parameter W=16,     // width for each element
-    parameter D,        // size of packed port arrays  TODO: generalise later
+    parameter D,        // size of dot product  TODO: generalise later
     parameter WEIGHTS   // root dir for weight hex files
 )(
   input                        clk,

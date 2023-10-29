@@ -5,6 +5,6 @@ TOPLEVEL = dot_product
 MODULE = dot_product_tb
 
 COMPILE_ARGS += -Pdot_product.D=16
-COMPILE_ARGS += -Pdot_product.B_VALUES=\"test_b_values.hex\"
+COMPILE_ARGS += -Pdot_product.WEIGHTS=\"test_b_values.hex\"
 
 include $(shell cocotb-config --makefiles)/Makefile.sim

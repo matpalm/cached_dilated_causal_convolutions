@@ -5,7 +5,7 @@
 module dot_product #(
     parameter W=16,     // width for each element
     parameter D,        // size of packed port arrays
-    parameter B_VALUES
+    parameter WEIGHTS   // root dir for weight hex files
 )(
   input                        clk,
   input                        rst,
@@ -33,9 +33,9 @@ module dot_product #(
     reg signed [2*W-1:0] product0;
 
     // b values for dot product are network weights and are
-    // provided by B_VALUES module level param
+    // provided by WEIGHTS module level param
     initial begin
-        $readmemh(B_VALUES, b_values);
+        $readmemh(WEIGHTS, b_values);
         out_v <= 0;
     end
     reg signed [W-1:0] b_values [0:D-1];

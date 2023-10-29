@@ -7,6 +7,6 @@ MODULE = row_by_matrix_multiply_tb
 
 COMPILE_ARGS += -Prow_by_matrix_multiply.IN_D=4
 COMPILE_ARGS += -Prow_by_matrix_multiply.OUT_D=8
-COMPILE_ARGS += -Prow_by_matrix_multiply.B_VALUES=\"test_matrix_4_8\"
+COMPILE_ARGS += -Prow_by_matrix_multiply.WEIGHTS=\"test_matrix_4_8\"
 
 include $(shell cocotb-config --makefiles)/Makefile.sim
