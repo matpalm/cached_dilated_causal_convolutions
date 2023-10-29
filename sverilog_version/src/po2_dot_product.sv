@@ -38,7 +38,7 @@ module po2_dot_product #(
     reg [W-1:0] log_2_weights [0:D-1];
 
     // b values for dot product are network weights and are
-    // provided by B_VALUES module level param
+    // provided by WEIGHTS module level param
     initial begin
         $readmemh({WEIGHTS, "/zero_weights.hex"}, zero_weights);
         $readmemh({WEIGHTS, "/negative_weights.hex"}, negative_weights);

@@ -116,7 +116,7 @@ module network #(
     assign c0a2 = {lsb_out_in0_2, lsb_out_in1_2, lsb_out_in2_2, lsb_out_in3_2};
     assign c0a3 = {lsb_out_in0_3, lsb_out_in1_3, lsb_out_in2_3, lsb_out_in3_3};
 
-    conv1d #(.W(W), .IN_D(IN_OUT_D), .OUT_D(FILTER_D), .B_VALUES("weights/qconv_qb_0")) conv0 (
+    conv1d #(.W(W), .IN_D(IN_OUT_D), .OUT_D(FILTER_D), .WEIGHTS("weights/qconv_qb_0")) conv0 (
         .clk(clk), .rst(c0_rst), .apply_relu(1'b1),
         .packed_a0(c0a0), .packed_a1(c0a1), .packed_a2(c0a2), .packed_a3(c0a3),
         .packed_out(c0_out),
@@ -147,7 +147,7 @@ module network #(
     reg signed [FILTER_D*W-1:0] c1_out;
     reg c1_out_v;
 
-    conv1d #(.W(W), .IN_D(FILTER_D), .OUT_D(FILTER_D), .B_VALUES("weights/qconv_qb_1")) conv1 (
+    conv1d #(.W(W), .IN_D(FILTER_D), .OUT_D(FILTER_D), .WEIGHTS("weights/qconv_qb_1")) conv1 (
         .clk(clk), .rst(c1_rst), .apply_relu(1'b1),
         .packed_a0(ac_c0_out_l0), .packed_a1(ac_c0_out_l1),
         .packed_a2(ac_c0_out_l2), .packed_a3(ac_c0_out_l3),
@@ -179,7 +179,7 @@ module network #(
     reg signed [IN_OUT_D*W-1:0] c2_out;
     reg c2_out_v;
 
-    conv1d #(.W(W), .IN_D(FILTER_D), .OUT_D(IN_OUT_D), .B_VALUES("weights/qconv_qb_2")) conv2 (
+    conv1d #(.W(W), .IN_D(FILTER_D), .OUT_D(IN_OUT_D), .WEIGHTS("weights/qconv_qb_2")) conv2 (
         .clk(clk), .rst(c2_rst), .apply_relu(1'b0),
         .packed_a0(ac_c1_out_l0), .packed_a1(ac_c1_out_l1),
         .packed_a2(ac_c1_out_l2), .packed_a3(ac_c1_out_l3),
