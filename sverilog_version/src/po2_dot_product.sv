@@ -5,7 +5,7 @@
 module po2_dot_product #(
     parameter W=16,     // width for each element
     parameter D,        // size of packed port arrays  TODO: generalise later
-    parameter WEIGHTS   // root dir of all the various weight pieces
+    parameter WEIGHTS   // root dir for weight hex files
 )(
   input                        clk,
   input                        rst,
@@ -40,9 +40,9 @@ module po2_dot_product #(
     // b values for dot product are network weights and are
     // provided by B_VALUES module level param
     initial begin
-        $readmemh({WEIGHTS,"/zero_weights.hex"}, zero_weights);
-        $readmemh({WEIGHTS,"/negative_weights.hex"}, negative_weights);
-        $readmemh({WEIGHTS,"/log_2_weights.hex"}, log_2_weights);
+        $readmemh({WEIGHTS, "/zero_weights.hex"}, zero_weights);
+        $readmemh({WEIGHTS, "/negative_weights.hex"}, negative_weights);
+        $readmemh({WEIGHTS, "/log_2_weights.hex"}, log_2_weights);
         out_v <= 0;
     end
 
@@ -56,24 +56,24 @@ module po2_dot_product #(
     reg [D-1:0] result_v;
 
     po2_multiply #(.W(W), .I(4)) m0 (
-        .clk(clk), .rst(rst),
-        .inp(a[0]), .negative_weight(negative_weights[0]), .log_2_weight(log_2_weights[0]),
+        .clk(clk), .rst(rst), .inp(a[0]),
+        .zero_weight(zero_weights[0]), .negative_weight(negative_weights[0]), .log_2_weight(log_2_weights[0]),
         .result(result[0]), .result_v(result_v[0])
     );
     po2_multiply #(.W(W), .I(4)) m1 (
-        .clk(clk), .rst(rst),
-        .inp(a[1]), .negative_weight(negative_weights[1]), .log_2_weight(log_2_weights[1]),
+        .clk(clk), .rst(rst), .inp(a[1]),
+        .zero_weight(zero_weights[1]), .negative_weight(negative_weights[1]), .log_2_weight(log_2_weights[1]),
         .result(result[1]), .result_v(result_v[1])
     );
     po2_multiply #(.W(W), .I(4)) m2 (
-        .clk(clk), .rst(rst),
-        .inp(a[2]), .negative_weight(negative_weights[2]), .log_2_weight(log_2_weights[2]),
+        .clk(clk), .rst(rst), .inp(a[2]),
+        .zero_weight(zero_weights[2]), .negative_weight(negative_weights[2]), .log_2_weight(log_2_weights[2]),
         .result(result[2]), .result_v(result_v[2])
     );
     po2_multiply #(.W(W), .I(4)) m3 (
-        .clk(clk), .rst(rst),
-        .inp(a[3]), .negative_weight(negative_weights[3]), .log_2_weight(log_2_weights[3]),
-       .result(result[3]), .result_v(result_v[3])
+        .clk(clk), .rst(rst), .inp(a[3]),
+        .zero_weight(zero_weights[3]), .negative_weight(negative_weights[3]), .log_2_weight(log_2_weights[3]),
+        .result(result[3]), .result_v(result_v[3])
     );
 
     always @(posedge clk or posedge rst) begin

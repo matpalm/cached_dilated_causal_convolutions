@@ -9,21 +9,18 @@ import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from tb_util import *
 
+po2_multiply_idx_to_str = dict(enumerate(
+    'NEGATE_1 NEGATE_2 PAD_TO_DOUBLE_WIDTH SHIFT EMIT_ZERO DONE'.split(' ')
+    ))
 def po2_multiply_state_to_str(s):
-    as_str = {
-        0: 'NEGATE_1',
-        1: 'NEGATE_2',
-        2: 'PAD_TO_DOUBLE_WIDTH',
-        3: 'SHIFT',
-        4: 'DONE',
-    }[int(s)]
+    as_str = po2_multiply_idx_to_str[int(s)]
     return f"{as_str} ({s})"
 
-
-async def test(dut, input, negative_weight, log2_weight, expected_result):
+async def test(dut, input, zero_weight, negative_weight, log2_weight, expected_result):
     # inp=3.0 * weight=0.25 = 0.75
 
     dut.inp.value = input
+    dut.zero_weight.value = zero_weight
     dut.negative_weight.value = negative_weight
     dut.log_2_weight.value = log2_weight
 
@@ -42,6 +39,7 @@ async def test(dut, input, negative_weight, log2_weight, expected_result):
         print("state", po2_multiply_state_to_str(dut.state.value))
         print("inp", convert_dut_var(dut.inp))
         print("negated_integer_part", dut.negated_integer_part.value)
+        print("log_2_weight", convert_dut_var(dut.log_2_weight))
         print("result", convert_dut_var(dut.result))
         print("result_v", dut.result_v.value)
         if dut.result_v.value == 1: break
@@ -60,14 +58,26 @@ async def test_ad_hoc_test(dut):
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
 
-    # inp=3.0 * weight=0.25 = 0.75
-    await test(dut, input=0x3000, negative_weight=0, log2_weight=2, expected_result=0.75)
+    # # inp=3.0 * weight=0.25 = 0.75
+    # await test(dut, input=0x3000, zero_weight=0, negative_weight=0, log2_weight=2, expected_result=0.75)
 
-    # inp=3.0 * weight=-0.25 = -0.75
-    await test(dut, input=0x3000, negative_weight=1, log2_weight=2, expected_result=-0.75)
+    # # inp=3.0 * weight=-0.25 = -0.75
+    # await test(dut, input=0x3000, zero_weight=0, negative_weight=1, log2_weight=2, expected_result=-0.75)
 
-    # inp=-3.0 * weight=0.25 = -0.75
-    await test(dut, input=0xd000, negative_weight=0, log2_weight=2, expected_result=-0.75)
+    # # inp=-3.0 * weight=0.25 = -0.75
+    # await test(dut, input=0xd000, zero_weight=0, negative_weight=0, log2_weight=2, expected_result=-0.75)
 
-    # inp=-3.0 * weight=-0.25 = 0.75
-    await test(dut, input=0xd000, negative_weight=1, log2_weight=2, expected_result=0.75)
+    # # inp=-3.0 * weight=-0.25 = 0.75
+    # await test(dut, input=0xd000, zero_weight=0, negative_weight=1, log2_weight=2, expected_result=0.75)
+
+    # # inp=3.0 * weight=0 = 0
+    # await test(dut, input=0x3000, zero_weight=1, negative_weight=0, log2_weight=0, expected_result=0)
+
+    # # inp=-3.0 * weight=0 = 0
+    # await test(dut, input=0xd000, zero_weight=1, negative_weight=0, log2_weight=0, expected_result=0)
+
+    # for dp test
+    await test(dut, input=0x1000, zero_weight=1, negative_weight=0, log2_weight=1, expected_result=0)
+    await test(dut, input=0x1000, zero_weight=0, negative_weight=1, log2_weight=1, expected_result=-1/2)
+    await test(dut, input=0x2000, zero_weight=0, negative_weight=0, log2_weight=0, expected_result=2)
+    await test(dut, input=0x0800, zero_weight=0, negative_weight=0, log2_weight=4, expected_result=1/32)

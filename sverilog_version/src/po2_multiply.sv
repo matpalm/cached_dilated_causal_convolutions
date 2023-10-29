@@ -6,6 +6,7 @@ module po2_multiply #(
     input                       clk,
     input                       rst,
     input      signed [W-1:0]   inp,
+    input                       zero_weight,      // 1 if weight is zero, 0 otherwise
     input                       negative_weight,  // 1 if weight is negative, 0 otherwise
     input             [W-1:0]   log_2_weight,     // absolute value of weight
     output reg signed [2*W-1:0] result,
@@ -17,7 +18,8 @@ module po2_multiply #(
         NEGATE_2            = 1,
         PAD_TO_DOUBLE_WIDTH = 2,
         SHIFT               = 3,
-        DONE                = 4;
+        EMIT_ZERO           = 4,
+        DONE                = 5;
     reg [3:0] state;
 
     // padding for conversion from single to double width.
@@ -32,7 +34,7 @@ module po2_multiply #(
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             result_v <= 0;
-            state <= negative_weight ? NEGATE_1 : PAD_TO_DOUBLE_WIDTH;
+            state <= zero_weight ? EMIT_ZERO : ( negative_weight ? NEGATE_1 : PAD_TO_DOUBLE_WIDTH );
             // decide left padding based on whether the result will be negative,
             // in which we want 1 padding for 2s comp, otherwise pad with 0
             LEFT_PAD <= (negative_weight ^ (inp < 0)) ? '1 : 0;
@@ -59,6 +61,11 @@ module po2_multiply #(
                 SHIFT: begin
                     // "multiply" result by the weight, by doing right shift by log2
                     result <= result >>> log_2_weight;
+                    result_v <= 1;
+                    state <= DONE;
+                end
+                EMIT_ZERO: begin
+                    result <= 0;
                     result_v <= 1;
                     state <= DONE;
                 end
