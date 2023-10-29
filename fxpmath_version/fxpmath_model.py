@@ -22,7 +22,8 @@ class FxpModel(object):
         print("weight_ids", weight_ids)
         self.weight_ids = weight_ids
         for weight_id in weight_ids:
-            assert (weight_id.startswith('qconv_qb_') or weight_id.startswith('qconv_po2')) , weight_id
+            assert weight_id.startswith('qconv_')
+            assert weight_id.endswith('_qb') or weight_id.endswith('_po2')
 
         self.num_layers = len(weight_ids)
         print("|layers|", self.num_layers)
@@ -36,9 +37,9 @@ class FxpModel(object):
             print("weight_id", weight_id, "num_kernels, in_d, out_d", num_kernels, in_d, out_d)
             in_ds[weight_id] = in_d
             out_ds[weight_id] = out_d
-            if weight_id.startswith('qconv_qb_'):
+            if weight_id.endswith('_qb'):
                 assert num_kernels == 4
-            elif weight_id.startswith('qconv_po2'):
+            elif weight_id.endswith('_po2'):
                 assert num_kernels in [1, 4]
 
         print(f"in_ds={in_ds} & out_ds={out_ds}")
@@ -64,7 +65,7 @@ class FxpModel(object):
 
             is_last_layer = (weight_id == weight_ids[-1])
 
-            if weight_id.startswith('qconv_qb_'):
+            if weight_id.endswith('_qb'):
                 self.layers.append(FxpMathConv1DQuantisedBitsBlock(
                     self.fxp,
                     layer_name=weight_id,
@@ -81,11 +82,11 @@ class FxpModel(object):
                     ))
                     dilation += 1
 
-            elif weight_id.startswith('qconv_po2_'):
-                assert (weight_id.endswith('1a') or weight_id.endswith('1b') or
-                        weight_id.endswith('2a') or weight_id.endswith('2b')), weight_id
+            elif weight_id.endswith('_po2'):
+                assert (('1a' in weight_id) or ('qb' in weight_id) or
+                        ('2a' in weight_id) or ('2b' in weight_id)), weight_id
 
-                # the last layer can only be a qconv_qb_ back down to outputs
+                # the last layer can only be a qconv_N_qb back down to outputs
                 assert not is_last_layer
 
                 self.layers.append(FxpMathConv1DPO2Block(
@@ -97,7 +98,8 @@ class FxpModel(object):
                     verbose=self.verbose
                 ))
 
-                if weight_id.endswith('2b'):
+                if '2b' in weight_id:
+                    # last layer of the block
                     self.layers.append(ActivationCache(
                         depth=out_ds[weight_id],
                         dilation=K**dilation,

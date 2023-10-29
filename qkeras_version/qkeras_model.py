@@ -68,7 +68,7 @@ def add_quantized_bits_conv_block(
         relu: bool
     ):
 
-    y_pred = QConv1D(name=f"qconv_qb_{layer_number}",
+    y_pred = QConv1D(name=f"qconv_{layer_number}_qb",
                      filters=out_filters,
                      kernel_size=K, padding='causal',
                      dilation_rate=K**layer_number,
@@ -86,24 +86,24 @@ def add_quantized_po2_conv_block(
         out_filters: int,
         po2_filters: int
     ):
-        y_pred = QConv1D(name=f"qconv_po2_{layer_number}_1a",
+        y_pred = QConv1D(name=f"qconv_{layer_number}_1a_po2",
                          filters=po2_filters,
                          kernel_size=K, padding='causal',
                          dilation_rate=K**layer_number,
                          kernel_quantizer=quantiser(po2=True),
                          bias_quantizer=quantiser())(inp)
-        y_pred = QConv1D(name=f"qconv_po2_{layer_number}_1b",
+        y_pred = QConv1D(name=f"qconv_{layer_number}_1b_po2",
                          filters=out_filters,
                          kernel_size=1, padding='valid',
                          kernel_quantizer=quantiser(po2=True),
                          bias_quantizer=quantiser())(y_pred)
         y_pred = QActivation(quant_relu(), name=f"qrelu_{layer_number}_1")(y_pred)
-        y_pred = QConv1D(name=f"qconv_po2_{layer_number}_2a",
+        y_pred = QConv1D(name=f"qconv_{layer_number}_2a_po2",
                          filters=po2_filters,
                          kernel_size=1, padding='valid',
                          kernel_quantizer=quantiser(po2=True),
                          bias_quantizer=quantiser())(y_pred)
-        y_pred = QConv1D(name=f"qconv_po2_{layer_number}_2b",
+        y_pred = QConv1D(name=f"qconv_{layer_number}_2b_po2",
                          filters=out_filters,
                          kernel_size=1, padding='valid',
                          kernel_quantizer=quantiser(po2=True),
