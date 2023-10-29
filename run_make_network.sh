@@ -13,8 +13,9 @@ set -x
 
 RUN_DIR=`pwd`/runs/$RUN/
 
-# link in assets
+# clear old runs ( since they can have cached params )
 pushd sverilog_version/tests/network/
+rm -rf sim_build
 
 # run iverilog sim
 rm test_x.hex

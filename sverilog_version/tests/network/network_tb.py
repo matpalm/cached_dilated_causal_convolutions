@@ -80,6 +80,8 @@ async def test_networks(dut):
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
 
+    print("FILTER_D", dut.FILTER_D.value)
+
     # slurp entries from test_x values
     test_x_hex_values = []
     with open('test_x.hex', 'r') as f:
