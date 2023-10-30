@@ -83,7 +83,11 @@ class FxpUtil(object):
 
 def ensure_dir_exists(d):
     if not os.path.exists(d):
-        os.makedirs(d)
+        try:
+            os.makedirs(d)
+        except FileExistsError:
+            # can happen as race condition
+            pass
 
 def nearest_log2_value_or_zero(v, atol=1e-5):
     try:

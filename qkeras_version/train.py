@@ -2,8 +2,7 @@
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
-import pickle, os
-import contextlib
+import pickle, os, json, contextlib
 
 #from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
@@ -11,7 +10,7 @@ from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
-from .qkeras_model import create_dilated_model, masked_mse
+from .qkeras_model import QKerasModelBuilder, masked_mse
 
 if __name__ == '__main__':
 
@@ -58,7 +57,8 @@ if __name__ == '__main__':
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
     # construct model
-    train_model = create_dilated_model(TRAIN_SEQ_LEN,
+    builder = QKerasModelBuilder()
+    train_model = builder.create_dilated_model(TRAIN_SEQ_LEN,
             in_out_d=opts.in_out_d,
             num_layers=opts.num_layers,
             filter_size=opts.filter_size,
@@ -68,6 +68,8 @@ if __name__ == '__main__':
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
         with contextlib.redirect_stdout(f):
             train_model.summary()
+    with open(f"runs/{opts.run}/qkeras_model.layer_info.json", "w") as f:
+        json.dump(builder.layer_info, f)
 
     # make tf datasets
     train_ds = data.tf_dataset_for_split('train', TRAIN_SEQ_LEN, opts.num_train_egs)

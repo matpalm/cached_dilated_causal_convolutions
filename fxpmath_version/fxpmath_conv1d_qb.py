@@ -4,17 +4,11 @@ from .util import ensure_dir_exists
 
 class FxpMathConv1DQuantisedBitsBlock(object):
 
-    def __init__(self, fxp_util, layer_name, weights, biases, apply_relu, verbose):
+    def __init__(self, fxp_util, layer_name, weights, biases, verbose):
         self.fxp = fxp_util
         self.layer_name = layer_name
         self.verbose = verbose
-        self.apply_relu = apply_relu
         self.K = 4
-
-        print(">FxpMathConv1DQuantisedBitsBlock",
-              f" weights={weights.shape}",
-              f" biases={biases.shape}",
-              f" apply_relu={apply_relu}")
 
         self.fxp.check_all_qIF(weights)
         self.fxp.check_all_qIF(biases)
@@ -118,12 +112,6 @@ class FxpMathConv1DQuantisedBitsBlock(object):
             elif a > 7.99:
                 self._num_overflows += 1
 
-        # apply relu, if configured
-        if self.apply_relu:
-            for i in range(self.out_d):
-                if accums[0][i] < 0:
-                    accums[0][i] = self.fxp.double_width(0)
-
         # return as np array,
         return np.array(accums[0])
 
@@ -173,4 +161,5 @@ class FxpMathConv1DQuantisedBitsBlock(object):
                 f.write(double_width_hex_representation(self.biases[o]))
                 f.write(f" // {self.biases[o]}\n")
 
-
+    def __str__(self):
+        return f"weights={self.weights.shape} biases={self.biases.shape}"

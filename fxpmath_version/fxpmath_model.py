@@ -11,15 +11,44 @@ from .activation_cache import ActivationCache
 
 K = 4
 
+class Relu(object):
+    def __init__(self, zero_value):
+        self.zero_value = zero_value
+
+    def apply(self, x):
+        for i in range(len(x)):
+            if x[i] < 0:
+                x[i] = self.zero_value
+        return x
+
+    def __str__(self):
+        return "relu"
+
+
+def check_ids_match(weights, layer_info):
+    w_ids = set(weights.keys())
+    l_ids = set()
+    for l in layer_info:
+        if 'id' in l:
+            l_ids.add(l['id'])
+    if w_ids != l_ids:
+        raise Exception(f"mismatch between weight ids [{w_ids}] and layer ids [{l_ids}]")
+
+
 class FxpModel(object):
 
-    def __init__(self, weights_file, verbose):
+    def __init__(self, weights_file, layer_info, verbose):
 
         with open(weights_file, 'rb') as f:
             self.weights = pickle.load(f)
-
         weight_ids = list(self.weights.keys())
+
         print("weight_ids", weight_ids)
+        print("layer_info", layer_info)
+
+        # check there is a layer for each weight and vice versa
+        check_ids_match(self.weights, layer_info)
+
         self.weight_ids = weight_ids
         for weight_id in weight_ids:
             assert weight_id.startswith('qconv_')
@@ -34,7 +63,7 @@ class FxpModel(object):
         for weight_id in weight_ids:
             weights = self.weights[weight_id]['weights'][0]
             num_kernels, in_d, out_d = weights.shape
-            print("weight_id", weight_id, "num_kernels, in_d, out_d", num_kernels, in_d, out_d)
+            print(f"weight_id={weight_id} num_kernels={num_kernels} in_d={in_d} out_d={out_d}")
             in_ds[weight_id] = in_d
             out_ds[weight_id] = out_d
             if weight_id.endswith('_qb'):
@@ -50,64 +79,50 @@ class FxpModel(object):
         # general fxp util
         self.fxp = FxpUtil()
 
+        # make stateless relu layer
+        relu = Relu(zero_value=self.fxp.double_width(0))
+
         # buffer for layer0 input
         self.in_dim = in_ds[weight_ids[0]]
         self.input = np.zeros((K, self.in_dim), dtype=np.float32)
 
         self.verbose = verbose
 
-        #self.qconvs = []
-        #self.activation_caches = []
-
+        self._num_dilated_layers = 0
         self.layers = []
-        dilation = 1
-        for weight_id in weight_ids:
-
-            is_last_layer = (weight_id == weight_ids[-1])
-
-            if weight_id.endswith('_qb'):
-                self.layers.append(FxpMathConv1DQuantisedBitsBlock(
+        for info in layer_info:
+            if info['type'] == 'qb':
+                layer_id = info['id']
+                next_layer = FxpMathConv1DQuantisedBitsBlock(
                     self.fxp,
-                    layer_name=weight_id,
-                    weights=self.weights[weight_id]['weights'][0],
-                    biases=self.weights[weight_id]['weights'][1],
-                    apply_relu=(not is_last_layer),
+                    layer_name=layer_id,
+                    weights=self.weights[layer_id]['weights'][0],
+                    biases=self.weights[layer_id]['weights'][1],
                     verbose=self.verbose
-                    ))
-                if not is_last_layer:
-                    self.layers.append(ActivationCache(
-                        depth=out_ds[weight_id],
-                        dilation=K**dilation,
-                        kernel_size=K
-                    ))
-                    dilation += 1
-
-            elif weight_id.endswith('_po2'):
-                assert (('1a' in weight_id) or ('1b' in weight_id) or
-                        ('2a' in weight_id) or ('2b' in weight_id)), weight_id
-
-                # the last layer can only be a qconv_N_qb back down to outputs
-                assert not is_last_layer
-
-                self.layers.append(FxpMathConv1DPO2Block(
+                    )
+            elif info['type'] == 'po2':
+                layer_id = info['id']
+                next_layer = FxpMathConv1DPO2Block(
                     self.fxp,
-                    layer_name=weight_id,
-                    weights=self.weights[weight_id]['weights'][0],
-                    biases=self.weights[weight_id]['weights'][1],
-                    apply_relu=(('1b' in weight_id) or ('2b' in weight_id)),
+                    layer_name=layer_id,
+                    weights=self.weights[layer_id]['weights'][0],
+                    biases=self.weights[layer_id]['weights'][1],
                     verbose=self.verbose
-                ))
+                )
+            elif info['type'] == 'dilation':
+                next_layer = ActivationCache(
+                    depth=info['depth'],
+                    dilation=info['amount'],
+                    kernel_size=K
+                )
+                self._num_dilated_layers += 1
+            elif info['type'] == 'relu':
+                next_layer = relu
+            else:
+                raise Exception(f"unhandled type [{info['type']}]")
 
-                if '2b' in weight_id:
-                    # last layer of the block
-                    self.layers.append(ActivationCache(
-                        depth=out_ds[weight_id],
-                        dilation=K**dilation,
-                        kernel_size=K
-                    ))
-                    dilation += 1
-
-        self._num_dilated_layers = dilation
+            print(type(next_layer), next_layer)
+            self.layers.append(next_layer)
 
     def num_layers(self):
         return self._num_layers
@@ -116,10 +131,16 @@ class FxpModel(object):
         return self._num_dilated_layers
 
     def under_and_overflow_counts(self):
-        return {
-            'num_underflows': sum([q.num_underflows() for q in self.layers]),
-            'num_overflows': sum([q.num_overflows() for q in self.layers])
-        }
+        num_underflows = 0
+        num_overflows = 0
+        for l in self.layers:
+            try:
+                num_underflows += l.num_overflows()
+                num_overflows += l.num_overflows()
+            except AttributeError:
+                pass
+        return {'num_underflows': num_underflows,
+                'num_overflows': num_overflows }
 
     def predict(self, x):
 
@@ -146,4 +167,7 @@ class FxpModel(object):
 
     def export_weights_for_verilog(self, root_dir):
         for layer in self.layers:
-            layer.export_weights_for_verilog(root_dir)
+            try:
+                layer.export_weights_for_verilog(root_dir)
+            except AttributeError:
+                pass

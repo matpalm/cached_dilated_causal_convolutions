@@ -12,8 +12,6 @@ class ActivationCache(object):
             raise Exception(f"dilation ({dilation}) should be a power of kernel_size ({kernel_size})")
 
         self.num_entries = dilation * kernel_size
-        print(f">ActivationCache depth={depth} dilation={dilation}"
-              f" kernel_size={kernel_size} => num_entries={self.num_entries}")
         self.depth = depth
         self.dilation = dilation
         self.kernel_size = kernel_size
@@ -44,11 +42,7 @@ class ActivationCache(object):
         self.add(y_pred)
         return self.cached_dilated_values()
 
-    def num_underflows(self):
-        return 0
+    def __str__(self):
+        return f"depth={self.depth} dilation={self.dilation}" \
+               f" kernel_size={self.kernel_size} => num_entries={self.num_entries}"
 
-    def num_overflows(self):
-        return 0
-
-    def export_weights_for_verilog(self, root_dir):
-        pass

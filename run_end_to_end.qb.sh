@@ -1,8 +1,9 @@
 set -ex
 
-export RUN=22_qb_8d
+export RUN=27_qb__layer_regression_test
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
-export FILTER_D=8
+export FILTER_D=16
+
 
 [ ! -d runs/$RUN ] && mkdir runs/$RUN
 
@@ -18,6 +19,7 @@ export CUDA_VISIBLE_DEVICES=""
 time python3 -m fxpmath_version.test \
  --data-root-dir $DRD \
  --load-weights runs/$RUN/weights/qkeras/latest.pkl \
+ --layer-info runs/$RUN/qkeras_model.layer_info.json \
  --test-x-dir runs/$RUN/test_x_files/ \
  --plot-dir runs/$RUN/ \
  --write-verilog-weights runs/$RUN/weights/verilog/latest \

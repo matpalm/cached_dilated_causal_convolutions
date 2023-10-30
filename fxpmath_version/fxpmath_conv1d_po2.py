@@ -7,11 +7,10 @@ DP_COUNT = 0
 
 class FxpMathConv1DPO2Block(object):
 
-    def __init__(self, fxp_util, layer_name, weights, biases, apply_relu, verbose):
+    def __init__(self, fxp_util, layer_name, weights, biases, verbose):
         self.fxp = fxp_util
         self.layer_name = layer_name
         self.verbose = verbose
-        self.apply_relu = apply_relu
 
         # sometimes the weights from the qkeras model even with po2 might be _just_ off
         # so we do conversion now with a degree of tolerance
@@ -78,12 +77,6 @@ class FxpMathConv1DPO2Block(object):
         # conversion. these are OK, but too many means something wrong
         self._num_underflows = 0
         self._num_overflows = 0
-
-        print(">FxpMathConv1DPO2Block",
-              f" weights={self.negative_weights.shape}",
-              f" biases={biases.shape}",
-              f" apply_relu={apply_relu} K={self.K}")
-
 
     def dot_product(self, x, negative_weights, weights_log2, zero_weights, accumulator):
 
@@ -194,12 +187,6 @@ class FxpMathConv1DPO2Block(object):
             elif a > 7.99:
                 self._num_overflows += 1
 
-        # apply relu, if configured
-        if self.apply_relu:
-            for i in range(self.out_d):
-                if accums[0][i] < 0:
-                    accums[0][i] = self.fxp.double_width(0)
-
         # return as np array,
         return np.array(accums[0])
 
@@ -232,3 +219,8 @@ class FxpMathConv1DPO2Block(object):
         print("self.negative_weights", self.negative_weights.shape)
         print("self.weights_log2", self.weights_log2.shape)
         print("self.zero_weights", self.zero_weights.shape)
+
+    def __str__(self):
+        return f" negative_weights={self.negative_weights.shape}" \
+               f" weights_log2={self.weights_log2.shape}" \
+               f" zero_weights={self.zero_weights.shape}"

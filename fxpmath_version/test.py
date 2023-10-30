@@ -8,6 +8,7 @@ from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 import tqdm
 import util
 import warnings
+import json
 
 import argparse
 parser = argparse.ArgumentParser(
@@ -17,6 +18,7 @@ parser.add_argument('--wave', type=str, default=None,
 parser.add_argument('--data-root-dir', type=str, required=True)
 parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
 parser.add_argument('--load-weights', type=str)
+parser.add_argument('--layer-info', type=str)
 parser.add_argument('--test-x-dir', type=str, default=".")
 parser.add_argument('--plot-dir', type=str, default=".")
 parser.add_argument('--write-verilog-weights', type=str,
@@ -26,8 +28,15 @@ parser.add_argument('--verbose', action='store_true')
 opts = parser.parse_args()
 print("opts", opts)
 
+# parse layer info
+with open(opts.layer_info, 'r') as f:
+    layer_info = json.load(f)
+
 # run through fxp_model
-fxp_model = FxpModel(opts.load_weights, verbose=opts.verbose)
+fxp_model = FxpModel(
+    weights_file=opts.load_weights,
+    layer_info=layer_info,
+    verbose=opts.verbose)
 
 # export weights if requested
 if opts.write_verilog_weights is not None:
@@ -36,7 +45,7 @@ if opts.write_verilog_weights is not None:
 print(f"|layers|={fxp_model.num_layers()} |dilated_layers|={fxp_model.num_dilated_layers()}")
 
 K = 4
-RECEPTIVE_FIELD_SIZE = K**fxp_model.num_dilated_layers()
+RECEPTIVE_FIELD_SIZE = K**(fxp_model.num_dilated_layers() + 1)
 TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
 print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
