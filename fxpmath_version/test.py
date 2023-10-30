@@ -33,9 +33,10 @@ fxp_model = FxpModel(opts.load_weights, verbose=opts.verbose)
 if opts.write_verilog_weights is not None:
     fxp_model.export_weights_for_verilog(root_dir=opts.write_verilog_weights)
 
-print("|layers|=", fxp_model.num_layers)
+print(f"|layers|={fxp_model.num_layers()} |dilated_layers|={fxp_model.num_dilated_layers()}")
+
 K = 4
-RECEPTIVE_FIELD_SIZE = K**fxp_model.num_layers
+RECEPTIVE_FIELD_SIZE = K**fxp_model.num_dilated_layers()
 TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
 print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)

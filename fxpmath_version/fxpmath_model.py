@@ -25,8 +25,8 @@ class FxpModel(object):
             assert weight_id.startswith('qconv_')
             assert weight_id.endswith('_qb') or weight_id.endswith('_po2')
 
-        self.num_layers = len(weight_ids)
-        print("|layers|", self.num_layers)
+        self._num_layers = len(weight_ids)
+        print("|layers|", self._num_layers)
 
         # scan each conv to derive in/out size
         in_ds = {}
@@ -83,7 +83,7 @@ class FxpModel(object):
                     dilation += 1
 
             elif weight_id.endswith('_po2'):
-                assert (('1a' in weight_id) or ('qb' in weight_id) or
+                assert (('1a' in weight_id) or ('1b' in weight_id) or
                         ('2a' in weight_id) or ('2b' in weight_id)), weight_id
 
                 # the last layer can only be a qconv_N_qb back down to outputs
@@ -94,7 +94,7 @@ class FxpModel(object):
                     layer_name=weight_id,
                     weights=self.weights[weight_id]['weights'][0],
                     biases=self.weights[weight_id]['weights'][1],
-                    apply_relu=weight_id.endswith('b'),
+                    apply_relu=(('1b' in weight_id) or ('2b' in weight_id)),
                     verbose=self.verbose
                 ))
 
@@ -107,6 +107,13 @@ class FxpModel(object):
                     ))
                     dilation += 1
 
+        self._num_dilated_layers = dilation
+
+    def num_layers(self):
+        return self._num_layers
+
+    def num_dilated_layers(self):
+        return self._num_dilated_layers
 
     def under_and_overflow_counts(self):
         return {

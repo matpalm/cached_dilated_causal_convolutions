@@ -1,6 +1,7 @@
 from fxpmath import Fxp
 import numpy as np
 import os
+import math
 
 class FxpUtil(object):
 
@@ -25,13 +26,17 @@ class FxpUtil(object):
     def resize_double_width(self, v):
         v.resize(signed=True, n_word=self.n_word*2, n_frac=self.n_frac*2)
 
-    def check_all_log2(self, a):
+    def check_all_log2_or_zero(self, a):
         it = np.nditer(np.abs(a), flags=['multi_index'])
         for v in it:
-            log2_v = np.log2(v)
-            if int(log2_v) != log2_v:
-                raise Exception(f"value {v} [{it.multi_index}] not negative power of 2"
-                                f" log2_v={log2_v}")
+            if v != 0:
+                try:
+                    log2_v = math.log2(v)
+                    if int(log2_v) != log2_v:
+                        raise Exception(f"value {v} [{it.multi_index}] not negative power of 2"
+                                        f" log2_v={log2_v}")
+                except ValueError as ve:
+                    raise Exception(f"value error [{ve}] from v={v}")
 
     def check_all_qIF(self, a):
         it = np.nditer(a, flags=['multi_index'])
@@ -80,6 +85,20 @@ def ensure_dir_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
 
+def nearest_log2_value_or_zero(v, atol=1e-5):
+    try:
+        if v == 0:
+            return 0
+        negative_v = v < 0
+        l2v = math.log2(abs(v))
+        l2v_rounded = round(l2v)
+        if abs(l2v - l2v_rounded) > atol:
+            raise Exception(f"value={v} has log2_value={l2v} which rounds to {l2v_rounded}"
+                            f" which is not close enough given atol={atol}")
+        rv = 2 ** l2v_rounded
+        return -rv if negative_v else rv
+    except Exception as e:
+        print(f"??? v={v} e={e}")
 
 if __name__ == '__main__':
     fxp = FxpUtil()

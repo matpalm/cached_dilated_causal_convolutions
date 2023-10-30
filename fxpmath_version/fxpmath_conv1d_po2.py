@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import math
-from .util import ensure_dir_exists
+from .util import ensure_dir_exists, nearest_log2_value_or_zero
 
 DP_COUNT = 0
 
@@ -13,7 +13,12 @@ class FxpMathConv1DPO2Block(object):
         self.verbose = verbose
         self.apply_relu = apply_relu
 
-        self.fxp.check_all_log2(weights)
+        # sometimes the weights from the qkeras model even with po2 might be _just_ off
+        # so we do conversion now with a degree of tolerance
+        weights = np.vectorize(nearest_log2_value_or_zero)(weights)
+
+        # double check weights
+        self.fxp.check_all_log2_or_zero(weights)
         self.fxp.check_all_qIF(biases)
 
         # BUT NOT FOR PO2
@@ -31,13 +36,11 @@ class FxpMathConv1DPO2Block(object):
         assert len(biases.shape) == 1
         assert len(biases) == self.out_d
 
-        # check there are no weights values == 0 and no abs(values) over 1
-        if weights.size != np.count_nonzero(weights):
-            raise Exception(f"there was a zero value in weight {weights.shape}")
+        # check there are no weights with abs(values) over 1
         if weights.min() < -1:
-            raise Exception(f"no po2 weight value should be < -1  {weights.shape}")
+            raise Exception(f"no po2 weight value should be < -1  weights.min()={weights.min()}")
         if weights.max() > 1:
-            raise Exception(f"no po2 weight value should be > +1  {weights.shape}")
+            raise Exception(f"no po2 weight value should be > +1  weights.max()={weights.max()}")
 
         # keep track of three things about the weights;
         # 1) which are negative
@@ -99,12 +102,14 @@ class FxpMathConv1DPO2Block(object):
                 # negate and shift
                 prod = -x_i if negative_weights[i] else x_i
                 prod >>= weights_log2[i]
-            print(f"dp={DP_COUNT:10d} i={i:2d} x_i={x_i} nw_i={negative_weights[i]}"
-                f" w_log2_i={weights_log2[i]} zw_i={zero_weights[i]} => prod={prod}")
+            if self.verbose:
+                print(f"dp={DP_COUNT:10d} i={i:2d} x_i={x_i} nw_i={negative_weights[i]}"
+                    f" w_log2_i={weights_log2[i]} zw_i={zero_weights[i]} => prod={prod}")
 
             # add to accumulator
-            print(f"adding prod {prod} {self.fxp.bits(prod)} to"
-                  f" accumulator {accumulator} {self.fxp.bits(accumulator)}")
+            if self.verbose:
+                print(f"adding prod {prod} {self.fxp.bits(prod)} to"
+                    f" accumulator {accumulator} {self.fxp.bits(accumulator)}")
             accumulator.set_val(accumulator + prod)
 
             # keep accumulator double width. by dft a+b => +1 for int part
