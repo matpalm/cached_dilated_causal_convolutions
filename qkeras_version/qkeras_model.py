@@ -16,7 +16,7 @@ assert N_WORD == N_INT + N_FRAC
 # qkeras quantiser for all convolution kernels and biases
 def quantiser(po2=False):
     if po2:
-        return quantized_po2(bits=N_WORD, max_value=2**N_INT)
+        return quantized_po2(bits=N_WORD, max_value=1)
     else:
         return quantized_bits(bits=N_WORD, integer=N_INT, alpha=1)
 
@@ -24,7 +24,7 @@ def quantiser(po2=False):
 def quant_relu(po2=False):
     if po2:
         assert False, "never need to use this?"
-        return f"quantized_po2({N_WORD}, {2**N_INT})"
+        return f"quantized_po2({N_WORD}, 1)"
     else:
         return f"quantized_relu({N_WORD},{N_INT})"
 
