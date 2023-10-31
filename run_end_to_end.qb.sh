@@ -28,4 +28,7 @@ time python3 -m fxpmath_version.test \
 unset CUDA_VISIBLE_DEVICES
 
 # note: make files use FILTER_D
-time ./all_run_make_network.sh
+WAVE=sine ./run_make_network.sh
+WAVE=ramp ./run_make_network.sh
+WAVE=square ./run_make_network.sh
+WAVE=zigzag ./run_make_network.sh
