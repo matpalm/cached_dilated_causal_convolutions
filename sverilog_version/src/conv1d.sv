@@ -26,7 +26,7 @@ module conv1d #(
         SINGLE_W         = 5,
         APPLY_RELU       = 6,
         OUTPUT           = 7;
-    reg [2:0] state = MAT_MUL_RUNNING;
+    reg [2:0] state;
 
     reg [3:0] kernel_v;
 
