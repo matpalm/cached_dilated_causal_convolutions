@@ -17,7 +17,7 @@ def po2_multiply_state_to_str(s):
     return f"{as_str} ({s})"
 
 po2_dot_product_idx_to_str = dict(enumerate(
-    'MULTIPLYING_ELEMENTS ADD_1 ADD_2 DONE'.split(' ')
+    'MULTIPLYING_ELEMENTS ADD_16 ADD_8 ADD_4 ADD_2 DONE'.split(' ')
     ))
 def po2_dot_product_state_to_str(s):
     as_str = po2_dot_product_idx_to_str[int(s)]
@@ -29,9 +29,9 @@ async def test_po2_dot_product(dut):
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
 
-    #                      0    1    2    3
-    #                      1    1    2    1/2
-    dut.packed_a.value = 0x1000_1000_2000_0800
+    #                      0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
+    #                      1    1    2    1/2  0    0    0    0
+    dut.packed_a.value = 0x1000_1000_2000_0800_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_1000
 
     dut.rst.value = 1
     await RisingEdge(dut.clk)
@@ -49,17 +49,24 @@ async def test_po2_dot_product(dut):
     # e2 = 2 >> 0 = 2
     # e3 = 1/2 >> 4 = 1/32
     # sum = 1.46875
-    for i in range(10):
+    for i in range(20):
         print("===", i)
         print("state", po2_dot_product_state_to_str(dut.state.value))
 
-        mN_states = [
-            dut.m0.state.value, dut.m1.state.value,
-            dut.m2.state.value, dut.m3.state.value]
+        mN_states = [dut.m0.state.value, dut.m1.state.value,
+                     dut.m2.state.value, dut.m3.state.value]
         print("dp_states", [po2_multiply_state_to_str(s) for s in mN_states])
 
-        print("result", convert_dut_var(dut.result))
+        print("result")
+        r = convert_dut_var(dut.result)
+        for e in r: print(e)
+
         print("result_v", dut.result_v.value)
+
+        print("accumulators")
+        r = convert_dut_var(dut.accumulator)
+        for e in r: print(e)
+
         print("out   ", convert_dut_var(dut.out))
         print("out_v ", dut.out_v.value)
 
@@ -68,4 +75,4 @@ async def test_po2_dot_product(dut):
         await RisingEdge(dut.clk)
 
     _b, _h, d = convert_dut_var(dut.out)
-    assert d == 0 - 1/2 + 2 + 1/32
+    assert d == 0 - 1/2 + 2 + 1/32 - 1/2

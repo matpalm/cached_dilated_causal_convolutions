@@ -228,7 +228,7 @@ class FxpMathConv1DPO2Block(object):
                     for v in self.negative_weights[k, c]:
                         print(int(v), file=f)
 
-                with open(f"{d}/weights_log2.hex", 'w') as f:
+                with open(f"{d}/log_2_weights.hex", 'w') as f:
                     for v in self.weights_log2[k, c]:
                         print(hex(v)[2:], file=f)
 

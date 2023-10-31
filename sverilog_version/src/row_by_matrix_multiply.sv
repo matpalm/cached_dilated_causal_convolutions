@@ -46,7 +46,7 @@ module row_by_matrix_multiply #(
     );
 
     generate
-        if (OUT_D >=8 ) begin
+        if (OUT_D > 4 ) begin
             dot_product #(.W(W), .D(IN_D), .WEIGHTS({WEIGHTS,"/c04.hex"})) col4 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[4]), .out_v(col_v[4])
             );
@@ -63,7 +63,7 @@ module row_by_matrix_multiply #(
     endgenerate
 
     generate
-        if (OUT_D == 16) begin
+        if (OUT_D > 8) begin
             dot_product #(.W(W), .D(IN_D), .WEIGHTS({WEIGHTS,"/c08.hex"})) col8 (
                 .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[8]), .out_v(col_v[8])
             );
