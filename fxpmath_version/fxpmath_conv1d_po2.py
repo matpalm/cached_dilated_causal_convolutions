@@ -198,29 +198,55 @@ class FxpMathConv1DPO2Block(object):
         return self._num_overflows
 
     def export_weights_for_verilog(self, root_dir):
+        # export weights for this conv1d in format
+        # for loading in verilog with $readmemh
+
         root_dir = f"{root_dir}/{self.layer_name}"
+
+        print(">EXPORT", self.layer_name)
+        print("self.zero_weights", self.zero_weights.shape)
+        print("self.negative_weights", self.negative_weights.shape)
+        print("self.weights_log2", self.weights_log2.shape)
 
         num_k, out_d, in_d = self.negative_weights.shape
         print("num_k", num_k, "out_d", out_d, "in_d", in_d)
+        assert num_k == 1
 
         for k in range(num_k):
-            d = f"{root_dir}/k{k}"
-            ensure_dir_exists(d)
-            for o in range(out_d):
+            for c in range(out_d):
+                d = f"{root_dir}/k{k}/c{c:02d}"
+                ensure_dir_exists(d)
 
-                # write pow2 weights
-                with open(f"{d}/w_l2_{o:02d}.hex", 'w') as f:
-                    for i in range(in_d):
-                        v = self.weights_log2[k, o, i]
+                # note: verilog expects 0 or 1 for bool values zero_weights
+                #       and negative_weights
+
+                with open(f"{d}/zero_weights.hex", 'w') as f:
+                    for v in self.zero_weights[k, c]:
+                        print(int(v), file=f)
+
+                with open(f"{d}/negative_weights.hex", 'w') as f:
+                    for v in self.negative_weights[k, c]:
+                        print(int(v), file=f)
+
+                with open(f"{d}/weights_log2.hex", 'w') as f:
+                    for v in self.weights_log2[k, c]:
                         print(hex(v)[2:], file=f)
 
-                # TODO: decide how to write negative_weights and zero_weights bits
+        def double_width_hex_representation(w):
+            w_fp = self.fxp.double_width(w)
+            if w != float(w_fp):
+                raise Exception(f"??? value {k},{o},{i} ({w}) failed FP double check")
+            hex_string_without_0x = w_fp.hex()[2:]
+            assert len(hex_string_without_0x) == 8
+            return hex_string_without_0x
 
-        print("self.negative_weights", self.negative_weights.shape)
-        print("self.weights_log2", self.weights_log2.shape)
-        print("self.zero_weights", self.zero_weights.shape)
+        with open(f"{root_dir}/bias.hex", 'w') as f:
+            for o in range(out_d):
+                f.write(double_width_hex_representation(self.biases[o]))
+                f.write(f" // {self.biases[o]}\n")
+
 
     def __str__(self):
-        return f" negative_weights={self.negative_weights.shape}" \
-               f" weights_log2={self.weights_log2.shape}" \
-               f" zero_weights={self.zero_weights.shape}"
+        return f" zero_weights={self.zero_weights.shape}" \
+               f" negative_weights={self.negative_weights.shape}" \
+               f" weights_log2={self.weights_log2.shape}"
