@@ -58,23 +58,25 @@ async def test_ad_hoc_test(dut):
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
 
-    # # inp=3.0 * weight=0.25 = 0.75
-    # await test(dut, input=0x3000, zero_weight=0, negative_weight=0, log2_weight=2, expected_result=0.75)
+    # inp=3.0 * weight=0.25 = 0.75
+    await test(dut, input=0x3000, zero_weight=0, negative_weight=0, log2_weight=2, expected_result=0.75)
 
-    # # inp=3.0 * weight=-0.25 = -0.75
-    # await test(dut, input=0x3000, zero_weight=0, negative_weight=1, log2_weight=2, expected_result=-0.75)
+    # inp=3.0 * weight=-0.25 = -0.75
+    await test(dut, input=0x3000, zero_weight=0, negative_weight=1, log2_weight=2, expected_result=-0.75)
 
-    # # inp=-3.0 * weight=0.25 = -0.75
-    # await test(dut, input=0xd000, zero_weight=0, negative_weight=0, log2_weight=2, expected_result=-0.75)
+    # inp=-3.0 * weight=0.25 = -0.75
+    await test(dut, input=0xd000, zero_weight=0, negative_weight=0, log2_weight=2, expected_result=-0.75)
 
-    # # inp=-3.0 * weight=-0.25 = 0.75
-    # await test(dut, input=0xd000, zero_weight=0, negative_weight=1, log2_weight=2, expected_result=0.75)
+    # inp=-3.0 * weight=-0.25 = 0.75
+    await test(dut, input=0xd000, zero_weight=0, negative_weight=1, log2_weight=2, expected_result=0.75)
 
-    # # inp=3.0 * weight=0 = 0
-    # await test(dut, input=0x3000, zero_weight=1, negative_weight=0, log2_weight=0, expected_result=0)
+    # some variants on zero weight
+    await test(dut, input=0x3000, zero_weight=1, negative_weight=0, log2_weight=2, expected_result=0)
+    await test(dut, input=0xd000, zero_weight=1, negative_weight=1, log2_weight=3, expected_result=0)
 
-    # # inp=-3.0 * weight=0 = 0
-    # await test(dut, input=0xd000, zero_weight=1, negative_weight=0, log2_weight=0, expected_result=0)
+    # some variants on zero input
+    await test(dut, input=0, zero_weight=0, negative_weight=0, log2_weight=1, expected_result=0)
+    await test(dut, input=0, zero_weight=0, negative_weight=1, log2_weight=1, expected_result=0)
 
     # for dp test
     await test(dut, input=0x1000, zero_weight=1, negative_weight=0, log2_weight=1, expected_result=0)

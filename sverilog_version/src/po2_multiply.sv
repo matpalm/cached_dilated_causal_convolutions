@@ -34,10 +34,19 @@ module po2_multiply #(
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             result_v <= 0;
-            state <= zero_weight ? EMIT_ZERO : ( negative_weight ? NEGATE_1 : PAD_TO_DOUBLE_WIDTH );
-            // decide left padding based on whether the result will be negative,
-            // in which we want 1 padding for 2s comp, otherwise pad with 0
-            LEFT_PAD <= (negative_weight ^ (inp < 0)) ? '1 : 0;
+
+            if (zero_weight | inp==0)
+                // if either weight, or input, is zero we just emit zero
+                state <= EMIT_ZERO;
+            else begin
+                // decide left padding based on whether the result will be negative,
+                // in which we want 1 padding for 2s comp, otherwise pad with 0
+                LEFT_PAD <= (negative_weight ^ (inp < 0)) ? '1 : 0;
+                // and depending on whether weight is negative or not, we may
+                // need to negate the input
+                state <= negative_weight ? NEGATE_1 : PAD_TO_DOUBLE_WIDTH;
+            end
+
         end else
             case(state)
                 NEGATE_1: begin

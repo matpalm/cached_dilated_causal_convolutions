@@ -23,33 +23,16 @@ def po2_dot_product_state_to_str(s):
     as_str = po2_dot_product_idx_to_str[int(s)]
     return f"{as_str} ({s})"
 
-@cocotb.test()
-async def test_po2_dot_product(dut):
-
-    clock = Clock(dut.clk, 83, units='ns')
-    cocotb.start_soon(clock.start())
-
-    #                      0    1    2    3
-    #                      1    1    2    1/2
-    dut.packed_a.value = 0x1000_1000_2000_0800
+async def test_input_output(dut, input, expected_out):
+    dut.packed_a.value = input
 
     dut.rst.value = 1
     await RisingEdge(dut.clk)
     dut.rst.value = 0
     await RisingEdge(dut.clk)
 
-    print("packed_a    ", dut.packed_a.value)
-    print("zero_weights", dut.zero_weights.value)          # 1 0 0 0
-    print("negative_weights", dut.negative_weights.value)  # 0 1 0 0
-    print("log_2_weights", dut.log_2_weights.value)        # 1 1 0 4
+    for i in range(100):
 
-    # DP is then
-    # e0 = 1 * 0 = 0 ( zero weight )
-    # e1 = 1 * -1 = -1 >> 1 = -1 / 2 = -1/2
-    # e2 = 2 >> 0 = 2
-    # e3 = 1/2 >> 4 = 1/32
-    # sum = 1.46875
-    for i in range(10):
         print("===", i)
         print("state", po2_dot_product_state_to_str(dut.state.value))
 
@@ -72,8 +55,22 @@ async def test_po2_dot_product(dut):
         print("out_v ", dut.out_v.value)
 
         if dut.out_v == 1: break
-
         await RisingEdge(dut.clk)
 
+    assert dut.out_v == 1
+
     _b, _h, d = convert_dut_var(dut.out)
-    assert d == 0 - 1/2 + 2 + 1/32
+    assert d == expected_out
+
+
+@cocotb.test()
+async def test_po2_dot_product(dut):
+
+    clock = Clock(dut.clk, 83, units='ns')
+    cocotb.start_soon(clock.start())
+
+    # test 1; a zero vector by anything should be zero
+    await test_input_output(dut, 0, 0)
+
+    # test 2; a mix of values
+    await test_input_output(dut, 0x1000_1000_2000_0800, (0 - 1/2 + 2 + 1/32))
