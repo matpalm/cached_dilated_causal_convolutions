@@ -27,7 +27,7 @@ module po2_row_by_matrix_multiply #(
         end
     endgenerate
 
-    // auto generated! see sverilog_version.generate.py
+    // auto generated! see sverilog_version/generate.py
 
     po2_dot_product #(.W(W), .D(IN_D), .WEIGHTS({WEIGHTS, "/c00"})) col0 (
         .clk(clk), .rst(rst), .packed_a(packed_a), .out(dp_N_out[0]), .out_v(col_v[0])

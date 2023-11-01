@@ -159,8 +159,9 @@ class FxpModel(object):
         y_pred = self.input
 
         for layer in self.layers:
-            if self.verbose: print("layer", layer)
+            if self.verbose: print("running layer", layer)
             y_pred = layer.apply(y_pred)
+            if self.verbose: print("result ", list(y_pred))
 
         if self.verbose: print("y_pred", list(y_pred))
         return y_pred

@@ -1,6 +1,6 @@
 set -ex
 
-export RUN=28_po2_8d_16d
+export RUN=32_po2_regression_8d_16d
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
 export FILTER_D=8
 export FILTER_PO2_D=16
@@ -24,7 +24,16 @@ time python3 -m fxpmath_version.test \
  --plot-dir runs/$RUN/ \
  --write-verilog-weights runs/$RUN/weights/verilog/latest \
  --num-test-egs 300 \
- | tee runs/$RUN/fxpmath_version.test.out
+ > runs/$RUN/fxpmath_version.test.out
 unset CUDA_VISIBLE_DEVICES
 
-#time ./all_run_make_network.sh
+pushd sverilog_version/src
+[ -f network.sv ] && rm network.sv
+ln -s po2_network.sv network.sv
+popd
+
+# # note: make files use FILTER_D & FILTER_PO2_D
+WAVE=sine ./run_make_network.sh
+WAVE=ramp ./run_make_network.sh
+WAVE=square ./run_make_network.sh
+WAVE=zigzag ./run_make_network.sh

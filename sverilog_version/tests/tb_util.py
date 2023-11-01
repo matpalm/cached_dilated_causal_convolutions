@@ -1,5 +1,6 @@
 
 from cocotb.handle import BinaryValue, ModifiableObject, NonHierarchyIndexableObject
+import re, os
 
 def convert_dut_var(v):
     if type(v) == BinaryValue or type(v) == str:
@@ -81,3 +82,64 @@ def hex_fp_value_to_decimal(hex_fp_str):
         return integer_value + fractional_value
     else:
         raise Exception(len(hex_fp_str))
+
+class StateIdToStr(object):
+
+    def __init__(self, module_fname):
+
+        # assumes location of this file w.r.t src; clumsy :/
+        fname = os.path.join(os.path.dirname(__file__), '..', 'src', module_fname)
+        with open(fname, 'r') as f:
+            lines = f.readlines()
+        lines = list(map(str.strip, lines))
+
+        # search forward from start for state register definition
+        state_defn_re = re.compile(r"^reg \[.*?\] state.*")
+        state_defn_line_num = None
+        for i, line in enumerate(lines):
+            if state_defn_re.match(line):
+                state_defn_line_num = i
+                break
+        if state_defn_line_num is None:
+            raise Exception("couldn't find state register definition")
+
+        # search backwards to find localparam definition
+        i = state_defn_line_num - 1
+        localparam_line_num = None
+        while i > 0:
+            if lines[i] == 'localparam':
+                localparam_line_num = i
+                break
+            i -= 1
+        if localparam_line_num is None:
+            raise Exception("couldn't find localparam defintion")
+
+        # scan between the localparam and state_defn and
+        # extract state name to state id mapping
+        state_definition_re = re.compile("(.*?)=(.*)[,;]$")
+        self.state_id_to_str_dict = {}
+        for i in range(localparam_line_num+1, state_defn_line_num):
+            line = lines[i]
+            # ignore empty lines
+            if len(line) == 0:
+                continue
+            # remve potential trailing comments
+            line = re.sub("//.*", '', line).strip()
+
+            # extract name and id
+            m = state_definition_re.match(line)
+            if not m:
+                raise Exception(f"line [{lines[i]}] didn't match expected state definition")
+            state_name = m.group(1).strip()
+            state_id = int(m.group(2))
+            self.state_id_to_str_dict[state_id] = state_name
+
+        if len(self.state_id_to_str_dict) == 0:
+            raise Exception("no states extracted?")
+
+    def __getitem__(self, i):
+        try:
+            return f"{self.state_id_to_str_dict[int(i)]} ({i})"
+        except ValueError as e:
+            # xxxx value?
+            return "xxxx"

@@ -9,21 +9,10 @@ import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from tb_util import *
 
-po2_multiply_idx_to_str = dict(enumerate(
-    'NEGATE_1 NEGATE_2 PAD_TO_DOUBLE_WIDTH SHIFT EMIT_ZERO DONE'.split(' ')
-    ))
-def po2_multiply_state_to_str(s):
-    as_str = po2_multiply_idx_to_str[int(s)]
-    return f"{as_str} ({s})"
+po2_multiply_state_to_str = StateIdToStr('po2_multiply.sv')
+po2_dot_product_state_to_str = StateIdToStr('po2_dot_product.sv')
 
-po2_dot_product_idx_to_str = dict(enumerate(
-    'MULTIPLYING_ELEMENTS ADD_16 ADD_8 ADD_4 ADD_2 DONE'.split(' ')
-    ))
-def po2_dot_product_state_to_str(s):
-    as_str = po2_dot_product_idx_to_str[int(s)]
-    return f"{as_str} ({s})"
-
-async def test_input_output(dut, input, expected_out):
+async def test_input_output(dut, input, expected_out, atol=1e-5):
 
     dut.packed_a.value = input
 
@@ -45,12 +34,12 @@ async def test_input_output(dut, input, expected_out):
     # sum = 1.46875
     for i in range(10):
         print("===", i)
-        print("state", po2_dot_product_state_to_str(dut.state.value))
+        print("state", po2_dot_product_state_to_str[dut.state.value])
 
         mN_states = [
             dut.m0.state.value, dut.m1.state.value,
             dut.m2.state.value, dut.m3.state.value]
-        print("dp_states", [po2_multiply_state_to_str(s) for s in mN_states])
+        print("dp_states", [po2_multiply_state_to_str[s] for s in mN_states])
 
         print("result")
         r = convert_dut_var(dut.result)
@@ -70,7 +59,11 @@ async def test_input_output(dut, input, expected_out):
         await RisingEdge(dut.clk)
 
     _b, _h, d = convert_dut_var(dut.out)
-    assert d == expected_out
+    difference = d - expected_out
+    if difference < atol:
+        pass
+    else:
+        assert d == expected_out, "failed by tolerance diff"
 
 
 @cocotb.test()

@@ -162,4 +162,4 @@ class FxpMathConv1DQuantisedBitsBlock(object):
                 f.write(f" // {self.biases[o]}\n")
 
     def __str__(self):
-        return f"weights={self.weights.shape} biases={self.biases.shape}"
+        return f"{self.layer_name} weights={self.weights.shape} biases={self.biases.shape}"

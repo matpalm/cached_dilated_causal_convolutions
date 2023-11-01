@@ -9,6 +9,8 @@ import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from tb_util import *
 
+dot_product_state_to_str = StateIdToStr('dot_product.sv')
+
 @cocotb.test()
 async def test_dot_product(dut):
 
@@ -39,7 +41,7 @@ async def test_dot_product(dut):
     for i in range(20):
         if dut.out_v.value:
             break
-        print("i", i, "waiting", dut.state.value)
+        print("i", i, "state", dot_product_state_to_str[dut.state.value])
         print("dp.i    ", dut.i.value)
         try:
             print("dp.a[i] ", convert_dut_var(dut.a.value[dut.i.value]))

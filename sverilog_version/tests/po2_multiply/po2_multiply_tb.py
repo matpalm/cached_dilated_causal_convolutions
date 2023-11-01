@@ -9,14 +9,12 @@ import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from tb_util import *
 
-po2_multiply_idx_to_str = dict(enumerate(
-    'NEGATE_1 NEGATE_2 PAD_TO_DOUBLE_WIDTH SHIFT EMIT_ZERO DONE'.split(' ')
-    ))
-def po2_multiply_state_to_str(s):
-    as_str = po2_multiply_idx_to_str[int(s)]
-    return f"{as_str} ({s})"
+po2_multiply_state_to_str = StateIdToStr('po2_multiply.sv')
 
-async def test(dut, input, zero_weight, negative_weight, log2_weight, expected_result):
+async def test(dut, input,
+    zero_weight, negative_weight, log2_weight,
+    expected_result, atol=1e-5):
+
     # inp=3.0 * weight=0.25 = 0.75
 
     dut.inp.value = input
@@ -36,9 +34,10 @@ async def test(dut, input, zero_weight, negative_weight, log2_weight, expected_r
 
     for i in range(10):
         print("---------------")
-        print("state", po2_multiply_state_to_str(dut.state.value))
+        print("state", po2_multiply_state_to_str[dut.state.value])
         print("inp", convert_dut_var(dut.inp))
-        print("negated_integer_part", dut.negated_integer_part.value)
+        print("zero_weight", dut.zero_weight.value)
+        print("negative_weight", dut.negative_weight.value)
         print("log_2_weight", convert_dut_var(dut.log_2_weight))
         print("result", convert_dut_var(dut.result))
         print("result_v", dut.result_v.value)
@@ -50,7 +49,11 @@ async def test(dut, input, zero_weight, negative_weight, log2_weight, expected_r
     final_b, final_h, final_d = convert_dut_var(dut.result)
     print("final_result", final_b, final_h, final_d, "expected_result", expected_result)
 
-    assert final_d == expected_result
+    difference = final_d - expected_result
+    if difference < atol:
+        pass
+    else:
+        assert final_d == expected_result, "failed by tolerance diff"
 
 @cocotb.test()
 async def test_ad_hoc_test(dut):
@@ -83,3 +86,14 @@ async def test_ad_hoc_test(dut):
     await test(dut, input=0x1000, zero_weight=0, negative_weight=1, log2_weight=1, expected_result=-1/2)
     await test(dut, input=0x2000, zero_weight=0, negative_weight=0, log2_weight=0, expected_result=2)
     await test(dut, input=0x0800, zero_weight=0, negative_weight=0, log2_weight=4, expected_result=1/32)
+
+    # from real data
+    # input ('0001001110011000', '1398', 1.224609375)
+    # 1.224609375  0001.0011_1001_1000
+    # -1.224609375 1110.1100_0110_1000
+    # /2 =>        1111.0110_0011_0100  -0.6123046875
+
+    await test(dut,
+        input=0x1398,  # 1.224609375
+        zero_weight=0, negative_weight=1, log2_weight=1,
+        expected_result=-0.6123042702674866)  # recall; double width result

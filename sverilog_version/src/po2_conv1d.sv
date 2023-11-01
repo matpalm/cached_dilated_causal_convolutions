@@ -16,7 +16,7 @@ module po2_conv1d #(
 
     localparam
         MAT_MUL_RUNNING  = 0,
-        ACCUMULATE       = 1,   // TODO: drop for po2 version
+        ACCUMULATE       = 1,   // TODO: not used for po2_ version, but makes tests more consistent
         BIAS_ADD         = 2,
         CLIP_LOWER       = 3,
         CLIP_UPPER       = 4,

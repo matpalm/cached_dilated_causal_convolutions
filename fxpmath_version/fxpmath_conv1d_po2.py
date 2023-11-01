@@ -178,6 +178,9 @@ class FxpMathConv1DPO2Block(object):
         for i in range(self.out_d):
             self.fxp.resize_single_width(accums[0][i])
 
+        if self.verbose:
+            print(f"accumulated outputs {list(map(to_hex, accums[0]))}")
+
         # check for example under/overflow
         # NOTE: this are handled with clip on the double width values in verilog version
         #
@@ -247,6 +250,7 @@ class FxpMathConv1DPO2Block(object):
 
 
     def __str__(self):
-        return f" zero_weights={self.zero_weights.shape}" \
+        return self.layer_name + \
+               f" zero_weights={self.zero_weights.shape}" \
                f" negative_weights={self.negative_weights.shape}" \
                f" weights_log2={self.weights_log2.shape}"

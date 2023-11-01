@@ -7,14 +7,9 @@ from cocotb.handle import Force, Release
 # add .. to path so we can import a common test 'util'
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from tb_util import convert_dut_var, print_value_per_line, unpack_binary
+from tb_util import convert_dut_var, print_value_per_line, unpack_binary, StateIdToStr
 
-po2_conv1d_idx_to_str = dict(enumerate(
-    'MAT_MUL_RUNNING ACCUMULATE BIAS_ADD CLIP_LOWER CLIP_UPPER SINGLE_W APPLY_RELU OUTPUT'.split(' ')
-    ))
-def po2_conv1d_state_to_str(s):
-    as_str = po2_conv1d_idx_to_str[int(s)]
-    return f"{as_str} ({s})"
+po2_conv1d_state_to_str = StateIdToStr('po2_conv1d.sv')
 
 async def test_input_output(dut, input, apply_relu, expected_out):
 
@@ -30,7 +25,7 @@ async def test_input_output(dut, input, apply_relu, expected_out):
 
     for i in range(20):
         print("-"*100)
-        print("i", i, po2_conv1d_state_to_str(dut.state.value))
+        print("===i", i, po2_conv1d_state_to_str[dut.state.value])
         print("kernel0.col_v", dut.kernel0.col_v.value)
         print("kernel_out", dut.kernel_out.value)
         print_value_per_line("kernel_out_unpacked", dut.kernel_out_unpacked)

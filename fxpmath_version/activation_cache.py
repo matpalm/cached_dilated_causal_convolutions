@@ -43,6 +43,6 @@ class ActivationCache(object):
         return self.cached_dilated_values()
 
     def __str__(self):
-        return f"depth={self.depth} dilation={self.dilation}" \
+        return f"ActivationCache depth={self.depth} dilation={self.dilation}" \
                f" kernel_size={self.kernel_size} => num_entries={self.num_entries}"
 

@@ -106,7 +106,14 @@ def nearest_log2_value_or_zero(v, atol=1e-5):
 
 if __name__ == '__main__':
     fxp = FxpUtil()
-    a = fxp.single_width(0.234)
+    a = fxp.single_width(1.224609375)
     print("a", a, fxp.bits(a))
-    a >>= 0
+
+    a = fxp.single_width(-1.224609375)
     print("a", a, fxp.bits(a))
+
+    a = fxp.single_width(-1.224609375)
+    print("a", a, fxp.bits(a))
+
+    bin_str = 0b1111011000110100
+    print(bin_str, fxp.fixed_point_to_decimal(bin_str))

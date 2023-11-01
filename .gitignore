@@ -14,3 +14,4 @@ sverilog_version/tests/network/test_x.hex
 keras_weights/
 qkeras_weights
 keras_weights/
+sverilog_version/src/network.sv

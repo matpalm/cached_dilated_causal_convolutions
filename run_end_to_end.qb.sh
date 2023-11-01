@@ -1,9 +1,8 @@
 set -ex
 
-export RUN=27_qb__layer_regression_test
+export RUN=30_qb_regression_16d
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
 export FILTER_D=16
-
 
 [ ! -d runs/$RUN ] && mkdir runs/$RUN
 
@@ -26,6 +25,11 @@ time python3 -m fxpmath_version.test \
  --num-test-egs 200 \
  | tee runs/$RUN/fxpmath_version.test.out
 unset CUDA_VISIBLE_DEVICES
+
+pushd sverilog_version/src
+[ -f network.sv ] && rm network.sv
+ln -s qb_network.sv network.sv
+popd
 
 # note: make files use FILTER_D
 WAVE=sine ./run_make_network.sh

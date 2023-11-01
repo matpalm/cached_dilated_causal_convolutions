@@ -2,7 +2,8 @@
 
 module network #(
     parameter W = 16,        // width for each element
-    parameter FILTER_D       // size of packed port arrays for filters
+    parameter FILTER_D,      // size of packed conv0 and conv2 filters
+    parameter FILTER_PO2_D   // size of packed conv1 po2 filters
 )(
     input rst,
     input clk,
@@ -34,9 +35,17 @@ module network #(
         CLK_ACT_CACHE_2 = 9,
         RST_CONV_3      = 10,
         CONV_3_RUNNING  = 11,
-        OUTPUT          = 12;
+        OUTPUT          = 12,
+        RST_CONV_1_1A     = 13,
+        CONV_1_1A_RUNNING = 14,
+        RST_CONV_1_1B     = 15,
+        CONV_1_1B_RUNNING = 16,
+        RST_CONV_1_2A     = 17,
+        CONV_1_2A_RUNNING = 18,
+        RST_CONV_1_2B     = 19,
+        CONV_1_2B_RUNNING = 20;
 
-    reg [3:0] state;
+    reg [4:0] state;
 
     //--------------------------------
     // left shift buffers
@@ -143,6 +152,9 @@ module network #(
     //--------------------------------
     // conv 1 block
 
+    // the set of cN_rst and cN_out_v values here could be in an array
+    // since we just intend to rst, then wait, for each in sequence.
+
     reg c1_rst = 0;
     reg signed [FILTER_D*W-1:0] c1_out;
     reg c1_out_v;
@@ -153,6 +165,46 @@ module network #(
         .packed_a2(ac_c0_out_l2), .packed_a3(ac_c0_out_l3),
         .packed_out(c1_out),
         .out_v(c1_out_v));
+
+    reg c1_1a_rst = 0;
+    reg signed [FILTER_PO2_D*W-1:0] c1_1a_out;
+    reg c1_1a_out_v;
+
+    po2_conv1d #(.W(W), .IN_D(FILTER_D), .OUT_D(FILTER_PO2_D), .WEIGHTS("weights/qconv_1_1a_po2")) conv1_1a (
+        .clk(clk), .rst(c1_1a_rst), .apply_relu(1'b0),
+        .packed_a(c1_out),
+        .packed_out(c1_1a_out),
+        .out_v(c1_1a_out_v));
+
+    reg c1_1b_rst = 0;
+    reg signed [FILTER_D*W-1:0] c1_1b_out;
+    reg c1_1b_out_v;
+
+    po2_conv1d #(.W(W), .IN_D(FILTER_PO2_D), .OUT_D(FILTER_D), .WEIGHTS("weights/qconv_1_1b_po2")) conv1_1b (
+        .clk(clk), .rst(c1_1b_rst), .apply_relu(1'b1),
+        .packed_a(c1_1a_out),
+        .packed_out(c1_1b_out),
+        .out_v(c1_1b_out_v));
+
+    reg c1_2a_rst = 0;
+    reg signed [FILTER_PO2_D*W-1:0] c1_2a_out;
+    reg c1_2a_out_v;
+
+    po2_conv1d #(.W(W), .IN_D(FILTER_D), .OUT_D(FILTER_PO2_D), .WEIGHTS("weights/qconv_1_2a_po2")) conv1_2a (
+        .clk(clk), .rst(c1_2a_rst), .apply_relu(1'b0),
+        .packed_a(c1_1b_out),
+        .packed_out(c1_2a_out),
+        .out_v(c1_2a_out_v));
+
+    reg c1_2b_rst = 0;
+    reg signed [FILTER_D*W-1:0] c1_2b_out;
+    reg c1_2b_out_v;
+
+    po2_conv1d #(.W(W), .IN_D(FILTER_PO2_D), .OUT_D(FILTER_D), .WEIGHTS("weights/qconv_1_2b_po2")) conv1_2b (
+        .clk(clk), .rst(c1_2b_rst), .apply_relu(1'b1),
+        .packed_a(c1_2a_out),
+        .packed_out(c1_2b_out),
+        .out_v(c1_2b_out_v));
 
     // --------------------------------
     // conv 1 activation cache
@@ -165,7 +217,7 @@ module network #(
     localparam C1_DILATION = 4*4;
 
     activation_cache #(.W(W), .D(FILTER_D), .DILATION(C1_DILATION)) activation_cache_c1 (
-        .clk(ac_c1_clk), .rst(rst), .inp(c1_out),
+        .clk(ac_c1_clk), .rst(rst), .inp(c1_2b_out),
         .out_l0(ac_c1_out_l0),
         .out_l1(ac_c1_out_l1),
         .out_l2(ac_c1_out_l2),
@@ -231,7 +283,7 @@ module network #(
                     CONV_0_RUNNING: begin
                         // wait until conv0 has run
                         c0_rst <= 0;
-                        state <= c0_out_v ? CLK_ACT_CACHE_0 : CONV_0_RUNNING;
+                        if (c0_out_v) state <= CLK_ACT_CACHE_0;
                     end
 
                     CLK_ACT_CACHE_0: begin
@@ -250,7 +302,55 @@ module network #(
                     CONV_1_RUNNING: begin
                         // wait until conv1 has run
                         c1_rst <= 0;
-                        state <= c1_out_v ? CLK_ACT_CACHE_1 : CONV_1_RUNNING;
+                        if (c1_out_v) state <= RST_CONV_1_1A;
+                    end
+
+                    RST_CONV_1_1A: begin
+                        // signal conv to reset and run
+                        c1_1a_rst <= 1;
+                        state <= CONV_1_1A_RUNNING;
+                    end
+
+                    CONV_1_1A_RUNNING: begin
+                        // wait until conv has run
+                        c1_1a_rst <= 0;
+                        if (c1_1a_out_v) state <= RST_CONV_1_1B;
+                    end
+
+                    RST_CONV_1_1B: begin
+                        // signal conv to reset and run
+                        c1_1b_rst <= 1;
+                        state <= CONV_1_1B_RUNNING;
+                    end
+
+                    CONV_1_1B_RUNNING: begin
+                        // wait until conv has run
+                        c1_1b_rst <= 0;
+                        if (c1_1b_out_v) state <= RST_CONV_1_2A;
+                    end
+
+                    RST_CONV_1_2A: begin
+                        // signal conv to reset and run
+                        c1_2a_rst <= 1;
+                        state <= CONV_1_2A_RUNNING;
+                    end
+
+                    CONV_1_2A_RUNNING: begin
+                        // wait until conv has run
+                        c1_2a_rst <= 0;
+                        if (c1_2a_out_v) state <= RST_CONV_1_2B;
+                    end
+
+                    RST_CONV_1_2B: begin
+                        // signal conv to reset and run
+                        c1_2b_rst <= 1;
+                        state <= CONV_1_2B_RUNNING;
+                    end
+
+                    CONV_1_2B_RUNNING: begin
+                        // wait until conv1_1a has run
+                        c1_2b_rst <= 0;
+                        if (c1_2b_out_v) state <= CLK_ACT_CACHE_1;
                     end
 
                     CLK_ACT_CACHE_1: begin
@@ -269,7 +369,7 @@ module network #(
                     CONV_2_RUNNING: begin
                         // wait until conv2 has run
                         c2_rst <= 0;
-                        state <= c2_out_v ? OUTPUT : CONV_2_RUNNING;
+                        if (c2_out_v) state <= OUTPUT;
                     end
 
                     OUTPUT: begin

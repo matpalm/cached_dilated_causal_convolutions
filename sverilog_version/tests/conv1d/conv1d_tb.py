@@ -9,6 +9,9 @@ import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from tb_util import *
 
+conv1d_state_to_str = StateIdToStr('conv1d.sv')
+
+
 @cocotb.test()
 async def test_conv1d(dut):
 
@@ -35,7 +38,7 @@ async def test_conv1d(dut):
     await RisingEdge(dut.clk)
 
     for i in range(30):
-        print("i", i, "state", dut.state.value)
+        print("i", i, "state", conv1d_state_to_str[dut.state.value])
         print("accum      ", convert_dut_var(dut.accum))
         print("result     ", dut.result.value)
         if dut.out_v.value:
