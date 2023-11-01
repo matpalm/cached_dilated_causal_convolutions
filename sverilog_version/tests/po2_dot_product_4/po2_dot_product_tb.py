@@ -69,8 +69,10 @@ async def test_po2_dot_product(dut):
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
 
-    # test 1; a zero vector by anything should be zero
+    # zero input => zero output
     await test_input_output(dut, 0, 0)
 
     # test 2; a mix of values
-    await test_input_output(dut, 0x1000_1000_2000_0800, (0 - 1/2 + 2 + 1/32))
+    await test_input_output(dut,
+        input=0x1000_1000_2000_0800,
+        expected_out=(0 - 1/2 + 2 + 1/32))

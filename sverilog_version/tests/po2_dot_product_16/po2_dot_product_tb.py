@@ -23,15 +23,9 @@ def po2_dot_product_state_to_str(s):
     as_str = po2_dot_product_idx_to_str[int(s)]
     return f"{as_str} ({s})"
 
-@cocotb.test()
-async def test_po2_dot_product(dut):
+async def test_input_output(dut, input, expected_out):
 
-    clock = Clock(dut.clk, 83, units='ns')
-    cocotb.start_soon(clock.start())
-
-    #                      0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
-    #                      1    1    2    1/2  0    0    0    0
-    dut.packed_a.value = 0x1000_1000_2000_0800_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_1000
+    dut.packed_a.value = input
 
     dut.rst.value = 1
     await RisingEdge(dut.clk)
@@ -75,4 +69,20 @@ async def test_po2_dot_product(dut):
         await RisingEdge(dut.clk)
 
     _b, _h, d = convert_dut_var(dut.out)
-    assert d == 0 - 1/2 + 2 + 1/32 - 1/2
+    assert d == expected_out
+
+@cocotb.test()
+async def test_po2_dot_product(dut):
+
+    clock = Clock(dut.clk, 83, units='ns')
+    cocotb.start_soon(clock.start())
+
+    # zero input => zero output
+    await test_input_output(dut, 0, 0)
+
+    await test_input_output(dut,
+        #       0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15
+        #       1    1    2    1/2  0    0    0    0
+        input=0x1000_1000_2000_0800_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_0000_1000,
+        expected_out=(0 - 1/2 + 2 + 1/32 - 1/2)
+        )
