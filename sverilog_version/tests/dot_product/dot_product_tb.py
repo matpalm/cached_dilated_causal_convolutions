@@ -5,14 +5,12 @@ from cocotb.triggers import Timer, FallingEdge, RisingEdge, ClockCycles
 from cocotb.handle import Force, Release
 
 # add .. to path so we can import a common test 'util'
-#import sys, os
-#sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-#from util import *
-
-# ported from https://github.com/apfelaudio/eurorack-pmod/blob/master/gateware/sim/vca/tb_vca.py
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from tb_util import *
 
 @cocotb.test()
-async def test_1d_dot_product_low_values(dut):
+async def test_dot_product(dut):
 
     clock = Clock(dut.clk, 83, units='ns')
     cocotb.start_soon(clock.start())
@@ -44,14 +42,12 @@ async def test_1d_dot_product_low_values(dut):
         print("i", i, "waiting", dut.state.value)
         print("dp.i    ", dut.i.value)
         try:
-            print("dp.a[i] ", dut.a.value[dut.i.value])
-            print("dp.b[i] ", dut.b_values.value[dut.i.value])
+            print("dp.a[i] ", convert_dut_var(dut.a.value[dut.i.value]))
+            print("dp.b[i] ", convert_dut_var(dut.b_values.value[dut.i.value]))
         except IndexError:
             pass
-        print("acc0    ", dut.acc0.value)
-        #print("acc1    ", dut.acc1.value)
-        print("product0", dut.product0.value)
-        #print("product1", dut.product1.value)
+        print("accumulator ", convert_dut_var(dut.accumulator))
+        print("product     ", convert_dut_var(dut.product))
         await RisingEdge(dut.clk)
 
     # should be valid

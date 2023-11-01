@@ -29,8 +29,8 @@ module dot_product #(
         DONE                 = 2;
     reg [2:0] state = MULTIPLY_ELEMENT;
 
-    reg signed [2*W-1:0] acc0;
-    reg signed [2*W-1:0] product0;
+    reg signed [2*W-1:0] accumulator;
+    reg signed [2*W-1:0] product;
 
     // b values for dot product are network weights and are
     // provided by WEIGHTS module level param
@@ -44,26 +44,25 @@ module dot_product #(
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            acc0 <= 0;
-            product0 <= 0;
+            accumulator <= 0;
+            product <= 0;
             i <= 0;
             state <= MULTIPLY_ELEMENT;
             out_v <= 0;
         end else
             case(state)
                 MULTIPLY_ELEMENT: begin
-                    acc0 <= acc0 + product0;
-                    product0 <= a[i] * b_values[i];
+                    accumulator <= accumulator + product;
+                    product <= a[i] * b_values[i];
                     i <= i + 1;
-                    state <= (i == D-1) ? FINAL_ADD : MULTIPLY_ELEMENT;
+                    if (i == D-1) state <= FINAL_ADD;
                 end
                 FINAL_ADD: begin
-                    acc0 <= acc0 + product0;
+                    out <= accumulator + product;
+                    out_v <= 1;
                     state <= DONE;
                 end
                 DONE: begin
-                    out <= acc0;
-                    out_v <= 1;
                 end
             endcase
 
