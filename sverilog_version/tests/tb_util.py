@@ -2,7 +2,7 @@
 from cocotb.handle import BinaryValue, ModifiableObject, NonHierarchyIndexableObject
 
 def convert_dut_var(v):
-    if type(v) == BinaryValue:
+    if type(v) == BinaryValue or type(v) == str:
         h = bits_to_hex(v)
         d = hex_fp_value_to_decimal(h)
         return v, h, d
@@ -12,8 +12,15 @@ def convert_dut_var(v):
     elif type(v) == NonHierarchyIndexableObject:
         # basically an array of values; recall on each
         return [convert_dut_var(e) for e in v.value]
+    elif type(v) == list:
+        # basically an array of values; recall on each
+        return list(map(convert_dut_var, v))
     else:
         raise Exception("unsupported type", type(v))
+
+def print_value_per_line(header, v):
+    print(header)
+    print("\n".join(map(str, enumerate(convert_dut_var(v)))))
 
 def unpack_binary(values, W=16):
     values = str(values)

@@ -17,8 +17,6 @@ def po2_dot_product_state_to_str(s):
     return f"{as_str} ({s})"
 
 async def test_input_output(dut, input, expected_out):
-    clock = Clock(dut.clk, 83, units='ns')
-    cocotb.start_soon(clock.start())
 
     # 0 input => 0 output
 
@@ -53,6 +51,9 @@ async def test_input_output(dut, input, expected_out):
 
 @cocotb.test()
 async def test_row_by_matrix_multiply(dut):
+
+    clock = Clock(dut.clk, 83, units='ns')
+    cocotb.start_soon(clock.start())
 
     # zero in always => zero out
     await test_input_output(dut,
