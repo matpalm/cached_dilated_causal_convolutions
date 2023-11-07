@@ -1,8 +1,8 @@
 set -ex
 
-export RUN=30_qb_regression_16d
+export RUN=31_qb_regression_4d
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
-export FILTER_D=16
+export FILTER_D=4
 
 [ ! -d runs/$RUN ] && mkdir runs/$RUN
 
@@ -22,7 +22,7 @@ time python3 -m fxpmath_version.test \
  --test-x-dir runs/$RUN/test_x_files/ \
  --plot-dir runs/$RUN/ \
  --write-verilog-weights runs/$RUN/weights/verilog/latest \
- --num-test-egs 200 \
+ --num-test-egs 300 \
  | tee runs/$RUN/fxpmath_version.test.out
 unset CUDA_VISIBLE_DEVICES
 

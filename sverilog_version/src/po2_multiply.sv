@@ -14,11 +14,13 @@ module po2_multiply #(
 );
 
     localparam
-        NEGATE              = 0,
-        SHIFT               = 1,
-        EMIT_ZERO           = 2,
-        DONE                = 3;
-    reg [1:0] state;
+        CHECK_ZERO          = 0,
+        PAD_DOUBLE_WIDTH    = 1,
+        NEGATE              = 2,
+        SHIFT               = 3,
+        EMIT_ZERO           = 4,
+        DONE                = 5;
+    reg [2:0] state = DONE;
 
     // padding constants for conversion from single to double width.
     `define LEFT_PAD_0 {I{1'b0}}
@@ -28,18 +30,19 @@ module po2_multiply #(
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             result_v <= 0;
-            if (zero_weight | inp==0)
-                // if either weight, or input, is zero we just emit zero
-                state <= EMIT_ZERO;
-            else begin
-                // pad the input to double width. note: we need to retain sign of input
-                result <= { ((inp < 0) ? `LEFT_PAD_1 : `LEFT_PAD_0), inp, `RIGHT_PAD };
-                // then we either negate, or jump straight to shifting
-                state <= negative_weight ? NEGATE : SHIFT;
-            end
-
+            state <= CHECK_ZERO;
         end else
             case(state)
+                CHECK_ZERO: begin
+                    // if either weight, or input, is zero we just emit zero
+                    state <= (zero_weight | inp==0) ? EMIT_ZERO : PAD_DOUBLE_WIDTH;
+                end
+                PAD_DOUBLE_WIDTH: begin
+                    // pad the input to double width. note: we need to retain sign of input
+                    result <= { ((inp < 0) ? `LEFT_PAD_1 : `LEFT_PAD_0), inp, `RIGHT_PAD };
+                    // then we either negate, or jump straight to shifting
+                    state <= negative_weight ? NEGATE : SHIFT;
+                end
                 NEGATE: begin
                     // twos compliment negation is usually invert bits and add 1
                     // but for fixed point we need to add 2^I, not 1.

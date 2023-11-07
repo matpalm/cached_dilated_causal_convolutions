@@ -57,6 +57,7 @@ module network #(
     reg signed [W-1:0] shifted_sample_in3;
 
     // NOTE: not shifted for cocotb version, but >>>2 shifted for eurorack pmod
+    // check jack and if not plugged emit 0x8300 -32000, => -1 in embed space
     assign shifted_sample_in0 = sample_in0;
     assign shifted_sample_in1 = sample_in1;
     assign shifted_sample_in2 = sample_in2;

@@ -1,9 +1,9 @@
 set -ex
 
-export RUN=32_po2_regression_8d_16d
+export RUN=34_po2_regression_4d_8d
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
-export FILTER_D=8
-export FILTER_PO2_D=16
+export FILTER_D=4
+export FILTER_PO2_D=8
 
 [ ! -d runs/$RUN ] && mkdir runs/$RUN
 
