@@ -96,6 +96,7 @@ class QKerasModelBuilder(object):
             self,
             inp,
             layer_number: int,     # for dilation amount & naming
+            l2: float,
             out_filters: int,
             po2_filters: int
         ):
@@ -106,7 +107,9 @@ class QKerasModelBuilder(object):
                             kernel_size=K, padding='causal',
                             dilation_rate=K**layer_number,
                             kernel_quantizer=quantiser(),
-                            bias_quantizer=quantiser())(inp)
+                            bias_quantizer=quantiser(),
+                            kernel_regularizer=regularizers.L2(l2),
+                            bias_regularizer=regularizers.L2(l2))(inp)
             self.layer_info.append({'type': 'qb', 'id': layer_id})
 
             y_pred = QActivation(quant_relu(), name=f"qrelu_{layer_number}")(y_pred)
@@ -176,7 +179,7 @@ class QKerasModelBuilder(object):
         else:
             # using po2
             y_pred = self.add_quantized_po2_conv_block(y_pred, layer_number=1,
-                out_filters=filter_size, po2_filters=po2_filter_size)
+                out_filters=filter_size, po2_filters=po2_filter_size, l2=l2)
 
         self.layer_info.append({'type': 'dilation', 'amount': K*K, 'depth': filter_size})
 
