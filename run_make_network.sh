@@ -25,9 +25,8 @@ ln -s $RUN_DIR/weights/verilog/latest/ weights
 make > $RUN_DIR/net.$WAVE.out
 popd
 
-# generate plot
-cat $RUN_DIR/net.$WAVE.out \
- | grep "^OUT dec" | cut -f3 -d' ' | grep -v xxxx | uniq \
- > /tmp/$$.y_pred.sverilog.$WAVE.txt
-./plot.py --plot-png $RUN_DIR/verilog.y_pred.$WAVE.png < /tmp/$$.y_pred.sverilog.$WAVE.txt
-rm /tmp/$$.y_pred.sverilog.$WAVE.txt
+# generate plot, TODO: put these onto one plot
+cat $RUN_DIR/net.$WAVE.out | grep "^OUT dec" | cut -f3,4 -d' ' | grep -v xxxx | uniq > /tmp/$$.y_pred.sverilog.$WAVE.ssv
+cut -f1 -d' ' /tmp/$$.y_pred.sverilog.$WAVE.ssv | ./plot.py --plot-png $RUN_DIR/verilog.y_pred.$WAVE.png
+# cut -f2 -d' ' /tmp/$$.y_pred.sverilog.$WAVE.ssv | ./plot.py --plot-png $RUN_DIR/verilog.ra.y_pred.$WAVE.png
+rm /tmp/$$.y_pred.sverilog.$WAVE.ssv

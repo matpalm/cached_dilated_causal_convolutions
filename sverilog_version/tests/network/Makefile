@@ -6,6 +6,7 @@ VERILOG_SOURCES += ../../src/conv1d.sv
 VERILOG_SOURCES += ../../src/dot_product.sv
 VERILOG_SOURCES += ../../src/left_shift_buffer.sv
 VERILOG_SOURCES += ../../src/row_by_matrix_multiply.sv
+VERILOG_SOURCES += ../../src/rolling_average.sv
 VERILOG_SOURCES += ../../src/po2_conv1d.sv
 VERILOG_SOURCES += ../../src/po2_dot_product.sv
 VERILOG_SOURCES += ../../src/po2_multiply.sv

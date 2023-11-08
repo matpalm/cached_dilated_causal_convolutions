@@ -191,9 +191,14 @@ module network #(
     // main network state machine
 
     logic signed [W-1:0] out0;
-    logic signed [W-1:0] out1;
+    logic signed [W-1:0] out1;   // make reg for ra test
     logic signed [W-1:0] out2;
     logic signed [W-1:0] out3;
+
+    // // assign out1 to be a 64 windowed rolling average of out0
+    // rolling_average #(.W(W), .LEN(32)) out0_ra (
+    //     .clk(clk), .rst(rst), .inp(out0), .out(out1)
+    // );
 
     // keep timing of clk ticks vs num ticks in output
     // ( since output is the last state and implies head room )
@@ -277,9 +282,9 @@ module network #(
                         // NOTE: not shifted for cocotb version, but <<2 shifted for eurorack pmod
                         // final net output is last conv output
                         out0 <= c2_out[IN_OUT_D*W-1:(IN_OUT_D-1)*W];
-                        out1 <= n_clk_ticks >> W;
-                        out2 <= n_output_ticks >> W;
-                        out3 <= 0;
+                        out1 <= 0;
+                        out2 <= n_clk_ticks >> W;
+                        out3 <= n_output_ticks >> W;
                         n_output_ticks <= n_output_ticks + 1;
                     end
 
