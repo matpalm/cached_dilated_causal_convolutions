@@ -23,7 +23,9 @@ async def test_input_output(dut, input, expected_out, atol=1e-5):
     for i in range(100):
         print("===", i)
         print("state         ", po2_dot_product_state_to_str[dut.state.value])
-        print("po2 mult state", po2_multiply_state_to_str[dut.po2_mult.state.value])
+        print("po2 mult0 state", po2_multiply_state_to_str[dut.po2_mult_0.state.value])
+        print("po2 mult1 state", po2_multiply_state_to_str[dut.po2_mult_1.state.value])
+        print("po2 po2_result_v_01", dut.po2_result_v.value)
         print("i", dut.i.value)
         print("accumulators", convert_dut_var(dut.accumulator))
         print("out   ", convert_dut_var(dut.out))

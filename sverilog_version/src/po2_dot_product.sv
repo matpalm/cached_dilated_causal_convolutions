@@ -51,18 +51,25 @@ module po2_dot_product #(
 
     // registers to handle in/out of po2 mult
     reg                  po2_rst;
-    reg signed [W-1:0]   po2_inp;
-    reg                  po2_zero_weight;
-    reg                  po2_negative_weight;
-    reg [W-1:0]          po2_log_2_weight;
-    reg signed [2*W-1:0] po2_result;
-    reg                  po2_result_v;
+    reg signed [W-1:0]   po2_inp [0:1];
+    reg                  po2_zero_weight [0:1];
+    reg                  po2_negative_weight [0:1];
+    reg [W-1:0]          po2_log_2_weight [0:1];
+    reg signed [2*W-1:0] po2_result [0:1];
+    reg [1:0]            po2_result_v;
 
-    po2_multiply #(.W(W), .I(4)) po2_mult (
-        .clk(clk), .rst(po2_rst), .inp(po2_inp),
-        .zero_weight(po2_zero_weight), .negative_weight(po2_negative_weight),
-        .log_2_weight(po2_log_2_weight),
-        .result(po2_result), .result_v(po2_result_v)
+    po2_multiply #(.W(W), .I(4)) po2_mult_0 (
+        .clk(clk), .rst(po2_rst), .inp(po2_inp[0]),
+        .zero_weight(po2_zero_weight[0]), .negative_weight(po2_negative_weight[0]),
+        .log_2_weight(po2_log_2_weight[0]),
+        .result(po2_result[0]), .result_v(po2_result_v[0])
+    );
+
+    po2_multiply #(.W(W), .I(4)) po2_mult_1 (
+        .clk(clk), .rst(po2_rst), .inp(po2_inp[1]),
+        .zero_weight(po2_zero_weight[1]), .negative_weight(po2_negative_weight[1]),
+        .log_2_weight(po2_log_2_weight[1]),
+        .result(po2_result[1]), .result_v(po2_result_v[1])
     );
 
     integer i;
@@ -77,20 +84,24 @@ module po2_dot_product #(
             case(state)
                 START_NEXT_MULT: begin
                     po2_rst <= 1;
-                    po2_inp <= a[i];
-                    po2_zero_weight <= zero_weights[i];
-                    po2_negative_weight <= negative_weights[i];
-                    po2_log_2_weight <= log_2_weights[i];
+                    po2_inp[0] <= a[i];
+                    po2_inp[1] <= a[i+1];
+                    po2_zero_weight[0] <= zero_weights[i];
+                    po2_zero_weight[1] <= zero_weights[i+1];
+                    po2_negative_weight[0] <= negative_weights[i];
+                    po2_negative_weight[1] <= negative_weights[i+1];
+                    po2_log_2_weight[0] <= log_2_weights[i];
+                    po2_log_2_weight[1] <= log_2_weights[i+1];
                     state <= WAIT_FOR_MULT;
                 end
                 WAIT_FOR_MULT: begin
                     po2_rst <= 0;
-                    if (po2_result_v == 1) state <= ACCUMULATE;
+                    if (po2_result_v == '1) state <= ACCUMULATE;
                 end
                 ACCUMULATE: begin
-                    accumulator <= accumulator + po2_result;
-                    i <= i + 1;
-                    state <= (i == D-1) ? DONE : START_NEXT_MULT;
+                    accumulator <= accumulator + po2_result[0] + po2_result[1];
+                    i <= i + 2;
+                    state <= (i == D-2) ? DONE : START_NEXT_MULT;  // -2 for 2 dot products
                 end
                 DONE: begin
                     out <= accumulator;
