@@ -21,25 +21,11 @@ async def test_input_output(dut, input, expected_out, atol=1e-5):
     await RisingEdge(dut.clk)
 
     for i in range(100):
-
         print("===", i)
-        print("state", po2_dot_product_state_to_str[dut.state.value])
-
-        mN_states = [
-            dut.m0.state.value, dut.m1.state.value,
-            dut.m2.state.value, dut.m3.state.value]
-        print("dp_states", [po2_multiply_state_to_str[s] for s in mN_states])
-
-        print("result")
-        r = convert_dut_var(dut.result)
-        for e in r: print(e)
-
-        print("result_v", dut.result_v.value)
-
-        print("accumulators")
-        r = convert_dut_var(dut.accumulator)
-        for e in r: print(e)
-
+        print("state         ", po2_dot_product_state_to_str[dut.state.value])
+        print("po2 mult state", po2_multiply_state_to_str[dut.po2_mult.state.value])
+        print("i", dut.i.value)
+        print("accumulators", convert_dut_var(dut.accumulator))
         print("out   ", convert_dut_var(dut.out))
         print("out_v ", dut.out_v.value)
 

@@ -1,19 +1,19 @@
 set -ex
 
-export RUN=34_po2_regression_4d_8d
+export RUN=32_po2_regression_8d_16d
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
-export FILTER_D=4
-export FILTER_PO2_D=8
+export FILTER_D=8
+export FILTER_PO2_D=16
 
 [ ! -d runs/$RUN ] && mkdir runs/$RUN
 
-unset CUDA_VISIBLE_DEVICES
-time python3 -m qkeras_version.train \
- --run $RUN \
- --data-root-dir $DRD \
- --num-layers 3 --in-out-d 4 --filter-size $FILTER_D --po2-filter-size $FILTER_PO2_D \
- --num-train-egs 50000 --epochs 5 --learning-rate 1e-3 --l2 0.0001 \
- | tee runs/$RUN/qkeras_version.train.out
+# unset CUDA_VISIBLE_DEVICES
+# time python3 -m qkeras_version.train \
+#  --run $RUN \
+#  --data-root-dir $DRD \
+#  --num-layers 3 --in-out-d 4 --filter-size $FILTER_D --po2-filter-size $FILTER_PO2_D \
+#  --num-train-egs 50000 --epochs 5 --learning-rate 1e-3 --l2 0.0001 \
+#  | tee runs/$RUN/qkeras_version.train.out
 
 export CUDA_VISIBLE_DEVICES=""
 time python3 -m fxpmath_version.test \
@@ -27,13 +27,13 @@ time python3 -m fxpmath_version.test \
  > runs/$RUN/fxpmath_version.test.out
 unset CUDA_VISIBLE_DEVICES
 
-pushd sverilog_version/src
-[ -f network.sv ] && rm network.sv
-ln -s po2_network.sv network.sv
-popd
+# pushd sverilog_version/src
+# [ -f network.sv ] && rm network.sv
+# ln -s po2_network.sv network.sv
+# popd
 
-# # note: make files use FILTER_D & FILTER_PO2_D
-WAVE=sine ./run_make_network.sh
-WAVE=ramp ./run_make_network.sh
-WAVE=square ./run_make_network.sh
-WAVE=zigzag ./run_make_network.sh
+# # # note: make files use FILTER_D & FILTER_PO2_D
+# WAVE=sine ./run_make_network.sh
+# WAVE=ramp ./run_make_network.sh
+# WAVE=square ./run_make_network.sh
+# WAVE=zigzag ./run_make_network.sh

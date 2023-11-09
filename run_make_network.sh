@@ -26,7 +26,8 @@ make > $RUN_DIR/net.$WAVE.out
 popd
 
 # generate plot, TODO: put these onto one plot
-cat $RUN_DIR/net.$WAVE.out | grep "^OUT dec" | cut -f3,4 -d' ' | grep -v xxxx | uniq > /tmp/$$.y_pred.sverilog.$WAVE.ssv
-cut -f1 -d' ' /tmp/$$.y_pred.sverilog.$WAVE.ssv | ./plot.py --plot-png $RUN_DIR/verilog.y_pred.$WAVE.png
-# cut -f2 -d' ' /tmp/$$.y_pred.sverilog.$WAVE.ssv | ./plot.py --plot-png $RUN_DIR/verilog.ra.y_pred.$WAVE.png
+cat $RUN_DIR/net.$WAVE.out \
+ | grep "^OUT dec" | cut -f3 -d' ' | grep -v xxxx | uniq \
+ > /tmp/$$.y_pred.sverilog.$WAVE.ssv
+cat /tmp/$$.y_pred.sverilog.$WAVE.ssv | ./plot.py --plot-png $RUN_DIR/verilog.y_pred.$WAVE.png
 rm /tmp/$$.y_pred.sverilog.$WAVE.ssv

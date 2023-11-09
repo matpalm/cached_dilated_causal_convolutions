@@ -31,7 +31,6 @@ async def test_input_output(dut, input, expected_out):
         print("packed_a", dut.packed_a)
 
         print("col0 state", po2_dot_product_state_to_str[dut.col0.state.value])
-        print("col0 result", convert_dut_var(dut.col0.result))
         print("col0 accumulator", convert_dut_var(dut.col0.accumulator))
 
         for i, val in enumerate(convert_dut_var(dut.dp_N_out)):
