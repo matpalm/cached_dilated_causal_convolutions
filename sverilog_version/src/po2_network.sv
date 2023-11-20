@@ -1,5 +1,9 @@
 `default_nettype none
 
+// this version was developed to run only in simulation;
+// see https://github.com/matpalm/eurorack-pmod/blob/master/gateware/cores/po2_network.sv
+// for the slightly different version running on the actual eurorack-pmod / ecpix5 combination
+
 module network #(
     parameter W = 16,        // width for each element
     parameter FILTER_D,      // size of packed conv0 and conv2 filters
@@ -253,6 +257,10 @@ module network #(
     logic signed [2*W-1:0] n_output_ticks;
 
     logic prev_sample_clk;
+
+    // note this sample_clk and clk processing works in simulation
+    // but differs in the "real" version running on the eurorack pmod
+    // see https://github.com/matpalm/eurorack-pmod/blob/master/gateware/cores/po2_network.sv
 
     always @(posedge sample_clk) begin
         // start forward pass of network

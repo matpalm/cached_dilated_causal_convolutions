@@ -211,6 +211,10 @@ module network #(
 
     logic prev_sample_clk;
 
+    // note this sample_clk and clk processing works in simulation
+    // but differs in the "real" version running on the eurorack pmod
+    // see https://github.com/matpalm/eurorack-pmod/blob/master/gateware/cores/qb_network.sv
+
     always @(posedge sample_clk) begin
         // start forward pass of network
         state <= CLK_LSB;
