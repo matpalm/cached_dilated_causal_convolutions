@@ -44,7 +44,10 @@ module network #(
 
     //--------------------------------
     // left shift buffers
-    // TOOD: pack these too
+    // the first layer of the network takes as input the 4 sample_in values for this sample_clk
+    // as well as the 4 values one, two and three sample_clk agos
+    // TOOD: we are maintaining 3 left shift buffers and then packing their output, but
+    //       we could instead pack _first_ and then only have one left shift buffer.
 
     reg signed [W-1:0] shifted_sample_in0;
     reg signed [W-1:0] shifted_sample_in1;
@@ -52,7 +55,8 @@ module network #(
     reg signed [W-1:0] shifted_sample_in3;
 
     // NOTE: not shifted for cocotb version, but >>>2 shifted for eurorack pmod
-    // check jack and if not plugged emit 0x8300 -32000, => -1 in embed space
+    // TODO: check jack and if not plugged emit 0x8300 -32000, => -1 in embed space
+    // for this model we don't use input3, training network always assumed a value of 0
     assign shifted_sample_in0 = sample_in0;
     assign shifted_sample_in1 = sample_in1;
     assign shifted_sample_in2 = sample_in2;
@@ -60,20 +64,20 @@ module network #(
 
     reg lsb_clk =0;
 
-    reg signed [W-1:0] lsb_out_in0_0;
-    reg signed [W-1:0] lsb_out_in0_1;
-    reg signed [W-1:0] lsb_out_in0_2;
-    reg signed [W-1:0] lsb_out_in0_3;
+    reg signed [W-1:0] lsb_out_in0_0; // sample_in0 value, 3 sample_clks ago
+    reg signed [W-1:0] lsb_out_in0_1; // sample_in0 value, 2 sample_clks ago
+    reg signed [W-1:0] lsb_out_in0_2; // sample_in0 value, 1 sample_clk ago
+    reg signed [W-1:0] lsb_out_in0_3; // sample_in0 value, this sample_clk
 
     left_shift_buffer #(.W(W)) lsb_in0 (
         .clk(lsb_clk), .rst(rst),
         .inp(shifted_sample_in0),
         .out_0(lsb_out_in0_0), .out_1(lsb_out_in0_1), .out_2(lsb_out_in0_2), .out_3(lsb_out_in0_3)
     );
-    reg signed [W-1:0] lsb_out_in1_0;
-    reg signed [W-1:0] lsb_out_in1_1;
-    reg signed [W-1:0] lsb_out_in1_2;
-    reg signed [W-1:0] lsb_out_in1_3;
+    reg signed [W-1:0] lsb_out_in1_0; // sample_in1 value, 3 sample_clks ago
+    reg signed [W-1:0] lsb_out_in1_1; // sample_in1 value, 2 sample_clks ago
+    reg signed [W-1:0] lsb_out_in1_2; // sample_in1 value, 1 sample_clks ago
+    reg signed [W-1:0] lsb_out_in1_3; // sample_in1 value, this sample_clk
 
     left_shift_buffer #(.W(W)) lsb_in1 (
         .clk(lsb_clk), .rst(rst),
@@ -81,10 +85,10 @@ module network #(
         .out_0(lsb_out_in1_0), .out_1(lsb_out_in1_1), .out_2(lsb_out_in1_2), .out_3(lsb_out_in1_3)
     );
 
-    reg signed [W-1:0] lsb_out_in2_0;
-    reg signed [W-1:0] lsb_out_in2_1;
-    reg signed [W-1:0] lsb_out_in2_2;
-    reg signed [W-1:0] lsb_out_in2_3;
+    reg signed [W-1:0] lsb_out_in2_0; // sample_in2 value, 3 sample_clks ago
+    reg signed [W-1:0] lsb_out_in2_1; // sample_in2 value, 2 sample_clks ago
+    reg signed [W-1:0] lsb_out_in2_2; // sample_in2 value, 1 sample_clk ago
+    reg signed [W-1:0] lsb_out_in2_3; // sample_in2 value, this sample_clk
 
     left_shift_buffer #(.W(W)) lsb_in2 (
         .clk(lsb_clk), .rst(rst),
@@ -92,10 +96,10 @@ module network #(
         .out_0(lsb_out_in2_0), .out_1(lsb_out_in2_1), .out_2(lsb_out_in2_2), .out_3(lsb_out_in2_3)
     );
 
-    reg signed [W-1:0] lsb_out_in3_0;
-    reg signed [W-1:0] lsb_out_in3_1;
-    reg signed [W-1:0] lsb_out_in3_2;
-    reg signed [W-1:0] lsb_out_in3_3;
+    reg signed [W-1:0] lsb_out_in3_0; // sample_in3 value, 3 sample_clks ago
+    reg signed [W-1:0] lsb_out_in3_1; // sample_in3 value, 2 sample_clks ago
+    reg signed [W-1:0] lsb_out_in3_2; // sample_in3 value, 1 sample_clk ago
+    reg signed [W-1:0] lsb_out_in3_3; // sample_in3 value, this sample_clk
 
     left_shift_buffer #(.W(W)) lsb_in3 (
         .clk(lsb_clk), .rst(rst),
@@ -116,10 +120,10 @@ module network #(
     reg c0_out_v;
 
     // concat LSB elements into 4 packed values.
-    assign c0a0 = {lsb_out_in0_0, lsb_out_in1_0, lsb_out_in2_0, lsb_out_in3_0};
-    assign c0a1 = {lsb_out_in0_1, lsb_out_in1_1, lsb_out_in2_1, lsb_out_in3_1};
-    assign c0a2 = {lsb_out_in0_2, lsb_out_in1_2, lsb_out_in2_2, lsb_out_in3_2};
-    assign c0a3 = {lsb_out_in0_3, lsb_out_in1_3, lsb_out_in2_3, lsb_out_in3_3};
+    assign c0a0 = {lsb_out_in0_0, lsb_out_in1_0, lsb_out_in2_0, lsb_out_in3_0};  // sample_inN values 3 sample_clks ago
+    assign c0a1 = {lsb_out_in0_1, lsb_out_in1_1, lsb_out_in2_1, lsb_out_in3_1};  // sample_inN values 2 sample_clks ago
+    assign c0a2 = {lsb_out_in0_2, lsb_out_in1_2, lsb_out_in2_2, lsb_out_in3_2};  // sample_inN values 1 sample_clk ago
+    assign c0a3 = {lsb_out_in0_3, lsb_out_in1_3, lsb_out_in2_3, lsb_out_in3_3};  // sample_inN values this sample_clk
 
     conv1d #(.W(W), .IN_D(IN_OUT_D), .OUT_D(FILTER_D), .WEIGHTS("weights/qconv_0_qb")) conv0 (
         .clk(clk), .rst(c0_rst), .apply_relu(1'b1),
@@ -198,11 +202,6 @@ module network #(
     logic signed [W-1:0] out1;   // make reg for ra test
     logic signed [W-1:0] out2;
     logic signed [W-1:0] out3;
-
-    // // assign out1 to be a 64 windowed rolling average of out0
-    // rolling_average #(.W(W), .LEN(32)) out0_ra (
-    //     .clk(clk), .rst(rst), .inp(out0), .out(out1)
-    // );
 
     // keep timing of clk ticks vs num ticks in output
     // ( since output is the last state and implies head room )
