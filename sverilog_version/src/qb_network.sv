@@ -1,5 +1,9 @@
 `default_nettype none
 
+// this version was developed to run only in simulation;
+// see https://github.com/matpalm/eurorack-pmod/blob/master/gateware/cores/qb_network.sv
+// for the slightly different version running on the actual eurorack-pmod / ecpix5 combination
+
 module network #(
     parameter W = 16,        // width for each element
     parameter FILTER_D       // size of packed port arrays for filters
