@@ -72,13 +72,10 @@ class FxpUtil(object):
             return int(n)
 
     def fixed_point_to_decimal(self, fixed_point_binary):
-        # TODO! assumes FP 4/12. #lazy
-        assert self.n_int == 4
-        assert self.n_frac == 12
-        integer_bits = fixed_point_binary >> 12
+        integer_bits = fixed_point_binary >> self.n_frac
         integer_value = self._twos_comp_to_signed(integer_bits)
-        fractional_bits = fixed_point_binary & 0xFFF
-        fractional_value = fractional_bits / float(2**12)
+        fractional_bits = fixed_point_binary & (1<<self.n_frac)-1
+        fractional_value = fractional_bits / float(2**self.n_frac)
         return integer_value + fractional_value
 
 def ensure_dir_exists(d):
