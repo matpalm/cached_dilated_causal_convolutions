@@ -1,6 +1,6 @@
 set -ex
 
-export RUN=32_qb_regression_4d
+export RUN=50_amaranth_poc1
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
 export FILTER_D=4
 
@@ -26,13 +26,14 @@ time python3 -m fxpmath_version.test \
  | tee runs/$RUN/fxpmath_version.test.out
 unset CUDA_VISIBLE_DEVICES
 
-pushd sverilog_version/src
-[ -f network.sv ] && rm network.sv
-ln -s qb_network.sv network.sv
-popd
+# don't need anything here...
+# pushd sverilog_version/src
+# [ -f network.sv ] && rm network.sv
+# ln -s qb_network.sv network.sv
+# popd
 
-# note: make files use FILTER_D
-WAVE=sine ./run_make_network.sh
-WAVE=ramp ./run_make_network.sh
-WAVE=square ./run_make_network.sh
-WAVE=zigzag ./run_make_network.sh
+# # note: make files use FILTER_D
+# WAVE=sine ./run_make_network.sh
+# WAVE=ramp ./run_make_network.sh
+# WAVE=square ./run_make_network.sh
+# WAVE=zigzag ./run_make_network.sh
