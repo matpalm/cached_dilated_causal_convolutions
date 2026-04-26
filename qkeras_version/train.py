@@ -1,10 +1,9 @@
-
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 import pickle, os, json, contextlib
 
-#from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
+# from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 
 from qkeras.utils import model_save_quantized_weights
@@ -23,6 +22,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-layers', type=int, default=4)
     parser.add_argument('--l2', type=float, default=0.0)
+    parser.add_argument("--n-int", type=int, default=4)
+    parser.add_argument("--n-frac", type=int, default=12)
     parser.add_argument('--in-out-d', type=int, default=4)
     parser.add_argument('--filter-size', type=int, required=True)
     parser.add_argument('--po2-filter-size', type=int, default=None)
@@ -57,13 +58,18 @@ if __name__ == '__main__':
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
     # construct model
-    builder = QKerasModelBuilder()
-    train_model = builder.create_dilated_model(TRAIN_SEQ_LEN,
-            in_out_d=opts.in_out_d,
-            num_layers=opts.num_layers,
-            filter_size=opts.filter_size,
-            po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
-            l2=opts.l2)
+    builder = QKerasModelBuilder(
+        n_int=opts.n_int,
+        n_frac=opts.n_frac,
+    )
+    train_model = builder.create_dilated_model(
+        TRAIN_SEQ_LEN,
+        in_out_d=opts.in_out_d,
+        num_layers=opts.num_layers,
+        filter_size=opts.filter_size,
+        po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
+        l2=opts.l2,
+    )
     train_model.summary()
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
         with contextlib.redirect_stdout(f):
@@ -124,4 +130,3 @@ if __name__ == '__main__':
                     callbacks=[tensorboard_cb, checkpoint_cb,
                                check_y_pred_cb, save_quantised_weights_cb], #, lr_cb],
                     epochs=opts.epochs)
-

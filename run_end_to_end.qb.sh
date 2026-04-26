@@ -1,6 +1,6 @@
 set -ex
 
-export RUN=32_qb_regression_4d_20260425
+export RUN=35_qb_FP4_12
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
 export FILTER_D=4
 
@@ -9,8 +9,9 @@ export FILTER_D=4
 time uv run -m qkeras_version.train \
  --run $RUN \
  --data-root-dir $DRD \
+ --n-int 4 --n-frac 12 \
  --num-layers 3 --in-out-d 4 --filter-size $FILTER_D \
- --num-train-egs 20000 --epochs 5 --learning-rate 1e-3 --l2 0.0001 \
+ --num-train-egs 20000 --epochs 10 --learning-rate 1e-3 --l2 0.0001 \
  | tee runs/$RUN/qkeras_version.train.out
 
 time uv run -m fxpmath_version.test \

@@ -8,25 +8,10 @@ from tensorflow.keras.models import Model
 from tensorflow.keras import regularizers
 from typing import List
 
-N_WORD = 16
-N_INT = 4
-N_FRAC = 12
-assert N_WORD == N_INT + N_FRAC
-
-# qkeras quantiser for all convolution kernels and biases
-def quantiser(po2=False):
-    if po2:
-        return quantized_po2(bits=N_WORD, max_value=1)
-    else:
-        return quantized_bits(bits=N_WORD, integer=N_INT, alpha=1)
-
-# qkeras quantiser for all convolution activations
-def quant_relu(po2=False):
-    if po2:
-        assert False, "never need to use this?"
-        return f"quantized_po2({N_WORD}, 1)"
-    else:
-        return f"quantized_relu({N_WORD},{N_INT})"
+# N_WORD = 16
+# N_INT = 4
+# N_FRAC = 12
+# assert N_WORD == N_INT + N_FRAC
 
 
 def masked_mse(receptive_field_size, filter_column_idx=None):
@@ -63,8 +48,26 @@ K = 4
 
 class QKerasModelBuilder(object):
 
-    def __init__(self):
+    def __init__(self, n_int: int, n_frac: int):
         self.layer_info = []
+        self.n_int = n_int
+        self.n_frac = n_frac
+        self.n_word = self.n_int + self.n_frac
+
+    # qkeras quantiser for all convolution kernels and biases
+    def quantiser(self, po2=False):
+        if po2:
+            return quantized_po2(bits=self.n_word, max_value=1)
+        else:
+            return quantized_bits(bits=self.n_word, integer=self.n_int, alpha=1)
+
+    # qkeras quantiser for all convolution activations
+    def quant_relu(self, po2=False):
+        if po2:
+            assert False, "never need to use this?"
+            return f"quantized_po2({self.n_word}, 1)"
+        else:
+            return f"quantized_relu({self.n_word},{self.n_int})"
 
     def add_quantized_bits_conv_block(
             self,
@@ -76,18 +79,23 @@ class QKerasModelBuilder(object):
         ):
 
         layer_id = f"qconv_{layer_number}_qb"
-        y_pred = QConv1D(name=layer_id,
-                        filters=out_filters,
-                        kernel_size=K, padding='causal',
-                        dilation_rate=K**layer_number,
-                        kernel_quantizer=quantiser(),
-                        bias_quantizer=quantiser(),
-                        kernel_regularizer=regularizers.L2(l2),
-                        bias_regularizer=regularizers.L2(l2))(inp)
+        y_pred = QConv1D(
+            name=layer_id,
+            filters=out_filters,
+            kernel_size=K,
+            padding="causal",
+            dilation_rate=K**layer_number,
+            kernel_quantizer=self.quantiser(),
+            bias_quantizer=self.quantiser(),
+            kernel_regularizer=regularizers.L2(l2),
+            bias_regularizer=regularizers.L2(l2),
+        )(inp)
         self.layer_info.append({'type': 'qb', 'id': layer_id})
 
         if relu:
-            y_pred = QActivation(quant_relu(), name=f"qrelu_{layer_number}")(y_pred)
+            y_pred = QActivation(self.quant_relu(), name=f"qrelu_{layer_number}")(
+                y_pred
+            )
             self.layer_info.append({'type': 'relu'})
 
         return y_pred
@@ -100,45 +108,55 @@ class QKerasModelBuilder(object):
             out_filters: int,
             po2_filters: int
         ):
-            # start with a _qb conv layer to handle the dilation
-            layer_id = f"qconv_{layer_number}_qb"
-            y_pred = QConv1D(name=layer_id,
-                            filters=out_filters,
-                            kernel_size=K, padding='causal',
-                            dilation_rate=K**layer_number,
-                            kernel_quantizer=quantiser(),
-                            bias_quantizer=quantiser(),
-                            kernel_regularizer=regularizers.L2(l2),
-                            bias_regularizer=regularizers.L2(l2))(inp)
-            self.layer_info.append({'type': 'qb', 'id': layer_id})
+        # start with a _qb conv layer to handle the dilation
+        layer_id = f"qconv_{layer_number}_qb"
+        y_pred = QConv1D(
+            name=layer_id,
+            filters=out_filters,
+            kernel_size=K,
+            padding="causal",
+            dilation_rate=K**layer_number,
+            kernel_quantizer=self.quantiser(),
+            bias_quantizer=self.quantiser(),
+            kernel_regularizer=regularizers.L2(l2),
+            bias_regularizer=regularizers.L2(l2),
+        )(inp)
+        self.layer_info.append({"type": "qb", "id": layer_id})
 
-            y_pred = QActivation(quant_relu(), name=f"qrelu_{layer_number}")(y_pred)
-            self.layer_info.append({'type': 'relu'})
+        y_pred = QActivation(self.quant_relu(), name=f"qrelu_{layer_number}")(y_pred)
+        self.layer_info.append({"type": "relu"})
 
-            # then a pair of 1x1 _po2 convs; expand to po2_filters, contract back to out_filters
-            for sublayer in [1, 2]:
+        # then a pair of 1x1 _po2 convs; expand to po2_filters, contract back to out_filters
+        for sublayer in [1, 2]:
 
-                layer_id = f"qconv_{layer_number}_{sublayer}a_po2"
-                y_pred = QConv1D(name=layer_id,
-                                filters=po2_filters,
-                                kernel_size=1, padding='valid',
-                                kernel_quantizer=quantiser(po2=True),
-                                bias_quantizer=quantiser())(y_pred)
-                self.layer_info.append({'type': 'po2', 'id': layer_id})
+            layer_id = f"qconv_{layer_number}_{sublayer}a_po2"
+            y_pred = QConv1D(
+                name=layer_id,
+                filters=po2_filters,
+                kernel_size=1,
+                padding="valid",
+                kernel_quantizer=self.quantiser(po2=True),
+                bias_quantizer=self.quantiser(),
+            )(y_pred)
+            self.layer_info.append({"type": "po2", "id": layer_id})
 
-                layer_id = f"qconv_{layer_number}_{sublayer}b_po2"
-                y_pred = QConv1D(name=layer_id,
-                                filters=out_filters,
-                                kernel_size=1, padding='valid',
-                                kernel_quantizer=quantiser(po2=True),
-                                bias_quantizer=quantiser())(y_pred)
-                self.layer_info.append({'type': 'po2', 'id': layer_id})
+            layer_id = f"qconv_{layer_number}_{sublayer}b_po2"
+            y_pred = QConv1D(
+                name=layer_id,
+                filters=out_filters,
+                kernel_size=1,
+                padding="valid",
+                kernel_quantizer=self.quantiser(po2=True),
+                bias_quantizer=self.quantiser(),
+            )(y_pred)
+            self.layer_info.append({"type": "po2", "id": layer_id})
 
-                y_pred = QActivation(quant_relu(), name=f"qrelu_{layer_number}_{sublayer}")(y_pred)
-                self.layer_info.append({'type': 'relu'})
+            y_pred = QActivation(
+                self.quant_relu(), name=f"qrelu_{layer_number}_{sublayer}"
+            )(y_pred)
+            self.layer_info.append({"type": "relu"})
 
-            return y_pred
-
+        return y_pred
 
     def create_dilated_model(
             self,
