@@ -1,55 +1,70 @@
 from pathlib import Path
 import sys
+import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from amaranth.sim import Simulator
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from amaranth_future import fixed
+
 from cdcc.left_shift_buffer import LeftShiftBuffer
+from cdcc import NNQ
 
 
-def test_left_shift_buffer():
-    dut = LeftShiftBuffer()
+class TestLeftShiftBuffer(unittest.TestCase):
 
-    ref = [[0 for _ in range(dut.OUT_D)] for _ in range(dut.K)]
+    def test_left_shift_buffer(self):
 
-    async def testbench(ctx):
-        ctx.set(dut.o.ready, 1)
+        dut = LeftShiftBuffer()
 
-        for i in range(10):
-            in_row = [i % 4, (i + 1) % 4, (i + 2) % 4, 0]
+        ref = [[0 for _ in range(dut.OUT_D)] for _ in range(dut.K)]
 
-            ctx.set(dut.i.valid, 1)
-            for d in range(dut.IN_D):
-                ctx.set(dut.i.payload[d], in_row[d])
+        async def testbench(ctx):
+            ctx.set(dut.o.ready, 1)
 
-            assert ctx.get(dut.i.ready) == 1
-            assert ctx.get(dut.o.valid) == 1
+            inputs = [
+                [0.11, 0.12, 0.13, 0],
+                [0.21, 0.22, 0.23, 0],
+                [0.31, 0.32, 0.33, 0],
+                [0.41, 0.42, 0.43, 0],
+                [0.51, 0.52, 0.53, 0],
+                [0.61, 0.62, 0.63, 0],
+            ]
 
-            await ctx.tick()
+            to_c = lambda v: fixed.Const(v, shape=NNQ)
+            inputs = [[to_c(v) for v in entry] for entry in inputs]
 
-            ref.pop(0)
-            ref.append(in_row)
+            for i, inp in enumerate(inputs):
 
-            for k in range(dut.K):
-                for d in range(dut.OUT_D):
-                    assert ctx.get(dut.o.payload[k][d]).as_float() == ref[k][d]
+                # set next input
+                ctx.set(dut.i.payload, inputs[i])
+                ctx.set(dut.i.valid, 1)
+                await ctx.tick()
 
-        ctx.set(dut.i.valid, 1)
-        for d in range(dut.IN_D):
-            ctx.set(dut.i.payload[d], 3)
+                # for first step we expect the first 3 elements to all
+                # be zero and the last element to be the latest input
+                if i == 0:
+                    for k in range(4):
+                        for out_d in range(4):
+                            actual = ctx.get(dut.o.payload[k][out_d]).as_float()
+                            if k != 3:
+                                expected = 0
+                            else:
+                                expected = inputs[i][out_d].as_float()
+                            self.assertEqual(actual, expected)
 
-        ctx.set(dut.o.ready, 0)
-        await ctx.tick()
+                # and by the time we get to last step we should see the last entry
+                # in the kernel be the most recent, and each other one lagging
+                if i == 5:
+                    for k in range(4):
+                        for out_d in range(4):
+                            actual = ctx.get(dut.o.payload[k][out_d]).as_float()
+                            expected = inputs[k + 2][out_d].as_float()
+                            self.assertEqual(actual, expected)
 
-        assert ctx.get(dut.i.ready) == 0
-        assert ctx.get(dut.o.valid) == 1
-
-        for k in range(dut.K):
-            for d in range(dut.OUT_D):
-                assert ctx.get(dut.o.payload[k][d]).as_float() == ref[k][d]
-
-    sim = Simulator(dut)
-    sim.add_clock(1e-6, domain="sync")
-    sim.add_testbench(testbench)
-    with sim.write_vcd(vcd_file=open("test_lsb.vcd", "w")):
-        sim.run()
+        sim = Simulator(dut)
+        sim.add_clock(1e-6, domain="sync")
+        sim.add_testbench(testbench)
+        with sim.write_vcd(vcd_file=open("test_lsb.vcd", "w")):
+            sim.run()
