@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-#from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 import tqdm
 import util
@@ -132,4 +131,3 @@ if opts.wave is None:
 else:
     assert opts.wave in waves
     process(opts.wave)
-

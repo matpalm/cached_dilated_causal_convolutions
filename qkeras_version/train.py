@@ -21,9 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning-rate', type=float, default=1e-3)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-layers', type=int, default=4)
-    parser.add_argument('--l2', type=float, default=0.0)
-    parser.add_argument("--n-int", type=int, default=4)
-    parser.add_argument("--n-frac", type=int, default=12)
+    parser.add_argument("--l2", type=float, default=0.0)
     parser.add_argument('--in-out-d', type=int, default=4)
     parser.add_argument('--filter-size', type=int, required=True)
     parser.add_argument('--po2-filter-size', type=int, default=None)
@@ -58,10 +56,7 @@ if __name__ == '__main__':
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
     # construct model
-    builder = QKerasModelBuilder(
-        n_int=opts.n_int,
-        n_frac=opts.n_frac,
-    )
+    builder = QKerasModelBuilder()
     train_model = builder.create_dilated_model(
         TRAIN_SEQ_LEN,
         in_out_d=opts.in_out_d,

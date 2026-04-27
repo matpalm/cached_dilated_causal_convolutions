@@ -17,9 +17,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
 parser.add_argument('--data-root-dir', type=str, required=True)
-parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
-parser.add_argument("--n-int", type=int, default=4)
-parser.add_argument("--n-frac", type=int, default=12)
+parser.add_argument("--data-rescaling-factor", type=float, default=1.953125)
 parser.add_argument('--num-layers', type=int, default=4)
 parser.add_argument('--filter-size', type=int, required=True)
 parser.add_argument('--po2-filter-size', type=int, default=None)
@@ -44,10 +42,7 @@ print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
 # construct model
-builder = QKerasModelBuilder(
-    n_int=opts.n_int,
-    n_frac=opts.n_frac,
-)
+builder = QKerasModelBuilder()
 test_model = builder.create_dilated_model(
     opts.test_seq_len,
     in_out_d=4,

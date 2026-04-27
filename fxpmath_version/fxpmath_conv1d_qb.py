@@ -29,7 +29,6 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         self.weights = weights
         self.biases = biases
 
-
         # keep count of stats of under/overflows w.r.t double to single precision
         # conversion. these are OK, but too many means something wrong
         self._num_underflows = 0
@@ -46,13 +45,11 @@ class FxpMathConv1DQuantisedBitsBlock(object):
             # keep accumulator double width. by dft a+b => +1 for int part
             self.fxp.resize_double_width(accumulator)
 
-
     def row_by_matrix_multiply(self, x, weights, accumulators):
         # this loop represents what could be in the state machine
         # but can be pipelined
         for column in range(self.out_d):
             self.dot_product(x, weights[column], accumulators[column])
-
 
     def apply(self, x):
 
@@ -115,7 +112,6 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         # return as np array,
         return np.array(accums[0])
 
-
     def num_underflows(self):
         return self._num_underflows
 
@@ -133,7 +129,9 @@ class FxpMathConv1DQuantisedBitsBlock(object):
             if w != float(w_fp):
                 raise Exception(f"??? value {k},{o},{i} ({w}) failed FP double check")
             hex_string_without_0x = w_fp.hex()[2:]
-            assert len(hex_string_without_0x) == 4
+            # assert (
+            #     len(hex_string_without_0x) == 4
+            # ), f"expected hex_string_without_0x len=4, but [{hex_string_without_0x}]"
             return hex_string_without_0x
 
         def double_width_hex_representation(w):
@@ -141,7 +139,9 @@ class FxpMathConv1DQuantisedBitsBlock(object):
             if w != float(w_fp):
                 raise Exception(f"??? value {k},{o},{i} ({w}) failed FP double check")
             hex_string_without_0x = w_fp.hex()[2:]
-            assert len(hex_string_without_0x) == 8
+            # assert (
+            #     len(hex_string_without_0x) == 8
+            # ), f"expected hex_string_without_0x len=8, but [{hex_string_without_0x}]"
             return hex_string_without_0x
 
         assert len(self.weights.shape) == 3

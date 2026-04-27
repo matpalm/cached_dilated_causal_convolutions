@@ -1,12 +1,12 @@
+import os
+from typing import List
+
 import tensorflow as tf
-
-import qkeras
-
 from tensorflow.keras.layers import Input
-from qkeras import quantized_bits, quantized_po2, QConv1D, QActivation
 from tensorflow.keras.models import Model
 from tensorflow.keras import regularizers
-from typing import List
+import qkeras
+from qkeras import quantized_bits, quantized_po2, QConv1D, QActivation
 
 # N_WORD = 16
 # N_INT = 4
@@ -48,10 +48,11 @@ K = 4
 
 class QKerasModelBuilder(object):
 
-    def __init__(self, n_int: int, n_frac: int):
+    def __init__(self):
         self.layer_info = []
-        self.n_int = n_int
-        self.n_frac = n_frac
+        self.n_int = int(os.getenv("N_INT", 4))
+        self.n_frac = int(os.getenv("N_FRAC", 12))
+        print(f"FP N_INT={self.n_int} N_FRAC={self.n_frac}")
         self.n_word = self.n_int + self.n_frac
 
     # qkeras quantiser for all convolution kernels and biases

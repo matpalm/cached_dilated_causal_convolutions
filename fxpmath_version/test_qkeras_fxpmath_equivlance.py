@@ -1,3 +1,5 @@
+import os
+
 import unittest
 
 import numpy as np
@@ -20,10 +22,9 @@ from .util import FxpUtil
 
 np.set_printoptions(precision=32)
 
-N_WORD = 16
-N_INT = 4
-N_FRAC = 12
-assert N_WORD == N_INT + N_FRAC
+N_INT = int(os.getenv("N_INT", 4))
+N_FRAC = int(os.getenv("N_FRAC", 12))
+N_WORD = N_INT + N_FRAC
 
 # convert a value to the target fixed point representation for
 # values or weights
@@ -94,7 +95,6 @@ def qkeras_custom_mse_equivalant(test_x, test_y, qkeras_model, custom_inference_
     mse_diff = abs(qkeras_mse - custom_mse)
     print("qkeras_mse ", qkeras_mse, "custom_mse", custom_mse, "=> mse diff", mse_diff)
     return mse_diff < atol
-
 
 
 class TestQKerasFxpMathEquivalance(unittest.TestCase):
