@@ -3,19 +3,16 @@ import sys
 
 from amaranth.sim import Simulator
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from amaranth_version.left_shift_buffer import LeftShiftBuffer
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from cdcc.left_shift_buffer import LeftShiftBuffer
 
 
-def test_left_shift_buffer_stream_interface_shifting():
+def test_left_shift_buffer():
     dut = LeftShiftBuffer()
-
-    sim = Simulator(dut)
-    sim.add_clock(83e-9, domain="sync")
 
     ref = [[0 for _ in range(dut.OUT_D)] for _ in range(dut.K)]
 
-    async def bench(ctx):
+    async def testbench(ctx):
         ctx.set(dut.o.ready, 1)
 
         for i in range(10):
@@ -51,5 +48,8 @@ def test_left_shift_buffer_stream_interface_shifting():
             for d in range(dut.OUT_D):
                 assert ctx.get(dut.o.payload[k][d]).as_float() == ref[k][d]
 
-    sim.add_testbench(bench)
-    sim.run()
+    sim = Simulator(dut)
+    sim.add_clock(1e-6, domain="sync")
+    sim.add_testbench(testbench)
+    with sim.write_vcd(vcd_file=open("test_lsb.vcd", "w")):
+        sim.run()
