@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import unittest
+import json
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -8,7 +9,7 @@ from amaranth.sim import Simulator
 
 from amaranth_future import fixed
 
-from cdcc import NNQ
+from cdcc import NNQ, parse_nnq
 from cdcc.dot_product import DotProduct
 
 
@@ -16,17 +17,12 @@ class TestDotProduct(unittest.TestCase):
 
     def test_dot_product_single_vector(self):
 
-        weights = [0.5, -0.24, 0.125, -0.4]
-        weights = [fixed.Const(w, shape=NNQ) for w in weights]
-
-        dut = DotProduct(weights)
+        dut = DotProduct([0.5, -0.25, 0.125, -0.5])
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
 
-            inp = [0.85, -0.5, 0.25, 0.125]
-            inp = [fixed.Const(v, shape=NNQ) for v in inp]
-            print("inp", [i.as_float() for i in inp])
+            inp = parse_nnq([0.5, 0.0, 0.25, 3.125], check_exact=True)
 
             ctx.set(dut.i.payload, inp)
             ctx.set(dut.i.valid, 1)
@@ -41,9 +37,9 @@ class TestDotProduct(unittest.TestCase):
             self.assertEqual(ctx.get(dut.o.valid), 1)
 
             actual = ctx.get(dut.o.payload).as_float()
-            print("actual", actual)
-            expected = sum(a.as_float() * b.as_float() for a, b in zip(inp, weights))
-            print("expected", expected)
+            expected = sum(
+                a.as_float() * b.as_float() for a, b in zip(inp, dut._weights)
+            )
             self.assertAlmostEqual(actual, expected)
 
             await ctx.tick()

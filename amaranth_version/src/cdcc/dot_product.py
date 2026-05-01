@@ -1,4 +1,4 @@
-from pathlib import Path
+import json
 
 from amaranth import Array, Module, Signal
 from amaranth.lib import data, stream, wiring
@@ -6,8 +6,7 @@ from amaranth.lib import data, stream, wiring
 from amaranth_future import fixed
 
 # from . import N_FRAC, N_INT, NNQ, NNQ_DW
-from . import NNQ, NNQ_DW
-
+from . import NNQ, NNQ_DW, parse_nnq
 
 class DotProduct(wiring.Component):
     """Compute dot product between input vector and fixed weights.
@@ -19,7 +18,7 @@ class DotProduct(wiring.Component):
     # OUT_Q = fixed.SQ(2 * N_INT, 2 * N_FRAC)
 
     def __init__(self, weights):
-        self._weights = self._load_weights(weights)
+        self._weights = self._parse_weights(weights)
         self.D = len(self._weights)
 
         if self.D == 0:
@@ -41,21 +40,13 @@ class DotProduct(wiring.Component):
             Signal(NNQ, name=f"a_{i}", init=0) for i in range(self.D)
         )
 
-    def _load_weights(self, weights):
-        loaded = []
-        if isinstance(weights, (str, Path)):
-            text = Path(weights).read_text().splitlines()
-            for line in text:
-                line = line.split("//", maxsplit=1)[0].strip()
-                if not line:
-                    continue
-                for token in line.split():
-                    raw = int(token, 16)
-                    loaded.append(NNQ.from_bits(raw))
-        else:
-            for value in weights:
-                loaded = [fixed.Const(w, shape=NNQ) for w in weights]
-        return Array(loaded)
+    def _parse_weights(self, weights):
+        if isinstance(weights, str):
+            with open(weights, "r") as w:
+                str_weights = json.load(w)
+            weights = map(float, str_weights)
+        fp_weights = parse_nnq(weights, check_exact=True)
+        return Array(fp_weights)
 
     def elaborate(self, platform):
         m = Module()
