@@ -15,8 +15,6 @@ class DotProduct(wiring.Component):
     in the SystemVerilog module.
     """
 
-    # OUT_Q = fixed.SQ(2 * N_INT, 2 * N_FRAC)
-
     def __init__(self, weights):
         self._weights = self._parse_weights(weights)
         self.D = len(self._weights)
@@ -31,11 +29,12 @@ class DotProduct(wiring.Component):
             }
         )
 
-        self._state = Signal(2, init=0)
         self._index = Signal(range(self.D + 1), init=0)
 
-        self._accumulator = Signal(NNQ_DW, init=0)
+        # latest element product and accumulator are double width
         self._product = Signal(NNQ_DW, init=0)
+        self._accumulator = Signal(NNQ_DW, init=0)
+
         self._a_values = Array(
             Signal(NNQ, name=f"a_{i}", init=0) for i in range(self.D)
         )
@@ -51,47 +50,39 @@ class DotProduct(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        STATE_IDLE = 0
-        STATE_MULTIPLY_ELEMENT = 1
-        STATE_DONE = 2
+        m.d.comb += self.o.payload.eq(self._accumulator + self._product)
 
-        m.d.comb += [
-            self.i.ready.eq(self._state == STATE_IDLE),
-            self.o.payload.eq(self._accumulator + self._product),
-            self.o.valid.eq(self._state == STATE_DONE),
-        ]
+        with m.FSM() as fsm:
 
-        with m.If(self._state == STATE_IDLE):
-            with m.If(self.i.valid & self.i.ready):
-                for j in range(self.D):
-                    m.d.sync += self._a_values[j].eq(self.i.payload[j])
+            with m.State("IDLE"):
+                m.d.comb += self.i.ready.eq(1)
+                with m.If(self.i.valid):
+                    for j in range(self.D):
+                        m.d.sync += self._a_values[j].eq(self.i.payload[j])
+                    m.d.sync += [
+                        self._accumulator.eq(0),
+                        self._product.eq(0),
+                        self._index.eq(0),
+                    ]
+                    m.next = "MULTIPLY_ELEMENT"
+
+            with m.State("MULTIPLY_ELEMENT"):
                 m.d.sync += [
-                    self._accumulator.eq(0),
-                    self._product.eq(0),
-                    self._index.eq(0),
-                    self._state.eq(STATE_MULTIPLY_ELEMENT),
+                    self._accumulator.eq(self._accumulator + self._product),
+                    self._product.eq(
+                        (
+                            NNQ(self._a_values[self._index])
+                            * NNQ(self._weights[self._index])
+                        ).as_value()
+                    ),
+                    self._index.eq(self._index + 1),
                 ]
+                with m.If(self._index == self.D - 1):
+                    m.next = "DONE"
 
-        with m.Elif(self._state == STATE_MULTIPLY_ELEMENT):
-
-            m.d.sync += [
-                self._accumulator.eq(self._accumulator + self._product),
-                self._product.eq(
-                    (
-                        NNQ(self._a_values[self._index])
-                        * NNQ(self._weights[self._index])
-                    ).as_value()
-                ),
-                self._index.eq(self._index + 1),
-            ]
-
-            with m.If(self._index == self.D - 1):
-                m.d.sync += self._state.eq(STATE_DONE)
-
-        with m.Elif(self._state == STATE_DONE):
-            with m.If(self.o.ready):
-                m.d.sync += [
-                    self._state.eq(STATE_IDLE),
-                ]
+            with m.State("DONE"):
+                m.d.comb += self.o.valid.eq(1)
+                with m.If(self.o.ready):
+                    m.next = "IDLE"
 
         return m
