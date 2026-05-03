@@ -34,7 +34,7 @@ class TestRowByMatrixMultiply(unittest.TestCase):
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
 
-            inp = parse_nnq([0.0, 0.0625, 0.0, 0.0], check_exact=True)
+            inp = parse_nnq([0.0, 0.0625, 0.0, 0.0])
 
             ctx.set(dut.i.payload, inp)
             ctx.set(dut.i.valid, 1)

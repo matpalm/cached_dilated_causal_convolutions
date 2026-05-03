@@ -29,10 +29,10 @@ class TestConv1d(unittest.TestCase):
             ctx.set(dut.o.ready, 1)
 
             inp = [
-                parse_nnq([0.5, 1.0, -2.0, 0.0, 0.0], check_exact=True),
-                parse_nnq([3.0, -1.0, 0.25, 0.0, 0.0], check_exact=True),
-                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0], check_exact=True),
-                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0], check_exact=True),
+                parse_nnq([0.5, 1.0, -2.0, 0.0, 0.0]),
+                parse_nnq([3.0, -1.0, 0.25, 0.0, 0.0]),
+                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0]),
+                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0]),
             ]
 
             ctx.set(dut.i.payload, inp)
@@ -75,10 +75,10 @@ class TestConv1d(unittest.TestCase):
             ctx.set(dut.o.ready, 1)
 
             inp = [
-                parse_nnq([0.5, 1.0, -2.0, 0.0, 0.0], check_exact=True),
-                parse_nnq([3.0, -1.0, 0.25, 0.0, 0.0], check_exact=True),
-                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0], check_exact=True),
-                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0], check_exact=True),
+                parse_nnq([0.5, 1.0, -2.0, 0.0, 0.0]),
+                parse_nnq([3.0, -1.0, 0.25, 0.0, 0.0]),
+                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0]),
+                parse_nnq([0.0, 0.0, 0.0, 0.0, 0.0]),
             ]
 
             ctx.set(dut.i.payload, inp)

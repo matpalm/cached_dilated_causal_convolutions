@@ -25,7 +25,7 @@ class TestDotProduct(unittest.TestCase):
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
 
-            inp = parse_nnq([0.5, 0.0, 0.25, 3.125], check_exact=True)
+            inp = parse_nnq([0.5, 0.0, 0.25, 3.125])
 
             ctx.set(dut.i.payload, inp)
             ctx.set(dut.i.valid, 1)
