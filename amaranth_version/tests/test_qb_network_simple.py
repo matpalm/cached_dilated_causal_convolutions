@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import unittest
+import pickle
 
 import numpy as np
 
@@ -65,3 +66,10 @@ class TestQbNetworkSimple(unittest.TestCase):
         sim.add_clock(1e-6, domain="sync")
         sim.add_testbench(testbench)
         sim.run()
+
+    def test_qkeras_parse(self):
+        with open("runs/41_tiliqua_1layer/weights/qkeras/latest.pkl", "rb") as f:
+            d = pickle.load(f)
+        weights, biases = d["qconv_0_qb"]["weights"]
+        for idx in np.ndindex(weights.shape):
+            print(idx, weights[idx], parse_nnq(float(weights[idx])))

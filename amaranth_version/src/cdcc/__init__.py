@@ -15,14 +15,18 @@ NNQ_DW = fixed.SQ(N_INT * 2, N_FRAC * 2)
 K = 4
 
 
-def parse_nnq(values: List[float]):
-    fp_values = [fixed.Const(v, shape=NNQ) for v in values]
-    for fpv, v in zip(fp_values, values):
+def parse_nnq(v):
+    try:
+        iterator = iter(v)
+    except TypeError:
+        fpv = fixed.Const(v, shape=NNQ)
         if fpv.as_float() != v:
             raise ValueError(
                 f"value {v} parsed to NNQ {fpv.as_float()} which isn't exact"
             )
-    return fp_values
+        return fpv
+    else:
+        return [parse_nnq(v) for v in iterator]
 
 
 # re-export core modules

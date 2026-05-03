@@ -22,7 +22,6 @@ class DotProduct(wiring.Component):
 
         self._np_weights = np_weights
         self._weights = Array(parse_nnq(np_weights))
-
         self.D = self._np_weights.shape[0]
 
         super().__init__(

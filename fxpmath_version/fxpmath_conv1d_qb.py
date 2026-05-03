@@ -122,6 +122,8 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         # export weights for this conv1d in format
         # for loading in verilog with $readmemh
 
+        print(">export_weights_for_verilog", root_dir)
+
         root_dir = root_dir + "/" + self.layer_name
 
         def single_width_hex_representation(w):

@@ -87,6 +87,11 @@ def ensure_dir_exists(d):
             # can happen as race condition
             pass
 
+
+def ensure_dir_exists_for_file(f):
+    ensure_dir_exists(os.path.dirname(os.path.abspath(f)))
+
+
 def nearest_log2_value_or_zero(v, atol=1e-5):
     try:
         if v == 0:
@@ -101,17 +106,3 @@ def nearest_log2_value_or_zero(v, atol=1e-5):
         return -rv if negative_v else rv
     except Exception as e:
         print(f"??? v={v} e={e}")
-
-if __name__ == '__main__':
-    fxp = FxpUtil()
-    a = fxp.single_width(1.224609375)
-    print("a", a, fxp.bits(a))
-
-    a = fxp.single_width(-1.224609375)
-    print("a", a, fxp.bits(a))
-
-    a = fxp.single_width(-1.224609375)
-    print("a", a, fxp.bits(a))
-
-    bin_str = 0b1111011000110100
-    print(bin_str, fxp.fixed_point_to_decimal(bin_str))

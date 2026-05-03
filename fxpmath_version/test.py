@@ -1,14 +1,19 @@
-from fxpmath_version.fxpmath_model import FxpModel
+import os
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 import tqdm
 import warnings
+import pickle
 import json
 
-import fxpmath_version.util
+from fxpmath_version.fxpmath_model import FxpModel
+from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
+from . import util
 
 import argparse
 parser = argparse.ArgumentParser(
@@ -41,8 +46,8 @@ fxp_model = FxpModel(
     verbose=opts.verbose)
 
 # export weights if requested
-if opts.write_verilog_weights is not None:
-    fxp_model.export_weights_for_verilog(root_dir=opts.write_verilog_weights)
+# if opts.write_verilog_weights is not None:
+#     fxp_model.export_weights_for_verilog(root_dir=opts.write_verilog_weights)
 
 print(f"|layers|={fxp_model.num_layers()} |dilated_layers|={fxp_model.num_dilated_layers()}")
 
@@ -60,6 +65,9 @@ data = Embed2DInterpolatedWaveFormData(
 
 fxp = util.FxpUtil()
 
+# None:
+#    util.ensure_dir_exists(opts.test_x_dir)
+
 def process(wave):
     print("running wave", wave)
 
@@ -68,21 +76,22 @@ def process(wave):
                         max_samples=1,
                         specific_wave=wave)
 
-    for x, y in test_ds:
-        x, y = x[0].numpy(), y[0].numpy()
+    for x, y_true in test_ds:
+        x, y_true = x[0].numpy(), y_true[0].numpy()
         assert x.shape == (opts.num_test_egs, fxp_model.in_dim), x.shape
-        assert y.shape == (opts.num_test_egs, fxp_model.in_dim), y.shape
+        assert y_true.shape == (opts.num_test_egs, fxp_model.in_dim), y_true.shape
         break
 
     # also write to file, if configured
-    test_x_hex_f = None
-    if opts.test_x_dir is not None:
-        util.ensure_dir_exists(opts.test_x_dir)
-        fname = f"{opts.test_x_dir}/test_x.{wave}.hex"
-        print("writing to", fname)
-        test_x_hex_f = open(fname, 'w')
-    else:
-        print("not writing test_x.W.hex")
+    # test_x_hex_f = None
+    # if opts.test_x_dir is not None:
+    #    util.ensure_dir_exists(opts.test_x_dir)
+    #    print("opts.test_x_dir", opts.test_x_dir)
+    #     fname = f"{opts.test_x_dir}/test_x.{wave}.hex"
+    #     # print("writing to", fname)
+    #     # test_x_hex_f = open(fname, 'w')
+    # else:
+    #     print("not writing test_x.W.hex")
 
     # run net
     y_pred = []
@@ -91,37 +100,51 @@ def process(wave):
         # run through model
         y_pred.append(fxp_model.predict(x[i]))
 
+        # write data suitable for amaranth test harness
+
         # also write to hex file suitable for verilog tb
         # in0 in1 in2 in3
-        if test_x_hex_f is not None:
-            hex_outputs = []
-            for j in range(3):
-                next_x_fp = fxp.single_width(x[i, j])
-                next_x_fp_bits = next_x_fp.bin()
-                next_x_fp_hex = f"0x{int(next_x_fp_bits, 2):04x}"
-                hex_outputs.append(next_x_fp_hex)
-            hex_outputs.append("0x0000")  # just for completeness of 4 inputs in general
-            print(" ".join(hex_outputs), file=test_x_hex_f)
+        # if test_x_hex_f is not None:
+        #     hex_outputs = []
+        #     for j in range(3):
+        #         next_x_fp = fxp.single_width(x[i, j])
+        #         next_x_fp_bits = next_x_fp.bin()
+        #         next_x_fp_hex = f"0x{int(next_x_fp_bits, 2):04x}"
+        #         hex_outputs.append(next_x_fp_hex)
+        #     hex_outputs.append("0x0000")  # just for completeness of 4 inputs in general
+        #     print(" ".join(hex_outputs), file=test_x_hex_f)
+    y_pred = np.stack(y_pred)
 
     print(wave, fxp_model.under_and_overflow_counts())
 
-    y_pred = np.stack(y_pred)
-
-    if test_x_hex_f is not None:
-        test_x_hex_f.close()
+    output_data_pkl_fname = os.path.join(opts.test_x_dir, wave, "x_yp_yt.pkl")
+    util.ensure_dir_exists_for_file(output_data_pkl_fname)
+    print(
+        "writing x",
+        x.shape,
+        "y_true",
+        y_true.shape,
+        "y_pred",
+        y_pred.shape,
+        "to",
+        output_data_pkl_fname,
+    )
+    with open(output_data_pkl_fname, "wb") as f:
+        result = {"x": x, "y_true": y_true, "y_pred": y_pred}
+        pickle.dump(result, f)
 
     # save plot
     df = pd.DataFrame()
-    df['y_pred'] = y_pred[:,0]
-    df['y_true'] = y[:,0]
+    df["y_pred"] = y_pred[:, 0]
+    df["y_true"] = y_true[:, 0]
     df['n'] = range(len(y_pred))
     wide_df = pd.melt(df, id_vars=['n'], value_vars=['y_pred', 'y_true'])
     with warnings.catch_warnings():
         warnings.simplefilter(action='ignore', category=FutureWarning)
         p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
         p.set(ylim=(-2, 2))
-        util.ensure_dir_exists(opts.plot_dir)
         plt_fname = f"{opts.plot_dir}/fxp_math.y_pred.{wave}.png"
+        util.ensure_dir_exists_for_file(plt_fname)
         print("saving plot to", plt_fname)
         plt.savefig(plt_fname)
         plt.clf()
