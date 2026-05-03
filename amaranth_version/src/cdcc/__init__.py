@@ -11,6 +11,8 @@ NNQ = fixed.SQ(N_INT, N_FRAC)
 # config for ( double width ) values across dot products and kernel sums
 NNQ_DW = fixed.SQ(N_INT * 2, N_FRAC * 2)
 
+# all kernels in the network have a kernel size of 4
+K = 4
 
 def parse_nnq(values: List[float], check_exact: bool = False):
     fp_values = [fixed.Const(v, shape=NNQ) for v in values]
@@ -25,3 +27,4 @@ def parse_nnq(values: List[float], check_exact: bool = False):
 
 # re-export core modules
 from .row_by_matrix_multiply import RowByMatrixMultiply
+from .conv1d import Conv1d

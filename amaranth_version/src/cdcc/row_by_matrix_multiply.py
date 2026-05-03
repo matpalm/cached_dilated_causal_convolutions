@@ -15,7 +15,7 @@ class RowByMatrixMultiply(wiring.Component):
 
         if len(np_weights.shape) != 2:
             raise Exception(
-                f"Expect RowByMatrixMultiply to be inited with (IN_OUT, IN_D) vector but received shape {np_weights.shape}"
+                f"Expect RowByMatrixMultiply to be inited with (OUT_D, IN_D) vector but received shape {np_weights.shape}"
             )
 
         self._np_weights = np_weights
