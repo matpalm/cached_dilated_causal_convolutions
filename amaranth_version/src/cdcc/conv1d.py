@@ -79,6 +79,8 @@ class Conv1d(wiring.Component):
 
         with m.FSM():
 
+            # TODO: do we need an IDLE state here? or is it just latency?
+
             with m.State("MAT_MUL_RUNNING"):
                 m.d.comb += [
                     accept_inputs.eq(1),
