@@ -21,9 +21,17 @@ if __name__ == '__main__':
     parser.add_argument('--learning-rate', type=float, default=1e-3)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--num-layers', type=int, default=4)
+    parser.add_argument(
+        "--receptive-field-size",
+        type=int,
+        default=None,
+        help="override RFS. if not set, use K^num_layers",
+    )
     parser.add_argument("--l2", type=float, default=0.0)
     parser.add_argument('--in-out-d', type=int, default=4)
-    parser.add_argument('--filter-size', type=int, required=True)
+    parser.add_argument(
+        "--filter-size", type=int, required=True, help="shared per layer"
+    )
     parser.add_argument('--po2-filter-size', type=int, default=None)
     parser.add_argument('--num-train-egs', type=int, default=200_000)
     parser.add_argument('--num-validate-egs', type=int, default=100)
@@ -32,7 +40,7 @@ if __name__ == '__main__':
     print("opts", opts)
 
     ensure_dir_exists(f"runs/{opts.run}/")
-    for w in ['keras', 'qkeras', 'verilog']:
+    for w in ["keras", "qkeras", "amaranth"]:
         ensure_dir_exists(f"runs/{opts.run}/weights/{w}")
 
     data = Embed2DInterpolatedWaveFormData(
@@ -42,13 +50,14 @@ if __name__ == '__main__':
         seed=456)
 
     # we only care about the loss of the _first_ element of the output
+    # TODO: for amaranth version we should include a final OUT_D=1 layer
     filter_column_idx = 0
 
     # all convolutions use K=4
     K = 4
 
     # note: kernel size and implied dilation rate always assumed K
-    RECEPTIVE_FIELD_SIZE = K**opts.num_layers
+    RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**opts.num_layers
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 10
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
@@ -62,7 +71,7 @@ if __name__ == '__main__':
         in_out_d=opts.in_out_d,
         num_layers=opts.num_layers,
         filter_size=opts.filter_size,
-        po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
+        # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
         l2=opts.l2,
     )
     train_model.summary()
@@ -73,8 +82,19 @@ if __name__ == '__main__':
         json.dump(builder.layer_info, f)
 
     # make tf datasets
-    train_ds = data.tf_dataset_for_split('train', TRAIN_SEQ_LEN, opts.num_train_egs)
-    validate_ds = data.tf_dataset_for_split('validate', TRAIN_SEQ_LEN, opts.num_validate_egs)
+    print("HACK interpolated_samples=False,  # normally True")
+    train_ds = data.tf_dataset_for_split(
+        "train",
+        TRAIN_SEQ_LEN,
+        opts.num_train_egs,
+        interpolated_samples=False,  # normally True
+    )
+    validate_ds = data.tf_dataset_for_split(
+        "validate",
+        TRAIN_SEQ_LEN,
+        opts.num_validate_egs,
+        interpolated_samples=False,  # normally True
+    )
 
     # construct some callbacks...
 

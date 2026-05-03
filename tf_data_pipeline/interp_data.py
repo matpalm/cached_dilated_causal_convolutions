@@ -148,13 +148,24 @@ class Embed2DInterpolatedWaveFormData(object):
                                self.tqzs_qz, self.tqzs_zs,
                                self.tzsr_zs, self.tzsr_sr ]
 
-    def tf_dataset_for_split(self, split, seq_len, max_samples, specific_wave=None):
+    def tf_dataset_for_split(
+        self,
+        split,
+        seq_len,
+        max_samples,
+        interpolated_samples: bool = True,
+        specific_wave: str = None,
+    ):
 
         if specific_wave is None:
             # all waves and interpolations
             sampled_ds = tf.data.Dataset.sample_from_datasets(
-                [wd.as_tf_dataset(seq_len, max_samples, interpolated_samples=True)
-                 for wd in self.all_wave_data]
+                [
+                    wd.as_tf_dataset(
+                        seq_len, max_samples, interpolated_samples=interpolated_samples
+                    )
+                    for wd in self.all_wave_data
+                ]
             )
         else:
             # just specific wave. assume that each of these is as good as their

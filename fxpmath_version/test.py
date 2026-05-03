@@ -5,9 +5,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 import tqdm
-import util
 import warnings
 import json
+
+import fxpmath_version.util
 
 import argparse
 parser = argparse.ArgumentParser(
@@ -30,6 +31,8 @@ print("opts", opts)
 # parse layer info
 with open(opts.layer_info, 'r') as f:
     layer_info = json.load(f)
+
+print("layer_info", layer_info)
 
 # run through fxp_model
 fxp_model = FxpModel(

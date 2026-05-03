@@ -160,13 +160,14 @@ class QKerasModelBuilder(object):
         return y_pred
 
     def create_dilated_model(
-            self,
-            seq_len: int,
-            in_out_d: int,
-            num_layers: int,
-            filter_size: int,
-            po2_filter_size: int,
-            l2: float=0.0):
+        self,
+        seq_len: int,
+        in_out_d: int,
+        num_layers: int,
+        filter_size: int,
+        # po2_filter_size: int,
+        l2: float = 0.0,
+    ):
         '''
         create a qkeras model with a stack of dilation 1d convolutions
 
@@ -180,29 +181,56 @@ class QKerasModelBuilder(object):
             qkeras model
         '''
 
-        assert num_layers == 3, "wip refactoring re: po2 layers"
-
         self.layer_info = []
 
         inp = Input((seq_len, in_out_d))
+        y_pred = inp
 
-        y_pred = self.add_quantized_bits_conv_block(inp, layer_number=0,
-            out_filters=filter_size, l2=l2, relu=True)
+        for layer_num in range(num_layers):
 
-        self.layer_info.append({'type': 'dilation', 'amount': K, 'depth': filter_size})
+            last_layer = layer_num == num_layers - 1
 
-        if po2_filter_size is None:
-            # LKG "standard" model
-            y_pred = self.add_quantized_bits_conv_block(y_pred, layer_number=1,
-                out_filters=filter_size, l2=l2, relu=True)
-        else:
-            # using po2
-            y_pred = self.add_quantized_po2_conv_block(y_pred, layer_number=1,
-                out_filters=filter_size, po2_filters=po2_filter_size, l2=l2)
+            y_pred = self.add_quantized_bits_conv_block(
+                y_pred,
+                layer_number=layer_num,
+                out_filters=in_out_d if last_layer else filter_size,
+                l2=l2,
+                relu=(not last_layer),
+            )
 
-        self.layer_info.append({'type': 'dilation', 'amount': K*K, 'depth': filter_size})
+            # first layer dilates K, second K^2, etc
+            # no dilation after last layer
+            if not last_layer:
+                self.layer_info.append(
+                    {
+                        "type": "dilation",
+                        "amount": K ** (layer_num + 1),
+                        "depth": filter_size,
+                    }
+                )
 
-        y_pred = self.add_quantized_bits_conv_block(y_pred, layer_number=2,
-            out_filters=in_out_d, l2=l2, relu=False)
+        # TODO: rewire in po2 stuff later
+        # if po2_filter_size is None:
+        # LKG "standard" model
+        # y_pred = self.add_quantized_bits_conv_block(
+        #     y_pred, layer_number=1, out_filters=filter_size, l2=l2, relu=True
+        # )
+        # else:
+        #     # using po2
+        #     y_pred = self.add_quantized_po2_conv_block(
+        #         y_pred,
+        #         layer_number=1,
+        #         out_filters=filter_size,
+        #         po2_filters=po2_filter_size,
+        #         l2=l2,
+        #     )
+        # self.layer_info.append(
+        #     {"type": "dilation", "amount": K * K, "depth": filter_size}
+        # )
+        # y_pred = self.add_quantized_bits_conv_block(
+        #     y_pred, layer_number=2, out_filters=in_out_d, l2=l2, relu=False
+        # )
+
+        print("layer_info", self.layer_info)
 
         return Model(inp, y_pred)
