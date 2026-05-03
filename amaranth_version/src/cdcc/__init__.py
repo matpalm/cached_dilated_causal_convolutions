@@ -28,3 +28,4 @@ def parse_nnq(values: List[float]):
 # re-export core modules
 from .row_by_matrix_multiply import RowByMatrixMultiply
 from .conv1d import Conv1d
+from .qb_network_simple import QbNetworkSimple
