@@ -3,11 +3,13 @@ import sys
 import unittest
 import json
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
 from amaranth.sim import Simulator
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
 from amaranth_future import fixed
+
+import numpy as np
 
 from cdcc import NNQ, parse_nnq
 from cdcc.dot_product import DotProduct
@@ -17,8 +19,7 @@ class TestDotProduct(unittest.TestCase):
 
     def test_dot_product_single_vector(self):
 
-        weights = [0.5, -0.25, 0.125, -0.5]
-
+        weights = np.array([0.5, -0.25, 0.125, -0.5])
         dut = DotProduct(weights)
 
         async def testbench(ctx):

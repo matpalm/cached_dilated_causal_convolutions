@@ -6,6 +6,8 @@ import tempfile
 
 from amaranth.sim import Simulator
 
+import numpy as np
+
 from cdcc import parse_nnq
 from cdcc.row_by_matrix_multiply import RowByMatrixMultiply
 
@@ -14,16 +16,18 @@ class TestRowByMatrixMultiply(unittest.TestCase):
 
     def test_row_by_matrix_multiply_single_vector(self):
 
-        weights = [
-            [-0.759765625, 0.599853515625, -0.158935546875, 1.0],
-            [1.0, 1.0, 1.0, 1.0],
-            [-0.759765625, 0.599853515625, -0.158935546875, 1.0],
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-        ]
+        weights = np.array(
+            [
+                [-0.759765625, 0.599853515625, -0.158935546875, 1.0],
+                [1.0, 1.0, 1.0, 1.0],
+                [-0.759765625, 0.599853515625, -0.158935546875, 1.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ]
+        )
 
         dut = RowByMatrixMultiply(weights)
 

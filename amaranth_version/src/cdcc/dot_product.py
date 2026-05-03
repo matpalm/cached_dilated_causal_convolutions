@@ -5,21 +5,25 @@ from amaranth.lib import data, stream, wiring
 
 from amaranth_future import fixed
 
+import numpy as np
+from numpy.typing import NDArray
+
 from . import NNQ, NNQ_DW, parse_nnq
 
+
 class DotProduct(wiring.Component):
-    """Compute dot product between input vector and fixed weights.
 
-    The implementation mirrors the staged multiply-accumulate behavior used
-    in the SystemVerilog module.
-    """
+    def __init__(self, np_weights: NDArray):
 
-    def __init__(self, weights):
-        self._weights = Array(parse_nnq(weights, check_exact=True))
-        self.D = len(self._weights)
+        if len(np_weights.shape) != 1:
+            raise Exception(
+                f"Expect DotProduct to be inited with (D,) vector but received shape {np_weights.shape}"
+            )
 
-        if self.D == 0:
-            raise ValueError("weights must contain at least one element")
+        self._np_weights = np_weights
+        self._weights = Array(parse_nnq(np_weights, check_exact=True))
+
+        self.D = self._np_weights.shape[0]
 
         super().__init__(
             {

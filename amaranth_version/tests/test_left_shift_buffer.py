@@ -2,10 +2,9 @@ from pathlib import Path
 import sys
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
 from amaranth.sim import Simulator
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from amaranth_future import fixed
 
 from cdcc.left_shift_buffer import LeftShiftBuffer

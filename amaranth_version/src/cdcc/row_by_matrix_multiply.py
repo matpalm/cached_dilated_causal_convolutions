@@ -10,22 +10,18 @@ from .dot_product import DotProduct
 
 
 class RowByMatrixMultiply(wiring.Component):
-    """Compute a matrix multiply for a single input row.
 
-    This composes one DotProduct per output column and mirrors the
-    SystemVerilog row_by_matrix_multiply wiring.
-    """
+    def __init__(self, np_weights):
 
-    def __init__(self, weights):
+        if len(np_weights.shape) != 2:
+            raise Exception(
+                f"Expect RowByMatrixMultiply to be inited with (IN_OUT, IN_D) vector but received shape {np_weights.shape}"
+            )
 
-        self._dot_products = [DotProduct(w) for w in weights]
+        self._np_weights = np_weights
+        self._dot_products = [DotProduct(w) for w in np_weights]
 
-        self.IN_D = self._dot_products[0].D
-        self.OUT_D = len(self._dot_products)
-
-        for dp in self._dot_products:
-            if dp.D != self.IN_D:
-                raise ValueError("all columns must have the same input depth")
+        self.OUT_D, self.IN_D = np_weights.shape
 
         super().__init__(
             {
