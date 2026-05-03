@@ -21,3 +21,7 @@ def parse_nnq(values: List[float], check_exact: bool = False):
                     f"value {v} parsed to NNQ {fpv.as_float()} which isn't exact"
                 )
     return fp_values
+
+
+# re-export core modules
+from .row_by_matrix_multiply import RowByMatrixMultiply

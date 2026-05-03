@@ -17,7 +17,9 @@ class TestDotProduct(unittest.TestCase):
 
     def test_dot_product_single_vector(self):
 
-        dut = DotProduct([0.5, -0.25, 0.125, -0.5])
+        weights = [0.5, -0.25, 0.125, -0.5]
+
+        dut = DotProduct(weights)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
@@ -37,10 +39,7 @@ class TestDotProduct(unittest.TestCase):
             self.assertEqual(ctx.get(dut.o.valid), 1)
 
             actual = ctx.get(dut.o.payload).as_float()
-            expected = sum(
-                a.as_float() * b.as_float() for a, b in zip(inp, dut._weights)
-            )
-            self.assertAlmostEqual(actual, expected)
+            self.assertAlmostEqual(actual, -1.28125)
 
             await ctx.tick()
             self.assertEqual(ctx.get(dut.o.valid), 0)

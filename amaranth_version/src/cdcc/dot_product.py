@@ -5,7 +5,6 @@ from amaranth.lib import data, stream, wiring
 
 from amaranth_future import fixed
 
-# from . import N_FRAC, N_INT, NNQ, NNQ_DW
 from . import NNQ, NNQ_DW, parse_nnq
 
 class DotProduct(wiring.Component):
@@ -16,7 +15,7 @@ class DotProduct(wiring.Component):
     """
 
     def __init__(self, weights):
-        self._weights = self._parse_weights(weights)
+        self._weights = Array(parse_nnq(weights, check_exact=True))
         self.D = len(self._weights)
 
         if self.D == 0:
@@ -38,14 +37,6 @@ class DotProduct(wiring.Component):
         self._a_values = Array(
             Signal(NNQ, name=f"a_{i}", init=0) for i in range(self.D)
         )
-
-    def _parse_weights(self, weights):
-        if isinstance(weights, str):
-            with open(weights, "r") as w:
-                str_weights = json.load(w)
-            weights = map(float, str_weights)
-        fp_weights = parse_nnq(weights, check_exact=True)
-        return Array(fp_weights)
 
     def elaborate(self, platform):
         m = Module()
