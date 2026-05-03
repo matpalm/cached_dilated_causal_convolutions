@@ -22,8 +22,9 @@ class TestConv1d(unittest.TestCase):
         weights[0, 0, 0] = 1.0
         weights[0, 1, 1] = -0.5
         weights[0, 2, 2] = -0.25
+        biases = np.array([-0.25, 0, 0])
 
-        dut = Conv1d(weights, apply_relu=False)
+        dut = Conv1d(weights, biases, apply_relu=True)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
@@ -47,7 +48,8 @@ class TestConv1d(unittest.TestCase):
 
             self.assertEqual(ctx.get(dut.o.valid), 1)
 
-            expected = [0.5, -0.5, 0.5]
+            # expected = [0.5, 0.0, 0.5]  # without bias
+            expected = [0.25, 0.0, 0.5]
             for j, expected_val in enumerate(expected):
                 actual = ctx.get(dut.o.payload[j]).as_float()
                 self.assertAlmostEqual(actual, expected_val)
@@ -67,8 +69,9 @@ class TestConv1d(unittest.TestCase):
         weights = np.zeros((N_KERNELS, OUT_D, IN_D))
         weights[0, 0, 0] = 0.25
         weights[0, 0, 1] = -0.5
+        biases = np.array([0])  # 0.5])
 
-        dut = Conv1d(weights, apply_relu=False)
+        dut = Conv1d(weights, biases, apply_relu=False)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
@@ -111,8 +114,9 @@ class TestConv1d(unittest.TestCase):
         weights[0, 0, 0] = 1.0
         weights[0, 1, 1] = -0.5
         weights[0, 2, 2] = -0.25
+        biases = np.array([0.25, -0.125, 0.5])
 
-        dut = Conv1d(weights, apply_relu=True)
+        dut = Conv1d(weights, biases, apply_relu=False)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
@@ -136,7 +140,8 @@ class TestConv1d(unittest.TestCase):
 
             self.assertEqual(ctx.get(dut.o.valid), 1)
 
-            expected = [0.5, 0.0, 0.5]
+            # expected = [0.5, 0.0, 0.5]  # no bias
+            expected = [0.75, -0.625, 1.0]
             for j, expected_val in enumerate(expected):
                 actual = ctx.get(dut.o.payload[j]).as_float()
                 self.assertAlmostEqual(actual, expected_val)

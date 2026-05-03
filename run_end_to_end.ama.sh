@@ -1,21 +1,23 @@
 set -ex
 
-export RUN=50_amaranth_poc1
+export RUN=41_tiliqua_1layer
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
-export FILTER_D=4
+export FILTER_D=8
+export N_INT=4
+export N_FRAC=12
 
 [ ! -d runs/$RUN ] && mkdir runs/$RUN
 
-unset CUDA_VISIBLE_DEVICES
-time python3 -m qkeras_version.train \
- --run $RUN \
- --data-root-dir $DRD \
- --num-layers 3 --in-out-d 4 --filter-size $FILTER_D \
- --num-train-egs 20000 --epochs 5 --learning-rate 1e-3 --l2 0.0001 \
- | tee runs/$RUN/qkeras_version.train.out
+# TODO: we should train with fp32 first and then treat the qkeras model as fine tuning
+# time uv run -m qkeras_version.train \
+#  --run $RUN \
+#  --data-root-dir $DRD \
+#  --receptive-field-size 64 \
+#  --num-layers 1 --in-out-d 4 --filter-size $FILTER_D \
+#  --num-train-egs 20000 --epochs 10 --learning-rate 1e-3 --l2 0.0001 \
+#  | tee runs/$RUN/qkeras_version.train.out
 
-export CUDA_VISIBLE_DEVICES=""
-time python3 -m fxpmath_version.test \
+time uv run -m fxpmath_version.test \
  --data-root-dir $DRD \
  --load-weights runs/$RUN/weights/qkeras/latest.pkl \
  --layer-info runs/$RUN/qkeras_model.layer_info.json \
@@ -24,7 +26,6 @@ time python3 -m fxpmath_version.test \
  --write-verilog-weights runs/$RUN/weights/verilog/latest \
  --num-test-egs 300 \
  | tee runs/$RUN/fxpmath_version.test.out
-unset CUDA_VISIBLE_DEVICES
 
 # don't need anything here...
 # pushd sverilog_version/src

@@ -15,21 +15,23 @@ NNQ_DW = fixed.SQ(N_INT * 2, N_FRAC * 2)
 K = 4
 
 
-def parse_nnq(v):
+def parse_nnq(v, assert_exact: bool = True):
     try:
         iterator = iter(v)
     except TypeError:
+        v = float(v)
         fpv = fixed.Const(v, shape=NNQ)
-        if fpv.as_float() != v:
+        if assert_exact and fpv.as_float() != v:
             raise ValueError(
                 f"value {v} parsed to NNQ {fpv.as_float()} which isn't exact"
             )
         return fpv
     else:
-        return [parse_nnq(v) for v in iterator]
+        return [parse_nnq(v, assert_exact) for v in iterator]
 
 
 # re-export core modules
 from .row_by_matrix_multiply import RowByMatrixMultiply
 from .conv1d import Conv1d
 from .qb_network_simple import QbNetworkSimple
+from .activation_cache import ActivationCache

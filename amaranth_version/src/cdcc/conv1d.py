@@ -1,25 +1,27 @@
 from amaranth import Array, Module, Mux, Signal
 from amaranth.lib import data, stream, wiring
-
 import numpy as np
 from numpy.typing import NDArray
-
 from amaranth_future import fixed
 
-from . import NNQ, NNQ_DW, K
+from . import NNQ, NNQ_DW, K, parse_nnq
 from .row_by_matrix_multiply import RowByMatrixMultiply
 
 
 class Conv1d(wiring.Component):
 
-    def __init__(self, np_weights: NDArray, apply_relu: bool = False):
+    def __init__(
+        self,
+        np_weights: NDArray,
+        np_bias: NDArray,
+        apply_relu: bool = False,
+    ):
         if len(np_weights.shape) != 3:
             raise Exception(
                 "Expect Conv1d weights with shape (NUM_KERNELS, OUT_D, IN_D) "
                 f"but received {np_weights.shape}"
             )
 
-        self._np_weights = np_weights
         num_kernels, self.OUT_D, self.IN_D = np_weights.shape
 
         if num_kernels != K:
@@ -27,9 +29,11 @@ class Conv1d(wiring.Component):
                 f"Expect Conv1d weights first axis to be {K} but received {np_weights.shape[0]}"
             )
 
-        self._apply_relu = apply_relu
-
-        self._kernels = [RowByMatrixMultiply(np_weights[k]) for k in range(K)]
+        if len(np_bias.shape) != 1 or np_bias.shape[0] != self.OUT_D:
+            raise Exception(
+                f"Expect Conv1d bias with shape ({self.OUT_D},) "
+                f"but received {np_bias.shape}"
+            )
 
         super().__init__(
             {
@@ -41,6 +45,10 @@ class Conv1d(wiring.Component):
                 "o": wiring.Out(stream.Signature(data.ArrayLayout(NNQ, self.OUT_D))),
             }
         )
+
+        self._kernels = [RowByMatrixMultiply(np_weights[k]) for k in range(K)]
+        self._bias = Array(parse_nnq(np_bias))
+        self._apply_relu = apply_relu
 
         self._accum = Array(
             Signal(NNQ_DW, name=f"conv_accum_{i}", init=0) for i in range(self.OUT_D)
@@ -94,10 +102,12 @@ class Conv1d(wiring.Component):
                             + self._kernels[1].o.payload[i]
                             + self._kernels[2].o.payload[i]
                             + self._kernels[3].o.payload[i]
+                            + self._bias[i]
                         )
                     m.next = "CLIP_LOWER"
 
             with m.State("CLIP_LOWER"):
+                # TODO: combine CLIP_LOWER and _UPPER?
                 for i in range(self.OUT_D):
                     m.d.sync += self._accum[i].eq(
                         Mux(

@@ -8,16 +8,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from amaranth_future import fixed
 
 from cdcc.left_shift_buffer import LeftShiftBuffer
-from cdcc import NNQ
-
+from cdcc import NNQ, parse_nnq
 
 class TestLeftShiftBuffer(unittest.TestCase):
 
     def test_left_shift_buffer(self):
 
         dut = LeftShiftBuffer()
-
-        ref = [[0 for _ in range(dut.OUT_D)] for _ in range(dut.K)]
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
@@ -30,9 +27,7 @@ class TestLeftShiftBuffer(unittest.TestCase):
                 [0.51, 0.52, 0.53, 0],
                 [0.61, 0.62, 0.63, 0],
             ]
-
-            to_c = lambda v: fixed.Const(v, shape=NNQ)
-            inputs = [[to_c(v) for v in entry] for entry in inputs]
+            inputs = parse_nnq(inputs, assert_exact=False)
 
             for i, inp in enumerate(inputs):
 

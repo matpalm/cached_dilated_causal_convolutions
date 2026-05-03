@@ -2,9 +2,7 @@ import json
 
 from amaranth import Array, Module, Signal
 from amaranth.lib import data, stream, wiring
-
 from amaranth_future import fixed
-
 import numpy as np
 from numpy.typing import NDArray
 
@@ -20,9 +18,7 @@ class DotProduct(wiring.Component):
                 f"Expect DotProduct to be inited with (D,) vector but received shape {np_weights.shape}"
             )
 
-        self._np_weights = np_weights
-        self._weights = Array(parse_nnq(np_weights))
-        self.D = self._np_weights.shape[0]
+        self.D = np_weights.shape[0]
 
         super().__init__(
             {
@@ -30,6 +26,8 @@ class DotProduct(wiring.Component):
                 "o": wiring.Out(stream.Signature(NNQ_DW)),
             }
         )
+
+        self._weights = Array(parse_nnq(np_weights))
 
         self._index = Signal(range(self.D + 1), init=0)
 
