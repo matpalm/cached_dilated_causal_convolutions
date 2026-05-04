@@ -47,7 +47,10 @@ class LeftShiftBuffer(wiring.Component):
                 m.d.sync += self.buffer[k].eq(self.buffer[k + 1])
             m.d.sync += self.buffer[self.K - 1].eq(self.i.payload)
 
-        for k in range(self.K):
-            m.d.comb += self.o.payload[k].eq(self.buffer[k])
+        # Match fxpmath buffer semantics: emit the current input on the
+        # newest tap of the output window in the same accepted beat.
+        for k in range(self.K - 1):
+            m.d.comb += self.o.payload[k].eq(self.buffer[k + 1])
+        m.d.comb += self.o.payload[self.K - 1].eq(self.i.payload)
 
         return m

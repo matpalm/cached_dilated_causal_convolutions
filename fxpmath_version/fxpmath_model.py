@@ -1,4 +1,3 @@
-
 import pickle
 import numpy as np
 
@@ -93,13 +92,18 @@ class FxpModel(object):
         for info in layer_info:
             if info['type'] == 'qb':
                 layer_id = info['id']
+                w = self.weights[layer_id]["weights"][0]
+                b = self.weights[layer_id]["weights"][1]
+                print(
+                    f">FxpMathConv1DQuantisedBitsBlock layer_id={layer_id} w {w.shape} b {b.shape}"
+                )
                 next_layer = FxpMathConv1DQuantisedBitsBlock(
                     self.fxp,
                     layer_name=layer_id,
-                    weights=self.weights[layer_id]['weights'][0],
-                    biases=self.weights[layer_id]['weights'][1],
-                    verbose=self.verbose
-                    )
+                    weights=self.weights[layer_id]["weights"][0],
+                    biases=self.weights[layer_id]["weights"][1],
+                    verbose=self.verbose,
+                )
             elif info['type'] == 'po2':
                 layer_id = info['id']
                 next_layer = FxpMathConv1DPO2Block(
@@ -161,9 +165,9 @@ class FxpModel(object):
         for layer in self.layers:
             if self.verbose: print("running layer", layer)
             y_pred = layer.apply(y_pred)
-            if self.verbose: print("result ", list(y_pred))
+            if self.verbose:
+                print("result ", y_pred)
 
-        if self.verbose: print("y_pred", list(y_pred))
         return y_pred
 
     def export_weights_for_verilog(self, root_dir):

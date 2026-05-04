@@ -1,5 +1,7 @@
 set -ex
 
+exit("see .ama.sh")
+
 export RUN=41_tiliqua_1layer
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
 export FILTER_D=8

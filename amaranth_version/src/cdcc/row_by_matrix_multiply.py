@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import tempfile
+from numpy.typing import NDArray
 
 from amaranth import Module
 from amaranth.lib import data, stream, wiring
@@ -10,18 +11,29 @@ from .dot_product import DotProduct
 
 
 class RowByMatrixMultiply(wiring.Component):
+    """Row by Matrix Multiply.
 
-    def __init__(self, np_weights):
+    multiples vector (IN_D) by weights of (OUT_D, IN_D)
+    resulting in output (OUT_D)
+    does each column of weights in parallel.
+    """
 
+    def __init__(self, np_weights: NDArray):
+        """
+        Args:
+            np_weights  (IN_D, OUT_D)
+        """
         if len(np_weights.shape) != 2:
             raise Exception(
                 f"Expect RowByMatrixMultiply to be inited with (OUT_D, IN_D) vector but received shape {np_weights.shape}"
             )
 
-        self._np_weights = np_weights
-        self._dot_products = [DotProduct(w) for w in np_weights]
+        self.IN_D, self.OUT_D = np_weights.shape
 
-        self.OUT_D, self.IN_D = np_weights.shape
+        # we do mults per column, so transpose here from (IN_D, OUT_D)
+        # to (OUT_D, IN_D) to parallelise over columns
+        self._np_weights = np_weights.T
+        self._col_dot_products = [DotProduct(w) for w in self._np_weights]
 
         super().__init__(
             {
@@ -36,7 +48,7 @@ class RowByMatrixMultiply(wiring.Component):
         all_cols_ready = 1
         all_cols_valid = 1
 
-        for j, dp in enumerate(self._dot_products):
+        for j, dp in enumerate(self._col_dot_products):
             m.submodules[f"col{j:02d}"] = dp
 
             m.d.comb += [

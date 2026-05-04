@@ -1,6 +1,6 @@
 set -ex
 
-export RUN=41_tiliqua_1layer
+export RUN=42_tiliqua_2layer
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
 export FILTER_D=8
 export N_INT=4
@@ -8,12 +8,11 @@ export N_FRAC=12
 
 [ ! -d runs/$RUN ] && mkdir runs/$RUN
 
-# TODO: we should train with fp32 first and then treat the qkeras model as fine tuning
 # time uv run -m qkeras_version.train \
 #  --run $RUN \
 #  --data-root-dir $DRD \
 #  --receptive-field-size 64 \
-#  --num-layers 1 --in-out-d 4 --filter-size $FILTER_D \
+#  --num-layers 2 --in-out-d 4 --filter-size $FILTER_D \
 #  --num-train-egs 20000 --epochs 10 --learning-rate 1e-3 --l2 0.0001 \
 #  | tee runs/$RUN/qkeras_version.train.out
 
@@ -23,7 +22,6 @@ time uv run -m fxpmath_version.test \
  --layer-info runs/$RUN/qkeras_model.layer_info.json \
  --test-x-dir runs/$RUN/test_x_files/ \
  --plot-dir runs/$RUN/ \
- --write-verilog-weights runs/$RUN/weights/verilog/latest \
  --num-test-egs 300 \
  | tee runs/$RUN/fxpmath_version.test.out
 

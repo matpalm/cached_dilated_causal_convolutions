@@ -77,7 +77,7 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         if self.verbose:
             print("row_by_matrix_multiply inputs")
             for i in range(self.K):
-                print(f"cNaI i={i} {x[i].shape} {x[i]}")
+                print(f"cNaI i={i} {x[i].shape} {x[i].tolist()}")
 
         # run each kernel; can be in parallel
         for i in range(self.K):

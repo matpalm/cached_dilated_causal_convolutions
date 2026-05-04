@@ -9,7 +9,7 @@ class ActivationCache(wiring.Component):
 
     def __init__(self, in_out_d: int, dilation_level: int):
         if dilation_level < 1:
-            raise ValueError(f"dilation_level must be >=1 , received {dilation}")
+            raise ValueError(f"dilation_level must be >=1, received {dilation_level}")
 
         self.in_out_d = in_out_d
 

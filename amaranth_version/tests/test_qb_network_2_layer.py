@@ -14,70 +14,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from amaranth.sim import Simulator
 
 from cdcc import parse_nnq
-from cdcc.qb_network_simple import QbNetworkSimple, build_network
+from cdcc.qb_network_2_layer import QbNetworkTwoLayer
 
-class TestQbNetworkSimple(unittest.TestCase):
 
-    def test_lsb_then_conv1d_single_output(self):
-        K, OUT_D, IN_D = 4, 4, 4
-        weights = np.zeros((K, OUT_D, IN_D))
-        biases = np.zeros((OUT_D,))
+class TestQbNetworkTwoLayer(unittest.TestCase):
 
-        # kernel index 3 corresponds to the current sample in the left-shift window
-        weights[3, 0, 0] = 1.0
+    def test_fxp_math_equiv(self):
+        trained_weights = "runs/42_tiliqua_2layer/weights/qkeras/latest.pkl"
+        test_data = "runs/42_tiliqua_2layer/test_x_files/sine/x_yp_yt.pkl"
 
-        dut = QbNetworkSimple(weights, biases)
-
-        async def testbench(ctx):
-            ctx.set(dut.o.ready, 1)
-
-            inp = parse_nnq([1.5, 0.0, 0.0, 0.0])
-            zero_inp = parse_nnq([0.0, 0.0, 0.0, 0.0])
-
-            # First transaction primes the left-shift buffer.
-            ctx.set(dut.i.payload, inp)
-            ctx.set(dut.i.valid, 1)
-            await ctx.tick()
-            ctx.set(dut.i.valid, 0)
-
-            for _ in range(24):
-                if ctx.get(dut.o.valid):
-                    break
-                await ctx.tick()
-
-            self.assertEqual(ctx.get(dut.o.valid), 1)
-            self.assertAlmostEqual(ctx.get(dut.o.payload).as_float(), 0.0)
-
-            await ctx.tick()
-            self.assertEqual(ctx.get(dut.o.valid), 0)
-
-            # Second transaction makes Conv1d consume the primed window.
-            ctx.set(dut.i.payload, zero_inp)
-            ctx.set(dut.i.valid, 1)
-            await ctx.tick()
-            ctx.set(dut.i.valid, 0)
-
-            for _ in range(24):
-                if ctx.get(dut.o.valid):
-                    break
-                await ctx.tick()
-
-            self.assertEqual(ctx.get(dut.o.valid), 1)
-            self.assertAlmostEqual(ctx.get(dut.o.payload).as_float(), 1.5)
-
-            await ctx.tick()
-            self.assertEqual(ctx.get(dut.o.valid), 0)
-
-        sim = Simulator(dut)
-        sim.add_clock(1e-6, domain="sync")
-        sim.add_testbench(testbench)
-        sim.run()
-
-    def test_with_real_weights(self):
-        trained_weights = "runs/41_tiliqua_1layer/weights/qkeras/latest.pkl"
-        test_data = "runs/41_tiliqua_1layer/test_x_files/sine/x_yp_yt.pkl"
-
-        dut = build_network(trained_weights)
+        dut = QbNetworkTwoLayer.build(trained_weights)
 
         with open(test_data, "rb") as f:
             data = pickle.load(f)
@@ -142,7 +88,7 @@ class TestQbNetworkSimple(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter(action="ignore", category=FutureWarning)
             p = sns.lineplot(wide_df, x="n", y="value", hue="variable")
-            p.set(ylim=(-2, 2))
+            # p.set(ylim=(-2, 2))
             plt_fname = "foo.png"  # f"{opts.plot_dir}/fxp_math.y_pred.{wave}.png"
             print("saving plot to", plt_fname)
             plt.savefig(plt_fname)

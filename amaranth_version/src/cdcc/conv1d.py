@@ -13,26 +13,40 @@ class Conv1d(wiring.Component):
     def __init__(
         self,
         np_weights: NDArray,
-        np_bias: NDArray,
-        apply_relu: bool = False,
+        np_biases: NDArray,
+        apply_relu: bool,
     ):
+        """
+        Args:
+            np_weights  (K=4, IN_D, OUT_D)
+            np_bias     (OUT_D)
+        """
+
+        print(
+            ">Conv1d w",
+            np_weights.shape,
+            "b",
+            np_biases.shape,
+            "apply_relu",
+            apply_relu,
+        )
         if len(np_weights.shape) != 3:
             raise Exception(
-                "Expect Conv1d weights with shape (NUM_KERNELS, OUT_D, IN_D) "
+                "Expect Conv1d weights with shape (NUM_KERNELS, IN_D, OUT_D) "
                 f"but received {np_weights.shape}"
             )
 
-        num_kernels, self.OUT_D, self.IN_D = np_weights.shape
+        num_kernels, self.IN_D, self.OUT_D = np_weights.shape
 
         if num_kernels != K:
             raise Exception(
                 f"Expect Conv1d weights first axis to be {K} but received {np_weights.shape[0]}"
             )
 
-        if len(np_bias.shape) != 1 or np_bias.shape[0] != self.OUT_D:
+        if len(np_biases.shape) != 1 or np_biases.shape[0] != self.OUT_D:
             raise Exception(
                 f"Expect Conv1d bias with shape ({self.OUT_D},) "
-                f"but received {np_bias.shape}"
+                f"but received {np_biases.shape}"
             )
 
         super().__init__(
@@ -46,8 +60,10 @@ class Conv1d(wiring.Component):
             }
         )
 
+        print("Conv1d np_weights", np_weights.shape, np_weights)
+        print("Conv1d _bias", np_biases.shape, np_biases)
         self._kernels = [RowByMatrixMultiply(np_weights[k]) for k in range(K)]
-        self._bias = Array(parse_nnq(np_bias))
+        self._biases = Array(parse_nnq(np_biases, shape=NNQ_DW))
         self._apply_relu = apply_relu
 
         self._accum = Array(
@@ -66,12 +82,18 @@ class Conv1d(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
+        m.d.comb += [
+            self.i.ready.eq(0),
+            self.o.valid.eq(0),
+        ]
+
         for i in range(self.OUT_D):
             m.d.comb += self.o.payload[i].eq(self._result[i])
 
         all_kernels_ready = 1
         all_kernels_valid = 1
         accept_inputs = Signal(init=0)
+        consume_kernel_outputs = Signal(init=0)
 
         for k, kernel in enumerate(self._kernels):
             m.submodules[f"kernel{k}"] = kernel
@@ -79,7 +101,7 @@ class Conv1d(wiring.Component):
             m.d.comb += [
                 kernel.i.payload.eq(self.i.payload[k]),
                 kernel.i.valid.eq(self.i.valid & accept_inputs),
-                kernel.o.ready.eq(1),
+                kernel.o.ready.eq(consume_kernel_outputs),
             ]
 
             all_kernels_ready = all_kernels_ready & kernel.i.ready
@@ -87,22 +109,27 @@ class Conv1d(wiring.Component):
 
         with m.FSM():
 
+            frac_drop = NNQ_DW.f_bits - NNQ.f_bits
+            out_width = NNQ.width
+
             # TODO: do we need an IDLE state here? or is it just latency?
 
             with m.State("MAT_MUL_RUNNING"):
                 m.d.comb += [
                     accept_inputs.eq(1),
                     self.i.ready.eq(all_kernels_ready),
+                    # Consume one coherent set of kernel outputs in a single beat.
+                    consume_kernel_outputs.eq(all_kernels_valid),
                 ]
 
-                with m.If(all_kernels_valid):
+                with m.If(consume_kernel_outputs):
                     for i in range(self.OUT_D):
                         m.d.sync += self._accum[i].eq(
                             self._kernels[0].o.payload[i]
                             + self._kernels[1].o.payload[i]
                             + self._kernels[2].o.payload[i]
                             + self._kernels[3].o.payload[i]
-                            + self._bias[i]
+                            + self._biases[i]
                         )
                     m.next = "CLIP_LOWER"
 
@@ -131,10 +158,24 @@ class Conv1d(wiring.Component):
 
             with m.State("SINGLE_W"):
                 for i in range(self.OUT_D):
-                    # TODO: this slicing 12:28 depends on the the sizing of NNQ and NNQ_DW
-                    #       is there a better way to more directly do this conversion?
+                    # Ensure saturating behavior during narrowing, matching
+                    # fxpmath resize semantics used by the reference model.
+                    # Match fxpmath resize semantics (truncate toward zero)
+                    # while narrowing NNQ_DW -> NNQ using shape-derived widths.
+                    acc = self._accum[i].as_value()
+                    acc_clipped = Mux(
+                        acc < self._lower_bound,
+                        self._lower_bound,
+                        Mux(acc > self._upper_bound, self._upper_bound, acc),
+                    )
+                    frac_nonzero = acc_clipped[:frac_drop].any()
+                    trunc_toward_zero = Mux(
+                        acc_clipped[-1] & frac_nonzero,
+                        acc_clipped + (1 << frac_drop),
+                        acc_clipped,
+                    )
                     m.d.sync += self._result[i].eq(
-                        self._accum[i].as_value()[12:28].as_signed()
+                        trunc_toward_zero[frac_drop : frac_drop + out_width].as_signed()
                     )
                 if self._apply_relu:
                     m.next = "APPLY_RELU"
@@ -155,6 +196,8 @@ class Conv1d(wiring.Component):
             with m.State("OUTPUT"):
                 m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
+                    # Single in-flight transaction: do not accept next input
+                    # until the current output beat has been consumed.
                     m.next = "MAT_MUL_RUNNING"
 
         return m

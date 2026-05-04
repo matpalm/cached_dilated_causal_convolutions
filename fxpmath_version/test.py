@@ -26,8 +26,8 @@ parser.add_argument('--load-weights', type=str)
 parser.add_argument('--layer-info', type=str)
 parser.add_argument('--test-x-dir', type=str, default=".")
 parser.add_argument('--plot-dir', type=str, default=".")
-parser.add_argument('--write-verilog-weights', type=str,
-                    help='if set, export verilog weights')
+# parser.add_argument('--write-verilog-weights', type=str,
+#                     help='if set, export verilog weights')
 parser.add_argument('--num-test-egs', type=int, default=100)
 parser.add_argument('--verbose', action='store_true')
 opts = parser.parse_args()
@@ -36,8 +36,13 @@ print("opts", opts)
 # parse layer info
 with open(opts.layer_info, 'r') as f:
     layer_info = json.load(f)
-
 print("layer_info", layer_info)
+
+# double check params
+if opts.verbose and opts.wave is None:
+    raise Exception(
+        "need to set a --wave if --verbose ; otherwise output will clobber."
+    )
 
 # run through fxp_model
 fxp_model = FxpModel(

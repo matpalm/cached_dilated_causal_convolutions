@@ -40,7 +40,7 @@ if __name__ == '__main__':
     print("opts", opts)
 
     ensure_dir_exists(f"runs/{opts.run}/")
-    for w in ["keras", "qkeras", "amaranth"]:
+    for w in ["keras", "qkeras"]:
         ensure_dir_exists(f"runs/{opts.run}/weights/{w}")
 
     data = Embed2DInterpolatedWaveFormData(

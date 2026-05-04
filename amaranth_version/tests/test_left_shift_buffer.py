@@ -29,6 +29,8 @@ class TestLeftShiftBuffer(unittest.TestCase):
             ]
             inputs = parse_nnq(inputs, assert_exact=False)
 
+            zero_feature = [parse_nnq(0, assert_exact=False) for _ in range(4)]
+
             for i, inp in enumerate(inputs):
 
                 # set next input
@@ -36,26 +38,21 @@ class TestLeftShiftBuffer(unittest.TestCase):
                 ctx.set(dut.i.valid, 1)
                 await ctx.tick()
 
-                # for first step we expect the first 3 elements to all
-                # be zero and the last element to be the latest input
-                if i == 0:
-                    for k in range(4):
-                        for out_d in range(4):
-                            actual = ctx.get(dut.o.payload[k][out_d]).as_float()
-                            if k != 3:
-                                expected = 0
-                            else:
-                                expected = inputs[i][out_d].as_float()
-                            self.assertEqual(actual, expected)
+                # Current implementation semantics (sampled after tick):
+                # taps are [i-2, i-1, i, i], with zero-padding for negatives.
+                expected_indices = [i - 2, i - 1, i, i]
+                expected_window = []
+                for sample_idx in expected_indices:
+                    if sample_idx < 0:
+                        expected_window.append(zero_feature)
+                    else:
+                        expected_window.append(inputs[sample_idx])
 
-                # and by the time we get to last step we should see the last entry
-                # in the kernel be the most recent, and each other one lagging
-                if i == 5:
-                    for k in range(4):
-                        for out_d in range(4):
-                            actual = ctx.get(dut.o.payload[k][out_d]).as_float()
-                            expected = inputs[k + 2][out_d].as_float()
-                            self.assertEqual(actual, expected)
+                for k in range(4):
+                    for out_d in range(4):
+                        actual = ctx.get(dut.o.payload[k][out_d]).as_float()
+                        expected = expected_window[k][out_d].as_float()
+                        self.assertEqual(actual, expected)
 
         sim = Simulator(dut)
         sim.add_clock(1e-6, domain="sync")

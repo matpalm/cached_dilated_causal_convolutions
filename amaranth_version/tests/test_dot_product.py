@@ -40,6 +40,7 @@ class TestDotProduct(unittest.TestCase):
             self.assertEqual(ctx.get(dut.o.valid), 1)
 
             actual = ctx.get(dut.o.payload).as_float()
+            # 0.5*0.5 + 0 + 0.125*0.25 - 0.5*3.125 = -1.28125
             self.assertAlmostEqual(actual, -1.28125)
 
             await ctx.tick()
