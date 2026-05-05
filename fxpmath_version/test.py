@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
 parser.add_argument('--data-root-dir', type=str, required=True)
-parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
+# parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
 parser.add_argument('--load-weights', type=str)
 parser.add_argument('--layer-info', type=str)
 parser.add_argument('--test-x-dir', type=str, default=".")
@@ -63,10 +63,8 @@ print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
 data = Embed2DInterpolatedWaveFormData(
-    root_dir=opts.data_root_dir,
-    rescaling_factor=opts.data_rescaling_factor,
-    pad_size=fxp_model.in_dim,
-    seed=123)
+    root_dir=opts.data_root_dir, pad_size=fxp_model.in_dim, seed=123
+)
 
 fxp = util.FxpUtil()
 
@@ -140,10 +138,11 @@ def process(wave):
 
     # save plot
     df = pd.DataFrame()
+    df["x"] = x[:, 0]  # just waveform, not e0 or e1
     df["y_pred"] = y_pred[:, 0]
     df["y_true"] = y_true[:, 0]
     df['n'] = range(len(y_pred))
-    wide_df = pd.melt(df, id_vars=['n'], value_vars=['y_pred', 'y_true'])
+    wide_df = pd.melt(df, id_vars=["n"], value_vars=["x", "y_pred", "y_true"])
     with warnings.catch_warnings():
         warnings.simplefilter(action='ignore', category=FutureWarning)
         p = sns.lineplot(wide_df, x='n', y='value', hue='variable')

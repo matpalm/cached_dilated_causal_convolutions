@@ -9,7 +9,7 @@ class FxpUtil(object):
         self.n_int = int(os.getenv("N_INT", 4))
         self.n_frac = int(os.getenv("N_FRAC", 12))
         self.n_word = self.n_int + self.n_frac
-        print(f"FP N_INT={self.n_int} N_FRAC={self.n_frac}")
+        # print(f"FP N_INT={self.n_int} N_FRAC={self.n_frac}")
 
     def single_width(self, v):
         # convert a value to the target fixed point representation for

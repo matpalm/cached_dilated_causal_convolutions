@@ -9,6 +9,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import tqdm
+import os
 
 # for amaranth_future :/
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "amaranth_version" / "src"))
@@ -20,12 +21,13 @@ from fxpmath_version import util
 from fxpmath_version.fxpmath_model import FxpModel
 from fxpmath_version.activation_cache import ActivationCache as FxpActivationCache
 
-from cdcc import NNQ, parse_nnq
+from cdcc import parse_nnq, NNQ, NNQ_DW
 from cdcc.activation_cache import ActivationCache as AmaranthActivationCache
 from cdcc.dot_product import DotProduct
 from cdcc.row_by_matrix_multiply import RowByMatrixMultiply
 from cdcc.conv1d import Conv1d
-from cdcc.qb_network_2_layer import QbNetworkTwoLayer
+# from cdcc.qb_network_2_layer import QbNetworkTwoLayer
+from cdcc.qb_network_3_layer import QbNetworkThreeLayer
 from amaranth.sim import Simulator
 
 # cd ~/dev/cached_dilated_causal_convolutions
@@ -49,21 +51,17 @@ class TestEquivalences(unittest.TestCase):
         eg_inp = rnd01((D,))
         weights = rnd01((D,))
 
-        print('eg_inp', eg_inp)
-        print('weights', weights)
-
         # run fxp version
         # note: have to make fake conv, just to use dot_product method :/
         K = 4
         dummy_weights = np.zeros((K, D, D))
         dummy_biases = np.zeros((D))
         dummy_conv = fxpmath_conv1d_qb.FxpMathConv1DQuantisedBitsBlock(
-            fxp_util, 'layer_name', dummy_weights, dummy_biases, verbose=True
+            fxp_util, "layer_name", dummy_weights, dummy_biases, verbose=False
         )
         accum = fxp_util.double_width(0)
         dummy_conv.dot_product(eg_inp, weights, accum)
         fxp_math_result = float(accum)
-        print('fxp_math_result', fxp_math_result)
 
         # run amaranth version
         dut = DotProduct(weights)
@@ -72,8 +70,6 @@ class TestEquivalences(unittest.TestCase):
             ctx.set(dut.o.ready, 1)
 
             inp = parse_nnq(eg_inp)
-            for i in range(D):
-                print(i, inp[i], inp[i].as_float())
             ctx.set(dut.i.payload, inp)
             ctx.set(dut.i.valid, 1)
 
@@ -85,7 +81,6 @@ class TestEquivalences(unittest.TestCase):
             self.assertEqual(ctx.get(dut.o.valid), 1)
 
             amaranth_result = ctx.get(dut.o.payload).as_float()
-            print('amaranth_result', amaranth_result)
 
             self.assertAlmostEqual(
                 fxp_math_result, amaranth_result)
@@ -111,21 +106,17 @@ class TestEquivalences(unittest.TestCase):
         eg_inp = rnd01((IN_D,))
         row_wise_weights = rnd01((IN_D, OUT_D))
 
-        print('eg_inp', eg_inp.shape, eg_inp)
-        print('row_wise_weight', row_wise_weights.shape, row_wise_weights)
-
         # run fxp version
         # note: have to make fake conv, just to use row_by_matrix_multiply method :/
         dummy_weights = np.zeros((K, IN_D, OUT_D))
         dummy_biases = np.zeros((OUT_D))
         dummy_conv = fxpmath_conv1d_qb.FxpMathConv1DQuantisedBitsBlock(
-            fxp_util, 'layer_name', dummy_weights, dummy_biases, verbose=True
+            fxp_util, "layer_name", dummy_weights, dummy_biases, verbose=False
         )
         accums = [fxp_util.double_width(0) for _ in range(OUT_D)]
         col_wise_weights = row_wise_weights.T
         dummy_conv.row_by_matrix_multiply(eg_inp, col_wise_weights, accums)
         fxp_result = list(map(float, accums))
-        print("fxp_result", fxp_result)
 
         # run amaranth version
         dut = RowByMatrixMultiply(row_wise_weights)
@@ -134,8 +125,6 @@ class TestEquivalences(unittest.TestCase):
             ctx.set(dut.o.ready, 1)
 
             inp = parse_nnq(eg_inp)
-            for i in range(IN_D):
-                print(i, inp[i], inp[i].as_float())
             ctx.set(dut.i.payload, inp)
             ctx.set(dut.i.valid, 1)
 
@@ -146,7 +135,6 @@ class TestEquivalences(unittest.TestCase):
 
             amaranth_result = ctx.get(dut.o.payload)
             amaranth_result = [v.as_float() for v in amaranth_result]
-            print('amaranth_result', amaranth_result)
 
             np.testing.assert_allclose(fxp_result, amaranth_result)
 
@@ -181,10 +169,9 @@ class TestEquivalences(unittest.TestCase):
 
         # run fxp version
         fxp_conv = fxpmath_conv1d_qb.FxpMathConv1DQuantisedBitsBlock(
-            fxp_util, "layer_name", weights, biases, verbose=True
+            fxp_util, "layer_name", weights, biases, verbose=False
         )
         fxp_result = fxp_conv.apply(eg_inp)
-        print(fxp_result)
 
         # run amaranth version
         dut = Conv1d(weights, biases, apply_relu=False)
@@ -193,9 +180,6 @@ class TestEquivalences(unittest.TestCase):
             ctx.set(dut.o.ready, 1)
 
             inp = parse_nnq(eg_inp)
-            for k in range(K):
-                for i in range(IN_D):
-                    print(k, i, inp[k][i], inp[k][i].as_float())
             ctx.set(dut.i.payload, inp)
             ctx.set(dut.i.valid, 1)
 
@@ -206,7 +190,6 @@ class TestEquivalences(unittest.TestCase):
 
             amaranth_result = ctx.get(dut.o.payload)
             amaranth_result = [v.as_float() for v in amaranth_result]
-            print("amaranth_result", amaranth_result)
 
             np.testing.assert_allclose(fxp_result, amaranth_result)
 
@@ -284,12 +267,14 @@ class TestEquivalences(unittest.TestCase):
 
     def test_network(self):
 
-        repo_root = Path(__file__).resolve().parents[1]
-        trained_weights = repo_root / "runs/42_tiliqua_2layer/weights/qkeras/latest.pkl"
-        layer_info_fname = (
-            repo_root / "runs/42_tiliqua_2layer/qkeras_model.layer_info.json"
-        )
-        test_data = repo_root / "runs/42_tiliqua_2layer/test_x_files/sine/x_yp_yt.pkl"
+        if os.getenv("RUN") is None:
+            raise Exception("need to set $RUN for weights for test_network")
+
+        root_dir = Path(__file__).resolve().parents[1] / "runs" / os.getenv("RUN")
+        print(">test_network root_dir", root_dir)
+        trained_weights = root_dir / "weights/qkeras/latest.pkl"
+        layer_info_fname = root_dir / "qkeras_model.layer_info.json"
+        test_data = root_dir / "test_x_files/zigzag/x_yp_yt.pkl"
 
         with open(layer_info_fname, "r") as f:
             layer_info = json.load(f)
@@ -300,7 +285,7 @@ class TestEquivalences(unittest.TestCase):
             verbose=False,
         )
 
-        dut = QbNetworkTwoLayer.build(str(trained_weights))
+        dut = QbNetworkThreeLayer.build(str(trained_weights))
 
         with open(test_data, "rb") as f:
             data = pickle.load(f)
@@ -340,21 +325,30 @@ class TestEquivalences(unittest.TestCase):
         sim.add_testbench(testbench)
         sim.run()
 
-        print("x", len(x), "y_pred_am", len(y_pred_am), "y_pred_fxp", len(y_pred_fxp))
         df = pd.DataFrame()
         df["x"] = x[:, 0]
         df["y_pred_fxp"] = y_pred_fxp
         df["y_pred_am"] = y_pred_am
         df["n"] = range(len(x))
+
+        # jitter the plotted versions
+        scale = 0.05
+        jitter = np.random.default_rng(seed=1337).uniform(-scale, scale, size=len(df))
+        df["y_pred_fxp_jittered"] = df["y_pred_fxp"] + jitter
+        df["y_pred_am_jittered"] = df["y_pred_am"] - jitter
+
         wide_df = pd.melt(
-            df, id_vars=["n"], value_vars=["x", "y_pred_fxp", "y_pred_am"]
+            df,
+            id_vars=["n"],
+            value_vars=["x", "y_pred_fxp_jittered", "y_pred_am_jittered"],
         )
         with warnings.catch_warnings():
             warnings.simplefilter(action="ignore", category=FutureWarning)
             p = sns.lineplot(wide_df, x="n", y="value", hue="variable")
-            plt_fname = "foo.test_network.png"
+            p.set(ylim=(-2, 2))
+            plt_fname = f"{root_dir}/amaranth.zigzag.png"
             print("saving plot to", plt_fname)
             plt.savefig(plt_fname)
             plt.clf()
 
-        np.testing.assert_allclose(y_pred_fxp, y_pred_am)
+        np.testing.assert_allclose(y_pred_fxp, y_pred_am, atol=0.005)

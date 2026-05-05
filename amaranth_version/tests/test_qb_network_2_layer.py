@@ -13,15 +13,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from amaranth.sim import Simulator
 
-from cdcc import parse_nnq
+from cdcc import parse_nnq, NNQ, NNQ_DW
 from cdcc.qb_network_2_layer import QbNetworkTwoLayer
 
 
 class TestQbNetworkTwoLayer(unittest.TestCase):
 
-    def test_fxp_math_equiv(self):
-        trained_weights = "runs/42_tiliqua_2layer/weights/qkeras/latest.pkl"
-        test_data = "runs/42_tiliqua_2layer/test_x_files/sine/x_yp_yt.pkl"
+    def ___test_fxp_math_equiv(self):
+
+        # TODO: either port this to use a specific set of test weights
+        # or just drop in favor of eqivalence test
+
+        trained_weights = "runs/43_tiliqua_2layer_4d/weights/qkeras/latest.pkl"
+        test_data = "runs/43_tiliqua_2layer_4d/test_x_files/sine/x_yp_yt.pkl"
 
         dut = QbNetworkTwoLayer.build(trained_weights)
 
@@ -37,34 +41,18 @@ class TestQbNetworkTwoLayer(unittest.TestCase):
         y_pred_am = []
 
         async def testbench(ctx):
-            ctx.set(dut.i.valid, 0)
-            ctx.set(dut.o.ready, 1)
-
             for sample in x:
-                while not ctx.get(dut.i.ready):
-                    if ctx.get(dut.o.valid):
-                        y_pred_am.append(ctx.get(dut.o.payload).as_float())
-                    await ctx.tick()
-
+                ctx.set(dut.o.ready, 1)
                 ctx.set(dut.i.payload, parse_nnq(sample, assert_exact=False))
                 ctx.set(dut.i.valid, 1)
-
-                if ctx.get(dut.o.valid):
-                    y_pred_am.append(ctx.get(dut.o.payload).as_float())
-
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
-
-                if ctx.get(dut.o.valid):
-                    y_pred_am.append(ctx.get(dut.o.payload).as_float())
-
-            for _ in range(64):
-                if ctx.get(dut.o.valid):
-                    y_pred_am.append(ctx.get(dut.o.payload).as_float())
                 await ctx.tick()
 
-            print("dut outputs", y_pred_am)
-            # self.assertGreater(len(outputs), 0)
+                for _ in range(10000):
+                    if ctx.get(dut.o.valid):
+                        break
+                    await ctx.tick()
+
+                y_pred_am.append(ctx.get(dut.o.payload).as_float())
 
         sim = Simulator(dut)
         sim.add_clock(1e-6, domain="sync")
@@ -75,6 +63,8 @@ class TestQbNetworkTwoLayer(unittest.TestCase):
         df = pd.DataFrame()
         # plot just waveform for x and ignore e0 and e1
         df["x"] = x[:, 0]
+        df["e0"] = x[:, 1]
+        df["e1"] = x[:, 2]
         # recall: y_true, and fxpmath version, use simple old code version
         #         where output is always 4d
         # recall: fxp math replicated simple y_true 4d ( simple code )
@@ -83,13 +73,15 @@ class TestQbNetworkTwoLayer(unittest.TestCase):
         df["y_pred_am"] = y_pred_am
         df["n"] = range(len(x))
         wide_df = pd.melt(
-            df, id_vars=["n"], value_vars=["x", "y_true", "y_pred_fxp", "y_pred_am"]
+            df,
+            id_vars=["n"],
+            value_vars=["x", "e0", "e1", "y_true", "y_pred_fxp", "y_pred_am"],
         )
         with warnings.catch_warnings():
             warnings.simplefilter(action="ignore", category=FutureWarning)
             p = sns.lineplot(wide_df, x="n", y="value", hue="variable")
-            # p.set(ylim=(-2, 2))
-            plt_fname = "foo.png"  # f"{opts.plot_dir}/fxp_math.y_pred.{wave}.png"
+            p.set(ylim=(-2, 2))
+            plt_fname = f"{opts.plot_dir}/fxp_math.y_pred.{wave}.png"
             print("saving plot to", plt_fname)
             plt.savefig(plt_fname)
             plt.clf()

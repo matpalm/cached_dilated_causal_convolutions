@@ -11,17 +11,21 @@ from .activation_cache import ActivationCache
 K = 4
 
 class Relu(object):
-    def __init__(self, zero_value):
+
+    def __init__(self, zero_value, upper_value):
         self.zero_value = zero_value
+        self.upper_value = upper_value
 
     def apply(self, x):
         for i in range(len(x)):
             if x[i] < 0:
                 x[i] = self.zero_value
+            elif x[i] > self.upper_value:
+                x[i] = self.upper_value
         return x
 
     def __str__(self):
-        return "relu"
+        return "relu6"
 
 
 def check_ids_match(weights, layer_info):
@@ -78,8 +82,11 @@ class FxpModel(object):
         # general fxp util
         self.fxp = FxpUtil()
 
-        # make stateless relu layer
-        relu = Relu(zero_value=self.fxp.double_width(0))
+        # make stateless relu6 layer
+        relu = Relu(
+            zero_value=self.fxp.double_width(0),
+            upper_value=self.fxp.double_width(6.0),
+        )
 
         # buffer for layer0 input
         self.in_dim = in_ds[weight_ids[0]]

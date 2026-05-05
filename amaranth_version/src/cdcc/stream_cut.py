@@ -2,8 +2,8 @@ from amaranth import Module, Signal
 from amaranth.lib import stream, wiring
 
 
-class StreamRegister(wiring.Component):
-    """Single-entry register stage for ready/valid streams."""
+class StreamCut(wiring.Component):
+    """Single-entry ready/valid pipeline register."""
 
     def __init__(self, payload_shape):
         super().__init__(

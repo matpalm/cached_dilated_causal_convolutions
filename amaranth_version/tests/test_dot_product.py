@@ -32,7 +32,7 @@ class TestDotProduct(unittest.TestCase):
             await ctx.tick()
             ctx.set(dut.i.valid, 0)
 
-            for _ in range(dut.D + 3):
+            for _ in range(100):
                 if ctx.get(dut.o.valid):
                     break
                 await ctx.tick()

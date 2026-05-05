@@ -48,10 +48,12 @@ K = 4
 
 class QKerasModelBuilder(object):
 
-    def __init__(self):
+    def __init__(self, n_int: int, n_frac: int):
         self.layer_info = []
-        self.n_int = int(os.getenv("N_INT", 4))
-        self.n_frac = int(os.getenv("N_FRAC", 12))
+
+        self.n_int = n_int
+        self.n_frac = n_frac
+
         print(f"FP N_INT={self.n_int} N_FRAC={self.n_frac}")
         self.n_word = self.n_int + self.n_frac
 
@@ -68,7 +70,7 @@ class QKerasModelBuilder(object):
             assert False, "never need to use this?"
             return f"quantized_po2({self.n_word}, 1)"
         else:
-            return f"quantized_relu({self.n_word},{self.n_int})"
+            return f"quantized_relu({self.n_word},{self.n_int},relu_upper_bound=6)"
 
     def add_quantized_bits_conv_block(
             self,
@@ -163,24 +165,30 @@ class QKerasModelBuilder(object):
         self,
         seq_len: int,
         in_out_d: int,
-        num_layers: int,
-        filter_size: int,
+        filter_sizes: List[int],
         # po2_filter_size: int,
         l2: float = 0.0,
     ):
-        '''
+        """
         create a qkeras model with a stack of dilation 1d convolutions
 
         Parameters:
             seq_len: the length of the input sequence.
             in_out_d: the feature dim of both the input and the output)
-            num_layers: number of 1d convolution to stack, each with an increasing dilation
-            filter_size: kernel size for each convolution
+            filter_sizes: output depth for each convolution layer. Number of
+                layers is inferred from len(filter_sizes).
             l2: l2 penality for convolution kerne & bias
         Returns:
             qkeras model
-        '''
+        """
 
+        if len(filter_sizes) == 0:
+            raise ValueError("filter_sizes must contain at least one layer size")
+
+        # last layer always 4
+        filter_sizes.append(4)
+
+        num_layers = len(filter_sizes)
         self.layer_info = []
 
         inp = Input((seq_len, in_out_d))
@@ -189,11 +197,12 @@ class QKerasModelBuilder(object):
         for layer_num in range(num_layers):
 
             last_layer = layer_num == num_layers - 1
+            layer_filter_size = filter_sizes[layer_num]
 
             y_pred = self.add_quantized_bits_conv_block(
                 y_pred,
                 layer_number=layer_num,
-                out_filters=in_out_d if last_layer else filter_size,
+                out_filters=in_out_d if last_layer else layer_filter_size,
                 l2=l2,
                 relu=(not last_layer),
             )
@@ -205,7 +214,7 @@ class QKerasModelBuilder(object):
                     {
                         "type": "dilation",
                         "amount": K ** (layer_num + 1),
-                        "depth": filter_size,
+                        "depth": layer_filter_size,
                     }
                 )
 

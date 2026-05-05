@@ -70,7 +70,7 @@ def quantiser():
 
 # qkeras quantiser for activation
 def quant_relu():
-  return f"quantized_relu({N_WORD},{N_INT})"
+    return f"quantized_relu({N_WORD},{N_INT},relu_upper_bound=6)"
 
 def init_seeds(s):
     tf.random.set_seed(s)
@@ -133,8 +133,6 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         # check they are all representable with fxp math
         check_all_qIF(layer0_q_weights)
         check_all_qIF(layer0_q_biases)
-
-
 
     def _test_overfit_qkeras_dense_and_custom_fxpmath_inference(self):
         # train a simple (A,B,C) input -> ((A+B)/2, -(A+C)/2)single_width_fxp output
@@ -211,8 +209,6 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, single_layer_model, predict_single))
 
-
-
     def _test_underfit_qkeras_dense_and_custom_fxpmath_inference(self):
         # same model as above but with random data. the model will not
         # be able to fit this exactly so we expect weights to be generated
@@ -259,10 +255,10 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
         # extract weights
         col0_weights = layer0_q_weights[:,0]
         col0_bias = layer0_q_biases[0]
-        #print("col0_weights/biases", list(map(float, col0_weights)), float(col0_bias))
+        # print("col0_weights/biases", list(map(float, col0_weights)), float(col0_bias))
         col1_weights = layer0_q_weights[:,1]
         col1_bias = layer0_q_biases[1]
-        #print("col1_weights/biases", list(map(float, col1_weights)), float(col1_bias))
+        # print("col1_weights/biases", list(map(float, col1_weights)), float(col1_bias))
 
         # create simple dot product with bias method
         def dot_product_with_bias(x, weights, bias):
@@ -270,7 +266,7 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             # init accumulator with bias value, in double width ready to be accumulated
             # with dot product results
             accum = double_width_fxp(bias)
-            #print("accum inited with bias [", bias,"] as ", bits(accum))
+            # print("accum inited with bias [", bias,"] as ", bits(accum))
             # this loop represents what will be in the state machine
             for i in range(len(x)):
                 x_i = single_width_fxp(x[i])
@@ -279,12 +275,12 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                 accum += product
                 # keep accumulator double width. by dft a+b => +1 for int part
                 resize_double_width(accum)
-                #print("i", i, "x_i", bits(x_i), "w_i", bits(w_i), "=> product", bits(product), "=> accum", bits(accum), accum)
+                # print("i", i, "x_i", bits(x_i), "w_i", bits(w_i), "=> product", bits(product), "=> accum", bits(accum), accum)
 
             # return result resized down to single width
-            #print("accum (pre resize)  ", bits(accum), accum)
+            # print("accum (pre resize)  ", bits(accum), accum)
             resize_single_width(accum)
-            #print("accum (post resize) ", bits(accum), accum)
+            # print("accum (post resize) ", bits(accum), accum)
             return accum
 
         # predict for single example as explicit dot product for each of
@@ -299,7 +295,6 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, single_layer_model, predict_single))
-
 
     def _test_two_layer_dense_model(self):
         # test a two layer qdense model that includes a relu activation
@@ -321,7 +316,6 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                             bias_quantizer=quantiser())(dense_0)
         double_layer_model = Model(inp, dense_1)
         double_layer_model.compile(Adam(1e-2), loss='mse')
-
 
         # generate test_x and test_y values uniformly between (-1.9, 1.9)
         # slightly less than calculated expected range (-32K,32K) with n_int=2
@@ -353,9 +347,12 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
                 accum += product
                 # keep accumulator single width. by dft a+b => +1 for int part
                 resize_double_width(accum)
-            # 'apply' relu, if configured
-            if relu and accum < 0:
-                return double_width_fxp(0)
+            # 'apply' relu6, if configured
+            if relu:
+                if accum < 0:
+                    return double_width_fxp(0)
+                if accum > 6:
+                    return double_width_fxp(6)
             # return result resized down to single width
             resize_single_width(accum)
             return accum
@@ -383,7 +380,6 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, double_layer_model, predict_single))
-
 
     def _test_qkeras_conv1d(self):
         raise Exception("replaced with test_qkeras_conv1d_object")
@@ -479,8 +475,10 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
             # apply relu, if configured
             if relu:
                 for i in range(out_d):
-                    if accumulator[i] < 0:
-                        accumulator[i] = 0
+                    if accumulators[i] < 0:
+                        accumulators[i] = 0
+                    elif accumulators[i] > 6:
+                        accumulators[i] = 6
 
             # return as np array,
             return np.array(accumulators)
@@ -490,9 +488,6 @@ class TestQKerasFxpMathEquivalance(unittest.TestCase):
 
         self.assertTrue(
             qkeras_custom_mse_equivalant(test_x, test_y, single_conv_model, predict_single))
-
-
-
 
     def test_qkeras_conv1d_object(self):
 

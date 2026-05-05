@@ -17,38 +17,47 @@ parser = argparse.ArgumentParser(
 parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
 parser.add_argument('--data-root-dir', type=str, required=True)
-parser.add_argument("--data-rescaling-factor", type=float, default=1.953125)
-parser.add_argument('--num-layers', type=int, default=4)
-parser.add_argument('--filter-size', type=int, required=True)
-parser.add_argument('--po2-filter-size', type=int, default=None)
+# parser.add_argument("--data-rescaling-factor", type=float, default=1.953125)
+parser.add_argument('--filter-sizes', type=int, nargs='+', required=True)
 parser.add_argument('--load-weights', type=str, required=True)
 parser.add_argument('--test-seq-len', type=int, default=100)
+parser.add_argument(
+    "--n-int",
+    type=int,
+    default=4,
+    help=" integer bits for FP config",
+)
+parser.add_argument(
+    "--n-frac",
+    type=int,
+    default=12,
+    help="fractional bits for FP config",
+)
 opts = parser.parse_args()
 print("opts", opts)
 
 data = Embed2DInterpolatedWaveFormData(
     root_dir=opts.data_root_dir,
-    rescaling_factor=opts.data_rescaling_factor,
     pad_size=4,
-    seed=123)
+    seed=123,
+)
 
 # all convolutions use K=4
 K = 4
+num_layers = len(opts.filter_sizes)
 
 # note: kernel size and implied dilation rate always assumed K
-RECEPTIVE_FIELD_SIZE = K**opts.num_layers
+RECEPTIVE_FIELD_SIZE = K**num_layers
 TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
 print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
 # construct model
-builder = QKerasModelBuilder()
+builder = QKerasModelBuilder(n_int=opts.n_int, n_frac=opts.n_frac)
 test_model = builder.create_dilated_model(
     opts.test_seq_len,
     in_out_d=4,
-    num_layers=opts.num_layers,
-    filter_size=opts.filter_size,
-    po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
+    filter_sizes=opts.filter_sizes,
     l2=None,
 )
 test_model.summary()
@@ -68,10 +77,8 @@ GRID_SIZE = 7
 assert GRID_SIZE%2 != 0
 
 for i0, e0 in enumerate(np.linspace(-1, 1, GRID_SIZE)):
-    e0 *= opts.data_rescaling_factor
 
     for i1, e1 in enumerate(np.linspace(-1, 1, GRID_SIZE)):
-        e1 *= opts.data_rescaling_factor
 
         print("i", i0, i1, "=> e", e0, e1)
 

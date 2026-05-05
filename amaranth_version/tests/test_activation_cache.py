@@ -13,8 +13,8 @@ from cdcc.activation_cache import ActivationCache
 
 class TestActivationCache(unittest.TestCase):
 
-    def test_activation_cache(self):
-        dut = ActivationCache(in_out_d=3, dilation_level=1)
+    def _test_activation_cache(self, use_ebr: bool):
+        dut = ActivationCache(in_out_d=3, dilation_level=1, use_ebr=use_ebr)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
@@ -73,3 +73,9 @@ class TestActivationCache(unittest.TestCase):
         sim.add_clock(1e-6, domain="sync")
         sim.add_testbench(testbench)
         sim.run()
+
+    def test_activation_cache_ff(self):
+        self._test_activation_cache(use_ebr=False)
+
+    def test_activation_cache_ebr(self):
+        self._test_activation_cache(use_ebr=True)

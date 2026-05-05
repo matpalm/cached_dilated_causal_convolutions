@@ -19,23 +19,33 @@ if __name__ == '__main__':
     parser.add_argument('--data-root-dir', type=str, required=True)
     parser.add_argument('--run', type=str, required=True)
     parser.add_argument('--learning-rate', type=float, default=1e-3)
-    parser.add_argument('--epochs', type=int, default=5)
-    parser.add_argument('--num-layers', type=int, default=4)
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument(
         "--receptive-field-size",
         type=int,
         default=None,
-        help="override RFS. if not set, use K^num_layers",
+        help="override RFS. if not set, use K^len(filter_sizes)",
     )
     parser.add_argument("--l2", type=float, default=0.0)
     parser.add_argument('--in-out-d', type=int, default=4)
     parser.add_argument(
-        "--filter-size", type=int, required=True, help="shared per layer"
+        "--filter-sizes",
+        type=int,
+        nargs="+",
+        required=True,
+        help="sfeature depths for each layer; last layer always 4",
     )
     parser.add_argument('--po2-filter-size', type=int, default=None)
     parser.add_argument('--num-train-egs', type=int, default=200_000)
-    parser.add_argument('--num-validate-egs', type=int, default=100)
-    parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
+    parser.add_argument("--num-validate-egs", type=int, default=100)
+    parser.add_argument("--fp-int", type=int, default=4)
+    parser.add_argument("--fp-frac", type=int, default=12)
+    parser.add_argument(
+        "--init-weights",
+        type=str,
+        default=None,
+        help="path to keras weights used to initialize fine-tuning",
+    )
     opts = parser.parse_args()
     print("opts", opts)
 
@@ -45,9 +55,9 @@ if __name__ == '__main__':
 
     data = Embed2DInterpolatedWaveFormData(
         root_dir=opts.data_root_dir,
-        rescaling_factor=opts.data_rescaling_factor,
         pad_size=opts.in_out_d,
-        seed=456)
+        seed=456,
+    )
 
     # we only care about the loss of the _first_ element of the output
     # TODO: for amaranth version we should include a final OUT_D=1 layer
@@ -55,9 +65,10 @@ if __name__ == '__main__':
 
     # all convolutions use K=4
     K = 4
+    num_layers = len(opts.filter_sizes) + 1
 
     # note: kernel size and implied dilation rate always assumed K
-    RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**opts.num_layers
+    RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**num_layers
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 10
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
@@ -65,54 +76,60 @@ if __name__ == '__main__':
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
     # construct model
-    builder = QKerasModelBuilder()
+    builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
     train_model = builder.create_dilated_model(
         TRAIN_SEQ_LEN,
         in_out_d=opts.in_out_d,
-        num_layers=opts.num_layers,
-        filter_size=opts.filter_size,
+        filter_sizes=opts.filter_sizes,
         # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
         l2=opts.l2,
     )
+
+    if opts.init_weights is not None:
+        print(f"loading initial weights from {opts.init_weights}")
+        train_model.load_weights(opts.init_weights)
+
     train_model.summary()
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
         with contextlib.redirect_stdout(f):
             train_model.summary()
     with open(f"runs/{opts.run}/qkeras_model.layer_info.json", "w") as f:
         json.dump(builder.layer_info, f)
+    with open(f"runs/{opts.run}/qkeras_model.fp_config.json", "w") as f:
+        json.dump(
+            {
+                "n_int": builder.n_int,
+                "n_frac": builder.n_frac,
+                "init_weights": opts.init_weights,
+            },
+            f,
+        )
 
     # make tf datasets
-    print("HACK interpolated_samples=False,  # normally True")
     train_ds = data.tf_dataset_for_split(
-        "train",
-        TRAIN_SEQ_LEN,
-        opts.num_train_egs,
-        interpolated_samples=False,  # normally True
+        "train", TRAIN_SEQ_LEN, opts.num_train_egs, interpolated_samples=True
     )
     validate_ds = data.tf_dataset_for_split(
-        "validate",
-        TRAIN_SEQ_LEN,
-        opts.num_validate_egs,
-        interpolated_samples=False,  # normally True
+        "validate", TRAIN_SEQ_LEN, opts.num_validate_egs, interpolated_samples=True
     )
 
     # construct some callbacks...
 
-    ## tensorboard
+    # tensorboard
     tensorboard_dir = f"runs/{opts.run}/tb"
     tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
 
-    ## checkpointing raw keras weights
+    # checkpointing raw keras weights
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath=f"runs/{opts.run}/weights/keras/" + "{epoch:03d}-{val_loss:.5f}",
-        save_weights_only=True
+        filepath=f"runs/{opts.run}/weights/keras/" + "{epoch:03d}",
+        save_weights_only=True,
     )
 
-    ## plotting examples of validation data ( in tensorboard )
+    # plotting examples of validation data ( in tensorboard )
     check_y_pred_cb = CheckYPred(
         tb_dir=tensorboard_dir, dataset=validate_ds, model=train_model)
 
-    ## exporting qkeras quantised weights
+    # exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             # save quantised weights dict pickled

@@ -58,12 +58,14 @@ class TestQbNetworkOneLayer(unittest.TestCase):
                 if ctx.get(dut.o.valid):
                     y_pred_am.append(ctx.get(dut.o.payload).as_float())
 
-            for _ in range(64):
+            max_drain_cycles = len(x) * 256
+            for _ in range(max_drain_cycles):
+                if len(y_pred_am) >= len(x):
+                    break
                 if ctx.get(dut.o.valid):
                     y_pred_am.append(ctx.get(dut.o.payload).as_float())
                 await ctx.tick()
 
-            print("dut outputs", y_pred_am)
             # self.assertGreater(len(outputs), 0)
 
         sim = Simulator(dut)
@@ -90,6 +92,6 @@ class TestQbNetworkOneLayer(unittest.TestCase):
             p = sns.lineplot(wide_df, x="n", y="value", hue="variable")
             p.set(ylim=(-2, 2))
             plt_fname = "foo.png"  # f"{opts.plot_dir}/fxp_math.y_pred.{wave}.png"
-            print("saving plot to", plt_fname)
+
             plt.savefig(plt_fname)
             plt.clf()

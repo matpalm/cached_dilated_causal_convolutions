@@ -31,7 +31,7 @@ def parse(fname, w0n, w1n, w2n, invert_waves=[]):
 
 class WaveData(object):
 
-    def __init__(self, wave0, wave1, data, pad_to_size, rescaling_factor, seed):
+    def __init__(self, wave0, wave1, data, pad_to_size, seed):
         assert data.shape[1] == 3  # triangle + 2 waves
         self.wave0 = wave0
         self.wave1 = wave1
@@ -39,7 +39,6 @@ class WaveData(object):
         self.embed_pt1 = wave_to_embed_pt(wave1)
         self.data = data
         self.pad_to_size = pad_to_size
-        self.rescaling_factor = rescaling_factor
         self.rng = random.Random(seed)
 
     def sample(self, alpha, seq_len):
@@ -76,12 +75,12 @@ class WaveData(object):
         interpolated_e0, interpolated_e1 = interpolated_embed_pt
 
         x = np.zeros((len(sample), self.pad_to_size), dtype=float)
-        x[:, 0] = sample[:, 0] * self.rescaling_factor
-        x[:, 1] = interpolated_e0 * self.rescaling_factor
-        x[:, 2] = interpolated_e1 * self.rescaling_factor
+        x[:, 0] = sample[:, 0]
+        x[:, 1] = interpolated_e0
+        x[:, 2] = interpolated_e1
 
         y = np.zeros((len(sample), self.pad_to_size), dtype=float)
-        y[:, 0] = interpolated_sample * self.rescaling_factor
+        y[:, 0] = interpolated_sample
 
         return x, y
 
@@ -108,11 +107,7 @@ class WaveData(object):
 
 class Embed2DInterpolatedWaveFormData(object):
 
-    def __init__(self,
-                root_dir,
-                seed=None,
-                rescaling_factor=1,
-                pad_size=8):
+    def __init__(self, root_dir, seed=None, pad_size=8):
 
         if seed is None:
             seed = int(time.time())
@@ -123,25 +118,33 @@ class Embed2DInterpolatedWaveFormData(object):
         tqzs = parse(f"{root_dir}/tri_square_zigzag_sine.ssv", 'square', 'zigzag', 'sine', invert_waves=['sine', 'square'])
         tzsr = parse(f"{root_dir}/tri_zigzag_sine_ramp.ssv", 'zigzag', 'sine', 'ramp', invert_waves=['sine', 'zigzag'])
 
-        self.tsrq_sr = WaveData('sine', 'ramp',   tsrq[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
-        self.tsrq_rq = WaveData('ramp', 'square', tsrq[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
+        self.tsrq_sr = WaveData(
+            "sine", "ramp", tsrq[:, [0, 1, 2]], pad_to_size=pad_size, seed=seed
+        )
+        self.tsrq_rq = WaveData(
+            "ramp", "square", tsrq[:, [0, 2, 3]], pad_to_size=pad_size, seed=seed
+        )
 
-        self.trqz_rq = WaveData('ramp', 'square',   trqz[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
-        self.trqz_qz = WaveData('square', 'zigzag', trqz[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
+        self.trqz_rq = WaveData(
+            "ramp", "square", trqz[:, [0, 1, 2]], pad_to_size=pad_size, seed=seed
+        )
+        self.trqz_qz = WaveData(
+            "square", "zigzag", trqz[:, [0, 2, 3]], pad_to_size=pad_size, seed=seed
+        )
 
-        self.tqzs_qz = WaveData('square', 'zigzag', tqzs[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
-        self.tqzs_zs = WaveData('zigzag', 'sine',   tqzs[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
+        self.tqzs_qz = WaveData(
+            "square", "zigzag", tqzs[:, [0, 1, 2]], pad_to_size=pad_size, seed=seed
+        )
+        self.tqzs_zs = WaveData(
+            "zigzag", "sine", tqzs[:, [0, 2, 3]], pad_to_size=pad_size, seed=seed
+        )
 
-        self.tzsr_zs = WaveData('zigzag', 'sine', tzsr[:,[0,1,2]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
-        self.tzsr_sr = WaveData('sine', 'ramp',   tzsr[:,[0,2,3]],
-                              pad_to_size=pad_size, rescaling_factor=rescaling_factor, seed=seed)
+        self.tzsr_zs = WaveData(
+            "zigzag", "sine", tzsr[:, [0, 1, 2]], pad_to_size=pad_size, seed=seed
+        )
+        self.tzsr_sr = WaveData(
+            "sine", "ramp", tzsr[:, [0, 2, 3]], pad_to_size=pad_size, seed=seed
+        )
 
         self.all_wave_data = [ self.tsrq_sr, self.tsrq_rq,
                                self.trqz_rq, self.trqz_qz,
@@ -196,10 +199,9 @@ if __name__ == '__main__':
     import os
 
     data = Embed2DInterpolatedWaveFormData(
-        root_dir='datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz',
-        rescaling_factor=1,
+        root_dir="datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz",
         pad_size=4,
-        seed=123
+        seed=123,
     )
 
     test_ds = data.tf_dataset_for_split(

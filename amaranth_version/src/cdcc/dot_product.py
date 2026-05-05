@@ -27,12 +27,10 @@ class DotProduct(wiring.Component):
             }
         )
 
-        print("DotProduct", np_weights.shape, np_weights)
         self._weights = Array(parse_nnq(np_weights))
         self._index = Signal(range(self.D + 1), init=0)
 
-        # latest element product and accumulator are double width
-        self._product = Signal(NNQ_DW, init=0)
+        # running dot-product sum is double width
         self._accumulator = Signal(NNQ_DW, init=0)
 
         self._a_values = Array(
@@ -45,7 +43,7 @@ class DotProduct(wiring.Component):
         m.d.comb += [
             self.i.ready.eq(0),
             self.o.valid.eq(0),
-            self.o.payload.eq(self._accumulator + self._product),
+            self.o.payload.eq(self._accumulator),
         ]
 
         with m.FSM() as fsm:
@@ -57,19 +55,21 @@ class DotProduct(wiring.Component):
                         m.d.sync += self._a_values[j].eq(self.i.payload[j])
                     m.d.sync += [
                         self._accumulator.eq(0),
-                        self._product.eq(0),
                         self._index.eq(0),
                     ]
                     m.next = "MULTIPLY_ELEMENT"
 
             with m.State("MULTIPLY_ELEMENT"):
+                # note: originally had accum in seperate assignment from product but combining
+                # them allows yosys to know it's a MAC op and can use the accum in MULT18x18D
+                # ( which results in TRELLIS_FF & TRELLIS_COMB dropping )
                 m.d.sync += [
-                    self._accumulator.eq(self._accumulator + self._product),
-                    self._product.eq(
-                        (
-                            NNQ(self._a_values[self._index])
-                            * NNQ(self._weights[self._index])
-                        ).as_value()
+                    self._accumulator.eq(
+                        self._accumulator.as_value().as_signed()
+                        + (
+                            self._a_values[self._index].as_value().as_signed()
+                            * self._weights[self._index].as_value().as_signed()
+                        )
                     ),
                     self._index.eq(self._index + 1),
                 ]

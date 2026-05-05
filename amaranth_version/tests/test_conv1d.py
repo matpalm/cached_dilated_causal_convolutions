@@ -26,7 +26,8 @@ class TestConv1d(unittest.TestCase):
             await ctx.tick()
             ctx.set(dut.i.valid, 0)
 
-            for _ in range(dut.IN_D + 8):
+            max_wait_cycles = (len(inputs) * dut.IN_D * dut.OUT_D) + 16
+            for _ in range(max_wait_cycles):
                 if ctx.get(dut.o.valid):
                     break
                 await ctx.tick()
@@ -52,10 +53,8 @@ class TestConv1d(unittest.TestCase):
         K, IN_D, OUT_D = 4, 2, 3
         weights = np.zeros((K, IN_D, OUT_D))
         weights[0] = np.array([[-2, 1, 0], [0.5, -1, 0.25]])
-        print("weights", weights)
 
         biases = np.array([0, 0, 0])
-        print("biases", biases)
 
         inputs = [
             parse_nnq([0.5, -1.0]),
@@ -63,7 +62,6 @@ class TestConv1d(unittest.TestCase):
             parse_nnq([0.5, -1.0]),
             parse_nnq([0.5, -1.0]),
         ]
-        print("inputs", inputs)
 
         expected = parse_nnq([-1.5, 1.5, -0.25])
 
@@ -80,10 +78,8 @@ class TestConv1d(unittest.TestCase):
         weights[1] = -np.ones((IN_D, OUT_D))
         weights[2] = np.ones((IN_D, OUT_D))
         weights[3] = -np.ones((IN_D, OUT_D))
-        print("weights", weights)
 
         biases = np.array([0, 0, 0])
-        print("biases", biases)
 
         inputs = [
             parse_nnq([0.5, -1.0]),
@@ -91,7 +87,6 @@ class TestConv1d(unittest.TestCase):
             parse_nnq([0.5, -1.0]),
             parse_nnq([0.5, -1.0]),
         ]
-        print("inputs", inputs)
 
         expected = parse_nnq([0, 0, 0])
 
@@ -108,10 +103,8 @@ class TestConv1d(unittest.TestCase):
         weights[1] = -np.ones((IN_D, OUT_D))
         weights[2] = np.ones((IN_D, OUT_D))
         weights[3] = -np.ones((IN_D, OUT_D))
-        print("weights", weights)
 
         biases = np.array([0.25, -0.125, 0])
-        print("biases", biases)
 
         inputs = [
             parse_nnq([0.5, -1.0]),
@@ -119,7 +112,6 @@ class TestConv1d(unittest.TestCase):
             parse_nnq([0.5, -1.0]),
             parse_nnq([0.5, -1.0]),
         ]
-        print("inputs", inputs)
 
         expected = parse_nnq([0.25, -0.125, 0])
 
