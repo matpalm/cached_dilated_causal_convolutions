@@ -68,6 +68,7 @@ class QbNetwork(wiring.Component):
                 activation_caches.append(activation_cache)
 
         # inject cuts between convs and activation caches
+        # to break long handshake paths.
         # drops TRELLIS_COMB slightly, but ups TRELLIS_FF
         # most importantly makes routing a lot faster
         cut_conv_acts = []

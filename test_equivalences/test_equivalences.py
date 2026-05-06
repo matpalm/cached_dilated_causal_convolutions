@@ -26,8 +26,7 @@ from cdcc.activation_cache import ActivationCache as AmaranthActivationCache
 from cdcc.dot_product import DotProduct
 from cdcc.row_by_matrix_multiply import RowByMatrixMultiply
 from cdcc.conv1d import Conv1d
-from cdcc.qb_network_2_layer import QbNetworkTwoLayer
-from cdcc.qb_network_3_layer import QbNetworkThreeLayer
+from cdcc.qb_network import QbNetwork
 from amaranth.sim import Simulator
 
 # cd ~/dev/cached_dilated_causal_convolutions
@@ -285,7 +284,7 @@ class TestEquivalences(unittest.TestCase):
             verbose=False,
         )
 
-        dut = QbNetworkThreeLayer.build(str(trained_weights))
+        dut = QbNetwork.build(str(trained_weights))
 
         with open(test_data, "rb") as f:
             data = pickle.load(f)
@@ -294,8 +293,6 @@ class TestEquivalences(unittest.TestCase):
         x = x.reshape(-1, x.shape[-1])
         self.assertEqual(x.shape[1], dut.IN_D)
 
-        print("HACK! sampling x")
-        x = x[:100]
         y_pred_fxp = []
         for sample in tqdm.tqdm(x, desc="fxpmath"):
             y_pred_fxp.append(float(fxp_model.predict(sample)[0]))

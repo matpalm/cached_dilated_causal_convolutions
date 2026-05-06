@@ -15,15 +15,13 @@ class ActivationCache(wiring.Component):
             raise ValueError(f"ActivationCache is specialized for K=4, received {K}")
 
         self.in_out_d = in_out_d
+        self.input_layout = data.ArrayLayout(NNQ, self.in_out_d)
+        self.output_layout = data.ArrayLayout(self.input_layout, K)
 
         super().__init__(
             {
-                "i": wiring.In(stream.Signature(data.ArrayLayout(NNQ, self.in_out_d))),
-                "o": wiring.Out(
-                    stream.Signature(
-                        data.ArrayLayout(data.ArrayLayout(NNQ, self.in_out_d), K)
-                    )
-                ),
+                "i": wiring.In(stream.Signature(self.input_layout)),
+                "o": wiring.Out(stream.Signature(self.output_layout)),
             }
         )
 
@@ -31,7 +29,7 @@ class ActivationCache(wiring.Component):
         self._num_entries = K * self._dilation
         self._use_ebr = use_ebr
 
-        feature = data.ArrayLayout(NNQ, self.in_out_d)
+        feature = self.input_layout
         self._buffer = None
         self._ebr_memories = None
 
