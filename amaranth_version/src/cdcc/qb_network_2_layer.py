@@ -47,12 +47,13 @@ class QbNetworkTwoLayer(wiring.Component):
         m.submodules.act0 = act0 = ActivationCache(
             in_out_d=num_filters, dilation_level=1
         )
-        m.submodules.cut_conv0_to_act0 = cut_conv0_to_act0 = StreamCut(
-            data.ArrayLayout(NNQ, conv0.OUT_D)
-        )
-        m.submodules.cut_act0_to_conv1 = cut_act0_to_conv1 = StreamCut(
-            data.ArrayLayout(data.ArrayLayout(NNQ, conv1.IN_D), K)
-        )
+
+        # m.submodules.cut_conv0_to_act0 = cut_conv0_to_act0 = StreamCut(
+        #     data.ArrayLayout(NNQ, conv0.OUT_D)
+        # )
+        # m.submodules.cut_act0_to_conv1 = cut_act0_to_conv1 = StreamCut(
+        #     data.ArrayLayout(data.ArrayLayout(NNQ, conv1.IN_D), K)
+        # )
 
         w, b = self.conv_weights_biases_for("qconv_1_qb")
         m.submodules.conv1 = conv1 = Conv1d(w, b, apply_relu=False)
@@ -61,10 +62,12 @@ class QbNetworkTwoLayer(wiring.Component):
 
         wiring.connect(m, wiring.flipped(self.i), lsb.i)
         wiring.connect(m, lsb.o, conv0.i)
-        wiring.connect(m, conv0.o, cut_conv0_to_act0.i)
-        wiring.connect(m, cut_conv0_to_act0.o, act0.i)
-        wiring.connect(m, act0.o, cut_act0_to_conv1.i)
-        wiring.connect(m, cut_act0_to_conv1.o, conv1.i)
+        # wiring.connect(m, conv0.o, cut_conv0_to_act0.i)
+        # wiring.connect(m, cut_conv0_to_act0.o, act0.i)
+        # wiring.connect(m, act0.o, cut_act0_to_conv1.i)
+        # wiring.connect(m, cut_act0_to_conv1.o, conv1.i)
+        wiring.connect(m, conv0.o, act0.i)
+        wiring.connect(m, act0.o, conv1.i)
 
         final_conv = conv1
         m.d.comb += [

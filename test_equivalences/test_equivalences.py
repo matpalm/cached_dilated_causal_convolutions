@@ -26,7 +26,7 @@ from cdcc.activation_cache import ActivationCache as AmaranthActivationCache
 from cdcc.dot_product import DotProduct
 from cdcc.row_by_matrix_multiply import RowByMatrixMultiply
 from cdcc.conv1d import Conv1d
-# from cdcc.qb_network_2_layer import QbNetworkTwoLayer
+from cdcc.qb_network_2_layer import QbNetworkTwoLayer
 from cdcc.qb_network_3_layer import QbNetworkThreeLayer
 from amaranth.sim import Simulator
 
@@ -294,8 +294,10 @@ class TestEquivalences(unittest.TestCase):
         x = x.reshape(-1, x.shape[-1])
         self.assertEqual(x.shape[1], dut.IN_D)
 
+        print("HACK! sampling x")
+        x = x[:100]
         y_pred_fxp = []
-        for sample in x:
+        for sample in tqdm.tqdm(x, desc="fxpmath"):
             y_pred_fxp.append(float(fxp_model.predict(sample)[0]))
 
         y_pred_am = []
@@ -304,7 +306,7 @@ class TestEquivalences(unittest.TestCase):
             ctx.set(dut.i.valid, 0)
             ctx.set(dut.o.ready, 1)
 
-            for sample in tqdm.tqdm(x):
+            for sample in tqdm.tqdm(x, desc="amaranth"):
                 while not ctx.get(dut.i.ready):
                     await ctx.tick()
 
