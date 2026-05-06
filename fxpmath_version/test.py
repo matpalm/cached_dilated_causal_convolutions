@@ -71,8 +71,8 @@ fxp = util.FxpUtil()
 # None:
 #    util.ensure_dir_exists(opts.test_x_dir)
 
+
 def process(wave):
-    print("running wave", wave)
 
     test_ds = data.tf_dataset_for_split('test',
                         seq_len=opts.num_test_egs,
@@ -98,7 +98,7 @@ def process(wave):
 
     # run net
     y_pred = []
-    for i in tqdm.tqdm(range(len(x))):
+    for i in tqdm.tqdm(range(len(x)), desc=f"{wave:6s}"):
 
         # run through model
         y_pred.append(fxp_model.predict(x[i]))
@@ -152,6 +152,7 @@ def process(wave):
         print("saving plot to", plt_fname)
         plt.savefig(plt_fname)
         plt.clf()
+
 
 from multiprocessing import Pool
 waves = ['sine', 'ramp', 'square', 'zigzag']
