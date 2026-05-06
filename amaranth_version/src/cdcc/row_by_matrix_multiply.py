@@ -32,8 +32,8 @@ class RowByMatrixMultiply(wiring.Component):
 
         # we do mults per column, so transpose here from (IN_D, OUT_D)
         # to (OUT_D, IN_D) to parallelise over columns
-        self._np_weights = np_weights.T
-        self._col_dot_products = [DotProduct(w) for w in self._np_weights]
+        self.np_weights = np_weights.T
+        self.col_dot_products = [DotProduct(w) for w in self.np_weights]
 
         super().__init__(
             {
@@ -48,7 +48,7 @@ class RowByMatrixMultiply(wiring.Component):
         all_cols_ready = 1
         all_cols_valid = 1
 
-        for j, dp in enumerate(self._col_dot_products):
+        for j, dp in enumerate(self.col_dot_products):
             m.submodules[f"col{j:02d}"] = dp
 
             m.d.comb += [

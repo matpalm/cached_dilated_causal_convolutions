@@ -15,13 +15,6 @@ class LeftShiftBuffer(wiring.Component):
     OUT_D = 4  # output dim; (x, e0, e1, 0)
     K = 4  # kernel size
 
-    # TODO: use data.StructLayout
-    # i: In(stream.Signature(data.StructLayout({
-    #         "freq_inc": ASQ,
-    #         "phase": ASQ,
-    #     })))
-    # o: Out(stream.Signature(ASQ))
-
     i: wiring.In(stream.Signature(data.ArrayLayout(NNQ, IN_D)))
     o: wiring.Out(stream.Signature(data.ArrayLayout(data.ArrayLayout(NNQ, OUT_D), K)))
 
@@ -47,8 +40,6 @@ class LeftShiftBuffer(wiring.Component):
                 m.d.sync += self.buffer[k].eq(self.buffer[k + 1])
             m.d.sync += self.buffer[self.K - 1].eq(self.i.payload)
 
-        # Match fxpmath buffer semantics: emit the current input on the
-        # newest tap of the output window in the same accepted beat.
         for k in range(self.K - 1):
             m.d.comb += self.o.payload[k].eq(self.buffer[k + 1])
         m.d.comb += self.o.payload[self.K - 1].eq(self.i.payload)

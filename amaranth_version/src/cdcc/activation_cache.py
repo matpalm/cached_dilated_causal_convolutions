@@ -25,39 +25,37 @@ class ActivationCache(wiring.Component):
             }
         )
 
-        self._dilation = K**dilation_level
-        self._num_entries = K * self._dilation
-        self._use_ebr = use_ebr
+        self.dilation = K**dilation_level
+        self.num_entries = K * self.dilation
+        self.use_ebr = use_ebr
 
         feature = self.input_layout
-        self._buffer = None
-        self._ebr_memories = None
+        self.buffer = None
+        self.ebr_memories = None
 
-        if self._use_ebr:
-            # Replicate storage three times to provide three independent tap reads
-            # while still accepting one write per cycle.
-            init = [[0] * self.in_out_d for _ in range(self._num_entries)]
-            self._ebr_memories = [
+        if self.use_ebr:
+            init = [[0] * self.in_out_d for _ in range(self.num_entries)]
+            self.ebr_memories = [
                 Memory(
                     shape=feature,
-                    depth=self._num_entries,
+                    depth=self.num_entries,
                     init=init,
                     attrs={"ram_style": "block"},
                 )
                 for i in range(3)
             ]
         else:
-            self._buffer = Array(
+            self.buffer = Array(
                 Signal(feature, name=f"ac_{idx}", init=[0] * self.in_out_d)
-                for idx in range(self._num_entries)
+                for idx in range(self.num_entries)
             )
-        self._write_head = Signal(range(self._num_entries), init=0)
+        self.write_head = Signal(range(self.num_entries), init=0)
 
     def elaborate(self, platform):
         m = Module()
 
-        d = self._dilation
-        n = self._num_entries
+        d = self.dilation
+        n = self.num_entries
         ring_mask = n - 1
 
         idx_1d = Signal(range(n))
@@ -69,21 +67,21 @@ class ActivationCache(wiring.Component):
             self.o.valid.eq(self.i.valid),
             # n is always a power-of-two (K=4 and dilation is K**level),
             # so modulo-n wrap is just masking the low bits.
-            idx_1d.eq((self._write_head - d) & ring_mask),
-            idx_2d.eq((self._write_head - (2 * d)) & ring_mask),
-            idx_3d.eq((self._write_head - (3 * d)) & ring_mask),
+            idx_1d.eq((self.write_head - d) & ring_mask),
+            idx_2d.eq((self.write_head - (2 * d)) & ring_mask),
+            idx_3d.eq((self.write_head - (3 * d)) & ring_mask),
             self.o.payload[3].eq(self.i.payload),
         ]
 
-        if self._use_ebr:
-            for i, mem in enumerate(self._ebr_memories):
+        if self.use_ebr:
+            for i, mem in enumerate(self.ebr_memories):
                 m.submodules[f"ac_mem_{i}"] = mem
 
-            rd_1d = self._ebr_memories[0].read_port(domain="comb")
-            rd_2d = self._ebr_memories[1].read_port(domain="comb")
-            rd_3d = self._ebr_memories[2].read_port(domain="comb")
+            rd_1d = self.ebr_memories[0].read_port(domain="comb")
+            rd_2d = self.ebr_memories[1].read_port(domain="comb")
+            rd_3d = self.ebr_memories[2].read_port(domain="comb")
 
-            wr_ports = [mem.write_port(domain="sync") for mem in self._ebr_memories]
+            wr_ports = [mem.write_port(domain="sync") for mem in self.ebr_memories]
 
             m.d.comb += [
                 rd_1d.addr.eq(idx_1d),
@@ -96,21 +94,21 @@ class ActivationCache(wiring.Component):
 
             for wr in wr_ports:
                 m.d.comb += [
-                    wr.addr.eq(self._write_head),
+                    wr.addr.eq(self.write_head),
                     wr.data.eq(self.i.payload),
                     wr.en.eq(self.i.valid & self.i.ready),
                 ]
         else:
             m.d.comb += [
-                self.o.payload[0].eq(self._buffer[idx_3d]),
-                self.o.payload[1].eq(self._buffer[idx_2d]),
-                self.o.payload[2].eq(self._buffer[idx_1d]),
+                self.o.payload[0].eq(self.buffer[idx_3d]),
+                self.o.payload[1].eq(self.buffer[idx_2d]),
+                self.o.payload[2].eq(self.buffer[idx_1d]),
             ]
 
             with m.If(self.i.valid & self.i.ready):
-                m.d.sync += self._buffer[self._write_head].eq(self.i.payload)
+                m.d.sync += self.buffer[self.write_head].eq(self.i.payload)
 
         with m.If(self.i.valid & self.i.ready):
-            m.d.sync += self._write_head.eq((self._write_head + 1) & ring_mask)
+            m.d.sync += self.write_head.eq((self.write_head + 1) & ring_mask)
 
         return m

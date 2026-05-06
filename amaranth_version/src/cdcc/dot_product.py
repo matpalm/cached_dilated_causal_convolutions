@@ -27,15 +27,13 @@ class DotProduct(wiring.Component):
             }
         )
 
-        self._weights = Array(parse_nnq(np_weights))
-        self._index = Signal(range(self.D + 1), init=0)
+        self.weights = Array(parse_nnq(np_weights))
+        self.index = Signal(range(self.D + 1), init=0)
 
         # running dot-product sum is double width
-        self._accumulator = Signal(NNQ_DW, init=0)
+        self.accumulator = Signal(NNQ_DW, init=0)
 
-        self._a_values = Array(
-            Signal(NNQ, name=f"a_{i}", init=0) for i in range(self.D)
-        )
+        self.a_values = Array(Signal(NNQ, name=f"a_{i}", init=0) for i in range(self.D))
 
     def elaborate(self, platform):
         m = Module()
@@ -43,7 +41,7 @@ class DotProduct(wiring.Component):
         m.d.comb += [
             self.i.ready.eq(0),
             self.o.valid.eq(0),
-            self.o.payload.eq(self._accumulator),
+            self.o.payload.eq(self.accumulator),
         ]
 
         with m.FSM() as fsm:
@@ -52,10 +50,10 @@ class DotProduct(wiring.Component):
                 m.d.comb += self.i.ready.eq(1)
                 with m.If(self.i.valid & self.i.ready):
                     for j in range(self.D):
-                        m.d.sync += self._a_values[j].eq(self.i.payload[j])
+                        m.d.sync += self.a_values[j].eq(self.i.payload[j])
                     m.d.sync += [
-                        self._accumulator.eq(0),
-                        self._index.eq(0),
+                        self.accumulator.eq(0),
+                        self.index.eq(0),
                     ]
                     m.next = "MULTIPLY_ELEMENT"
 
@@ -64,16 +62,16 @@ class DotProduct(wiring.Component):
                 # them allows yosys to know it's a MAC op and can use the accum in MULT18x18D
                 # ( which results in TRELLIS_FF & TRELLIS_COMB dropping )
                 m.d.sync += [
-                    self._accumulator.eq(
-                        self._accumulator.as_value().as_signed()
+                    self.accumulator.eq(
+                        self.accumulator.as_value().as_signed()
                         + (
-                            self._a_values[self._index].as_value().as_signed()
-                            * self._weights[self._index].as_value().as_signed()
+                            self.a_values[self.index].as_value().as_signed()
+                            * self.weights[self.index].as_value().as_signed()
                         )
                     ),
-                    self._index.eq(self._index + 1),
+                    self.index.eq(self.index + 1),
                 ]
-                with m.If(self._index == self.D - 1):
+                with m.If(self.index == self.D - 1):
                     m.next = "DONE"
 
             with m.State("DONE"):

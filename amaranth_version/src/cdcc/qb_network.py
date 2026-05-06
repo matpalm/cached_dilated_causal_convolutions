@@ -42,6 +42,9 @@ class QbNetwork(wiring.Component):
 
         m.submodules.lsb = lsb = LeftShiftBuffer()
 
+        # TODO: rather than just += module we could name them
+        #  e.g. m.submodules[f"conv{i}"] = conv
+
         # build convolutions as well as activation caches
         # for all but the last
         convs = []
@@ -82,6 +85,7 @@ class QbNetwork(wiring.Component):
             m.submodules += cut_act_conv
             cut_act_convs.append(cut_act_conv)
 
+        # do wiring; inp -> left shift -> first conv
         wiring.connect(m, wiring.flipped(self.i), lsb.i)
         wiring.connect(m, lsb.o, convs[0].i)
 

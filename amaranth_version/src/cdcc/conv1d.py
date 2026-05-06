@@ -53,35 +53,36 @@ class Conv1d(wiring.Component):
         # we don't have enough MULT18X18D units anymore to run all kernels in parallel
         # so instead run the K=4 sequentially.
 
-        self._weights = Array(
+        self.weights = Array(
             Array(Array(parse_nnq(np_weights[k, i])) for i in range(self.IN_D))
             for k in range(K)
         )
-        self._biases = Array(parse_nnq(np_biases, shape=NNQ_DW))
-        self._apply_relu = apply_relu
+        self.biases = Array(parse_nnq(np_biases, shape=NNQ_DW))
+        self.apply_relu = apply_relu
 
-        self._k_idx = Signal(range(K), init=0)
-        self._i_idx = Signal(range(self.IN_D), init=0)
-        self._o_idx = Signal(range(self.OUT_D), init=0)
+        self.k_idx = Signal(range(K), init=0)
+        self.i_idx = Signal(range(self.IN_D), init=0)
+        self.o_idx = Signal(range(self.OUT_D), init=0)
 
-        self._accum = Array(
+        self.accum = Array(
             Signal(NNQ_DW, name=f"conv_accum_{i}", init=0) for i in range(self.OUT_D)
         )
-        self._result = Array(
+        self.result = Array(
             Signal(NNQ, name=f"conv_result_{i}", init=0) for i in range(self.OUT_D)
         )
-        self._input = Array(
+        self.input = Array(
             Array(
                 Signal(NNQ, name=f"conv_in_{k}_{i}", init=0) for i in range(self.IN_D)
             )
             for k in range(K)
         )
 
-        # the max value for NNQ single precision is 7.999755859375 whereas the min value is -8
-        # so to avoid overflow we clip the double width precision
-        # value between these bounds _before_ the single precision conversion
-        self._lower_bound = fixed.Const(-8.0, shape=NNQ_DW).as_value()
-        self._upper_bound = fixed.Const(7.999755859375, shape=NNQ_DW).as_value()
+        # clip to representable NNQ bounds (expressed in NNQ_DW shape)
+        # before narrowing NNQ_DW -> NNQ. note: can't use fixed Value utils (clamp)
+        # directly since we're matching FXPmath/qkeras which does things slightly
+        # differently
+        self.lower_bound = fixed.Const(NNQ.min().as_float(), shape=NNQ_DW).as_value()
+        self.upper_bound = fixed.Const(NNQ.max().as_float(), shape=NNQ_DW).as_value()
 
     def elaborate(self, platform):
         m = Module()
@@ -92,7 +93,7 @@ class Conv1d(wiring.Component):
         ]
 
         for i in range(self.OUT_D):
-            m.d.comb += self.o.payload[i].eq(self._result[i])
+            m.d.comb += self.o.payload[i].eq(self.result[i])
 
         with m.FSM():
 
@@ -104,61 +105,59 @@ class Conv1d(wiring.Component):
                 with m.If(self.i.valid & self.i.ready):
                     for k in range(K):
                         for i in range(self.IN_D):
-                            m.d.sync += self._input[k][i].eq(self.i.payload[k][i])
+                            m.d.sync += self.input[k][i].eq(self.i.payload[k][i])
                     for i in range(self.OUT_D):
-                        m.d.sync += self._accum[i].eq(self._biases[i])
+                        m.d.sync += self.accum[i].eq(self.biases[i])
                     m.d.sync += [
-                        self._k_idx.eq(0),
-                        self._i_idx.eq(0),
-                        self._o_idx.eq(0),
+                        self.k_idx.eq(0),
+                        self.i_idx.eq(0),
+                        self.o_idx.eq(0),
                     ]
                     m.next = "MAT_MUL_RUNNING"
 
             with m.State("MAT_MUL_RUNNING"):
-                m.d.sync += self._accum[self._o_idx].eq(
-                    self._accum[self._o_idx].as_value().as_signed()
+                m.d.sync += self.accum[self.o_idx].eq(
+                    self.accum[self.o_idx].as_value().as_signed()
                     + (
-                        self._input[self._k_idx][self._i_idx].as_value().as_signed()
-                        * self._weights[self._k_idx][self._i_idx][self._o_idx]
+                        self.input[self.k_idx][self.i_idx].as_value().as_signed()
+                        * self.weights[self.k_idx][self.i_idx][self.o_idx]
                         .as_value()
                         .as_signed()
                     )
                 )
 
-                # gawd, what a mess! :/
-
-                with m.If(self._i_idx == self.IN_D - 1):
-                    m.d.sync += self._i_idx.eq(0)
-                    with m.If(self._o_idx == self.OUT_D - 1):
-                        m.d.sync += self._o_idx.eq(0)
-                        with m.If(self._k_idx == K - 1):
+                with m.If(self.i_idx == self.IN_D - 1):
+                    m.d.sync += self.i_idx.eq(0)
+                    with m.If(self.o_idx == self.OUT_D - 1):
+                        m.d.sync += self.o_idx.eq(0)
+                        with m.If(self.k_idx == K - 1):
                             m.next = "CLIP_LOWER"
                         with m.Else():
-                            m.d.sync += self._k_idx.eq(self._k_idx + 1)
+                            m.d.sync += self.k_idx.eq(self.k_idx + 1)
                     with m.Else():
-                        m.d.sync += self._o_idx.eq(self._o_idx + 1)
+                        m.d.sync += self.o_idx.eq(self.o_idx + 1)
                 with m.Else():
-                    m.d.sync += self._i_idx.eq(self._i_idx + 1)
+                    m.d.sync += self.i_idx.eq(self.i_idx + 1)
 
             with m.State("CLIP_LOWER"):
                 # TODO: combine CLIP_LOWER and _UPPER?
                 for i in range(self.OUT_D):
-                    m.d.sync += self._accum[i].eq(
+                    m.d.sync += self.accum[i].eq(
                         Mux(
-                            self._accum[i] < self._lower_bound,
-                            self._lower_bound,
-                            self._accum[i],
+                            self.accum[i] < self.lower_bound,
+                            self.lower_bound,
+                            self.accum[i],
                         )
                     )
                 m.next = "CLIP_UPPER"
 
             with m.State("CLIP_UPPER"):
                 for i in range(self.OUT_D):
-                    m.d.sync += self._accum[i].eq(
+                    m.d.sync += self.accum[i].eq(
                         Mux(
-                            self._accum[i] > self._upper_bound,
-                            self._upper_bound,
-                            self._accum[i],
+                            self.accum[i] > self.upper_bound,
+                            self.upper_bound,
+                            self.accum[i],
                         )
                     )
                 m.next = "SINGLE_W"
@@ -169,11 +168,11 @@ class Conv1d(wiring.Component):
                     # fxpmath resize semantics used by the reference model.
                     # Match fxpmath resize semantics (truncate toward zero)
                     # while narrowing NNQ_DW -> NNQ using shape-derived widths.
-                    acc = self._accum[i].as_value()
+                    acc = self.accum[i].as_value()
                     acc_clipped = Mux(
-                        acc < self._lower_bound,
-                        self._lower_bound,
-                        Mux(acc > self._upper_bound, self._upper_bound, acc),
+                        acc < self.lower_bound,
+                        self.lower_bound,
+                        Mux(acc > self.upper_bound, self.upper_bound, acc),
                     )
                     frac_nonzero = acc_clipped[:frac_drop].any()
                     trunc_toward_zero = Mux(
@@ -181,24 +180,24 @@ class Conv1d(wiring.Component):
                         acc_clipped + (1 << frac_drop),
                         acc_clipped,
                     )
-                    m.d.sync += self._result[i].eq(
+                    m.d.sync += self.result[i].eq(
                         trunc_toward_zero[frac_drop : frac_drop + out_width].as_signed()
                     )
-                if self._apply_relu:
+                if self.apply_relu:
                     m.next = "APPLY_RELU_6"
                 else:
                     m.next = "OUTPUT"
 
             with m.State("APPLY_RELU_6"):
                 for i in range(self.OUT_D):
-                    m.d.sync += self._result[i].eq(
+                    m.d.sync += self.result[i].eq(
                         Mux(
-                            self._result[i].as_value()[-1],
+                            self.result[i].as_value()[-1],
                             0,
                             Mux(
-                                self._result[i] > fixed.Const(6.0, shape=NNQ),
+                                self.result[i] > fixed.Const(6.0, shape=NNQ),
                                 fixed.Const(6.0, shape=NNQ),
-                                self._result[i],
+                                self.result[i],
                             ),
                         )
                     )
