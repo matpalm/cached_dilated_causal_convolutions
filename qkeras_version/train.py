@@ -46,6 +46,7 @@ if __name__ == '__main__':
         default=None,
         help="path to keras weights used to initialize fine-tuning",
     )
+    parser.add_argument("--relu-upper-bound", type=float, default=6)
     opts = parser.parse_args()
     print("opts", opts)
 
@@ -70,7 +71,7 @@ if __name__ == '__main__':
     # note: kernel size and implied dilation rate always assumed K
     RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**num_layers
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
-    TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 10
+    TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
@@ -83,6 +84,7 @@ if __name__ == '__main__':
         filter_sizes=opts.filter_sizes,
         # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
         l2=opts.l2,
+        relu_upper_bound=opts.relu_upper_bound,
     )
 
     if opts.init_weights is not None:

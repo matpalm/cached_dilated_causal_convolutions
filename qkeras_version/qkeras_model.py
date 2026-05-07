@@ -58,28 +58,36 @@ class QKerasModelBuilder(object):
         self.n_word = self.n_int + self.n_frac
 
     # qkeras quantiser for all convolution kernels and biases
-    def quantiser(self, po2=False):
+    def quantiser(self, po2: bool = False, double_width: bool = False):
+        nword = self.n_word
+        nint = self.n_int
+
+        if double_width:
+            nword *= 2
+            nint *= 2
+
         if po2:
-            return quantized_po2(bits=self.n_word, max_value=1)
+            return quantized_po2(bits=nword, max_value=1)
         else:
-            return quantized_bits(bits=self.n_word, integer=self.n_int, alpha=1)
+            return quantized_bits(bits=nword, integer=nint, alpha=1)
 
     # qkeras quantiser for all convolution activations
-    def quant_relu(self, po2=False):
+    def quant_relu(self, upper_bound: float, po2=False):
         if po2:
             assert False, "never need to use this?"
             return f"quantized_po2({self.n_word}, 1)"
         else:
-            return f"quantized_relu({self.n_word},{self.n_int},relu_upper_bound=6)"
+            return f"quantized_relu({self.n_word},{self.n_int},relu_upper_bound={upper_bound})"
 
     def add_quantized_bits_conv_block(
-            self,
-            inp,
-            layer_number: int,     # for dilation amount & naming
-            out_filters: int,
-            l2: float,
-            relu: bool
-        ):
+        self,
+        inp,
+        layer_number: int,  # for dilation amount & naming
+        out_filters: int,
+        l2: float,
+        relu: bool,
+        relu_upper_bound: float,
+    ):
 
         layer_id = f"qconv_{layer_number}_qb"
         y_pred = QConv1D(
@@ -96,21 +104,22 @@ class QKerasModelBuilder(object):
         self.layer_info.append({'type': 'qb', 'id': layer_id})
 
         if relu:
-            y_pred = QActivation(self.quant_relu(), name=f"qrelu_{layer_number}")(
-                y_pred
-            )
+            y_pred = QActivation(
+                self.quant_relu(relu_upper_bound), name=f"qrelu_{layer_number}"
+            )(y_pred)
             self.layer_info.append({'type': 'relu'})
 
         return y_pred
 
     def add_quantized_po2_conv_block(
-            self,
-            inp,
-            layer_number: int,     # for dilation amount & naming
-            l2: float,
-            out_filters: int,
-            po2_filters: int
-        ):
+        self,
+        inp,
+        layer_number: int,  # for dilation amount & naming
+        l2: float,
+        out_filters: int,
+        po2_filters: int,
+        relu_upper_bound: float,
+    ):
         # start with a _qb conv layer to handle the dilation
         layer_id = f"qconv_{layer_number}_qb"
         y_pred = QConv1D(
@@ -126,7 +135,9 @@ class QKerasModelBuilder(object):
         )(inp)
         self.layer_info.append({"type": "qb", "id": layer_id})
 
-        y_pred = QActivation(self.quant_relu(), name=f"qrelu_{layer_number}")(y_pred)
+        y_pred = QActivation(
+            self.quant_relu(relu_upper_bound), name=f"qrelu_{layer_number}"
+        )(y_pred)
         self.layer_info.append({"type": "relu"})
 
         # then a pair of 1x1 _po2 convs; expand to po2_filters, contract back to out_filters
@@ -155,7 +166,8 @@ class QKerasModelBuilder(object):
             self.layer_info.append({"type": "po2", "id": layer_id})
 
             y_pred = QActivation(
-                self.quant_relu(), name=f"qrelu_{layer_number}_{sublayer}"
+                self.quant_relu(relu_upper_bound),
+                name=f"qrelu_{layer_number}_{sublayer}",
             )(y_pred)
             self.layer_info.append({"type": "relu"})
 
@@ -167,7 +179,8 @@ class QKerasModelBuilder(object):
         in_out_d: int,
         filter_sizes: List[int],
         # po2_filter_size: int,
-        l2: float = 0.0,
+        l2: float,
+        relu_upper_bound: float,
     ):
         """
         create a qkeras model with a stack of dilation 1d convolutions
@@ -205,6 +218,7 @@ class QKerasModelBuilder(object):
                 out_filters=in_out_d if last_layer else layer_filter_size,
                 l2=l2,
                 relu=(not last_layer),
+                relu_upper_bound=relu_upper_bound,
             )
 
             # first layer dilates K, second K^2, etc
