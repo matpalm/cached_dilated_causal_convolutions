@@ -38,10 +38,10 @@ QbNetwork
 util for this sized model ( filters 4, 8, 16 ) is...
 
 ```
-Info: 	              DP16KD:      36/     56    64%    # conv 1 and 2 activation caches
+Info: 	              DP16KD:      12/     56    21%    # conv 1 and 2 activation caches
 Info: 	          MULT18X18D:       5/     28    17%
 ...
-Info: 	          TRELLIS_FF:    6306/  24288    25%
+Info: 	          TRELLIS_FF:    9888/  24288    40%
 Info: 	        TRELLIS_COMB:   10620/  24288    43%
 ```
 
