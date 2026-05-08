@@ -5,6 +5,8 @@ changes compared to verilog_version
 * Memory or Array (EBR) based activation caches
 * pipelining for the elements of the multiply
 
+qkeras model is...
+
 ```
 Layer (type)                Output Shape              Param #
 =================================================================
@@ -17,6 +19,24 @@ Layer (type)                Output Shape              Param #
 Total params: 992
 ```
 
+basic amaranth network structure is
+
+```
+QbNetwork
+  LeftShiftBuffer      # shift register for input
+  Conv1d_0
+  ActivationCache_0    # Array => FFs
+  Conv1d_1
+  ActivationCache_1    # Memory => EBR
+  Conv1d_2
+  ActivationCache_2    # Memory => EBR
+  Conv1d_3
+```
+
+`pdm build` takes 2m20s
+
+util for this sized model ( filters 4, 8, 16 ) is...
+
 ```
 Info: 	              DP16KD:      36/     56    64%    # conv 1 and 2 activation caches
 Info: 	          MULT18X18D:       5/     28    17%
@@ -24,6 +44,12 @@ Info: 	          MULT18X18D:       5/     28    17%
 Info: 	          TRELLIS_FF:    6306/  24288    25%
 Info: 	        TRELLIS_COMB:   10620/  24288    43%
 ```
+
+increasing number of filters per layer doesn't help much. the next most interesting thing is more depth ( which will require implementing an PSRAM version of the activation cache )
+
+original sverilog version ( and the first amaranth port )
+used conv1d -* row_by_matrix_mult -* dot_products
+but it's worked out easier to just roll everything into i, j, k loops in conv1d
 
 TODO:
 

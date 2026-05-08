@@ -95,6 +95,10 @@ class Conv1d(wiring.Component):
         for i in range(self.OUT_D):
             m.d.comb += self.o.payload[i].eq(self.result[i])
 
+        # TODO: started with conv1d -* row_by_matrix_mult -* dot_product
+        # but it's been easier to fold everything into this state machine
+        # can go back to split classes later if need be, but for now it's simpler.
+
         with m.FSM():
 
             frac_drop = NNQ_DW.f_bits - NNQ.f_bits
@@ -125,7 +129,6 @@ class Conv1d(wiring.Component):
                         .as_signed()
                     )
                 )
-
                 with m.If(self.i_idx == self.IN_D - 1):
                     m.d.sync += self.i_idx.eq(0)
                     with m.If(self.o_idx == self.OUT_D - 1):
@@ -164,10 +167,9 @@ class Conv1d(wiring.Component):
 
             with m.State("SINGLE_W"):
                 for i in range(self.OUT_D):
-                    # Ensure saturating behavior during narrowing, matching
-                    # fxpmath resize semantics used by the reference model.
-                    # Match fxpmath resize semantics (truncate toward zero)
-                    # while narrowing NNQ_DW -> NNQ using shape-derived widths.
+                    # TODO: had to include this because of a weird diff with narrowing
+                    # to match fxpmath :/ ( specifically difference in truncate toward zero
+                    # behaviour )
                     acc = self.accum[i].as_value()
                     acc_clipped = Mux(
                         acc < self.lower_bound,

@@ -42,5 +42,5 @@ rm -rf build/neural-waveshaper-r3/
 pdm neural_waveshaper build --hw r3 --fs-192khz
 grep -A30 ^Info:\ Devi build/neural-waveshaper-r3/top.tim
 openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit
-#pdm flash archive build/neural-waveshaper-r3/dsp-mirror*.tar.gz --slot 1 --noconfirm
+#pdm flash archive build/neural-waveshaper-r3/neural-waveshaper*.tar.gz --slot 1 --noconfirm
 popd

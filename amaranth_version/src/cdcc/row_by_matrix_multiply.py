@@ -10,6 +10,7 @@ from . import NNQ, NNQ_DW
 from .dot_product import DotProduct
 
 
+@deprecated("all folded in conv1d")
 class RowByMatrixMultiply(wiring.Component):
     """Row by Matrix Multiply.
 
