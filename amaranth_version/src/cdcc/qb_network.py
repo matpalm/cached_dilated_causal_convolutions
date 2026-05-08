@@ -70,17 +70,13 @@ class QbNetwork(wiring.Component):
                 m.submodules += activation_cache
                 activation_caches.append(activation_cache)
 
-        # inject cuts between convs and activation caches
+        # inject cuts after each activation cache
         # to break long handshake paths.
         # drops TRELLIS_COMB slightly, but ups TRELLIS_FF
         # most importantly makes routing a lot faster
-        cut_conv_acts = []
         cut_act_convs = []
         for i in range(self.num_layers - 1):  # ie. NOT last layer
-            print(f"{i} cut_conv_acts & cut_act_convs")
-            cut_conv_act = StreamCut(activation_caches[i].input_layout)
-            m.submodules += cut_conv_act
-            cut_conv_acts.append(cut_conv_act)
+            print(f"{i} cut_act_convs")
             cut_act_conv = StreamCut(activation_caches[i].output_layout)
             m.submodules += cut_act_conv
             cut_act_convs.append(cut_act_conv)
@@ -92,8 +88,7 @@ class QbNetwork(wiring.Component):
         # for every layer ( except the last ) wire it up to it's activation
         # cache and then to the next conv ( with each one having cut stream )
         for i in range(self.num_layers - 1):
-            wiring.connect(m, convs[i].o, cut_conv_acts[i].i)
-            wiring.connect(m, cut_conv_acts[i].o, activation_caches[i].i)
+            wiring.connect(m, convs[i].o, activation_caches[i].i)
             wiring.connect(m, activation_caches[i].o, cut_act_convs[i].i)
             wiring.connect(m, cut_act_convs[i].o, convs[i + 1].i)
 
