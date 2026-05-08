@@ -94,44 +94,63 @@ class ActivationCache(wiring.Component):
                 wr.data.eq(self.i.payload),
                 wr.en.eq(self.i.valid & self.i.ready),
                 rd.addr.eq(0),
+                rd.en.eq(0),
+                self.i.ready.eq(0),
+                self.o.valid.eq(0),
             ]
+
+            # cycle	state		i.r	i.v	o.v	o.r
+            # 0	    IDLE		1	1	0	1	accept input, capture payload -> READ3
+            # 1	    READ3		0	X	0	1	set read for tap3 -> READ2
+            # 2     READ2		0	X	0	1	capture tap3, set read for tap2 -> READ1
+            # 3	    READ1		0	X	0	1	capture tap2, set read for tap1 -> OUTPREP
+            # 4	    OUT_PREP	0	X	0	1	capture tap1 -> OUTPUT
+            # 5	    OUTPUT	    0	X	1	1	output valid, wait for o.ready -> IDLE
 
             with m.FSM(domain="sync", reset="IDLE") as fsm:
 
                 with m.State("IDLE"):
+                    # ready to process next input
                     with m.If(self.i.valid & self.i.ready):
                         m.d.sync += [
                             accepted_payload.eq(self.i.payload),
                             accepted_head.eq(self.write_head),
                         ]
                         m.next = "READ3"
+                    m.d.comb += [
+                        self.i.ready.eq(1),
+                    ]
 
                 with m.State("READ3"):
+                    # prep for read 2
+                    # ( note read3 done explicitly with incoming payload )
+                    m.d.comb += [rd.en.eq(1)]
                     m.next = "READ2"
 
                 with m.State("READ2"):
+                    # read 2, ready for 1
                     m.d.sync += tap[2].eq(rd.data)
+                    m.d.comb += [rd.en.eq(1)]
                     m.next = "READ1"
 
                 with m.State("READ1"):
+                    # read 1, ready for 0
                     m.d.sync += tap[1].eq(rd.data)
+                    m.d.comb += [rd.en.eq(1)]
                     m.next = "OUT_PREP"
 
                 with m.State("OUT_PREP"):
+                    # read 02
                     m.d.sync += tap[0].eq(rd.data)
                     m.next = "OUTPUT"
 
                 with m.State("OUTPUT"):
+                    # output valid and ready for idle
                     with m.If(self.o.ready):
                         m.next = "IDLE"
-
-            m.d.comb += [
-                self.i.ready.eq(fsm.ongoing("IDLE")),
-                self.o.valid.eq(fsm.ongoing("OUTPUT")),
-                rd.en.eq(
-                    fsm.ongoing("READ3") | fsm.ongoing("READ2") | fsm.ongoing("READ1")
-                ),
-            ]
+                    m.d.comb += [
+                        self.o.valid.eq(1),
+                    ]
 
             with m.If(fsm.ongoing("READ3")):
                 m.d.comb += rd.addr.eq(idx_accepted[2])
