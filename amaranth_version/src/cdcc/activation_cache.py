@@ -31,19 +31,16 @@ class ActivationCache(wiring.Component):
 
         feature = self.input_layout
         self.buffer = None
-        self.ebr_memories = None
+        self.ebr_memory = None
 
         if self.use_ebr:
             init = [[0] * self.in_out_d for _ in range(self.num_entries)]
-            self.ebr_memories = [
-                Memory(
-                    shape=feature,
-                    depth=self.num_entries,
-                    init=init,
-                    attrs={"ram_style": "block"},
-                )
-                for i in range(3)
-            ]
+            self.ebr_memory = Memory(
+                shape=feature,
+                depth=self.num_entries,
+                init=init,
+                attrs={"ram_style": "block"},
+            )
         else:
             self.buffer = Array(
                 Signal(feature, name=f"ac_{idx}", init=[0] * self.in_out_d)
@@ -58,51 +55,99 @@ class ActivationCache(wiring.Component):
         n = self.num_entries
         ring_mask = n - 1
 
-        idx_1d = Signal(range(n))
-        idx_2d = Signal(range(n))
-        idx_3d = Signal(range(n))
+        idx = Array(Signal(range(n), name=f"idx_{i}") for i in range(3))
 
         m.d.comb += [
-            self.i.ready.eq(self.o.ready),
-            self.o.valid.eq(self.i.valid),
             # n is always a power-of-two (K=4 and dilation is K**level),
             # so modulo-n wrap is just masking the low bits.
-            idx_1d.eq((self.write_head - d) & ring_mask),
-            idx_2d.eq((self.write_head - (2 * d)) & ring_mask),
-            idx_3d.eq((self.write_head - (3 * d)) & ring_mask),
-            self.o.payload[3].eq(self.i.payload),
+            idx[0].eq((self.write_head - d) & ring_mask),
+            idx[1].eq((self.write_head - (2 * d)) & ring_mask),
+            idx[2].eq((self.write_head - (3 * d)) & ring_mask),
         ]
 
         if self.use_ebr:
-            for i, mem in enumerate(self.ebr_memories):
-                m.submodules[f"ac_mem_{i}"] = mem
+            m.submodules.ac_mem = self.ebr_memory
 
-            rd_1d = self.ebr_memories[0].read_port(domain="comb")
-            rd_2d = self.ebr_memories[1].read_port(domain="comb")
-            rd_3d = self.ebr_memories[2].read_port(domain="comb")
+            # read and write
+            rd = self.ebr_memory.read_port(domain="sync")
+            wr = self.ebr_memory.write_port(domain="sync")
 
-            wr_ports = [mem.write_port(domain="sync") for mem in self.ebr_memories]
+            # incoming value and write head
+            accepted_payload = Signal(self.input_layout)
+            accepted_head = Signal(range(n), init=0)
+
+            # three outputs taps and idxs for reads
+            tap = Array(Signal(self.input_layout, name=f"tap_{i}") for i in range(3))
+            idx_accepted = Array(
+                Signal(range(n), name=f"idx_{i}_accepted") for i in range(3)
+            )
 
             m.d.comb += [
-                rd_1d.addr.eq(idx_1d),
-                rd_2d.addr.eq(idx_2d),
-                rd_3d.addr.eq(idx_3d),
-                self.o.payload[0].eq(rd_3d.data),
-                self.o.payload[1].eq(rd_2d.data),
-                self.o.payload[2].eq(rd_1d.data),
+                idx_accepted[0].eq((accepted_head - d) & ring_mask),
+                idx_accepted[1].eq((accepted_head - (2 * d)) & ring_mask),
+                idx_accepted[2].eq((accepted_head - (3 * d)) & ring_mask),
+                self.o.payload[0].eq(tap[2]),
+                self.o.payload[1].eq(tap[1]),
+                self.o.payload[2].eq(tap[0]),
+                self.o.payload[3].eq(accepted_payload),
+                wr.addr.eq(self.write_head),
+                wr.data.eq(self.i.payload),
+                wr.en.eq(self.i.valid & self.i.ready),
+                rd.addr.eq(0),
             ]
 
-            for wr in wr_ports:
-                m.d.comb += [
-                    wr.addr.eq(self.write_head),
-                    wr.data.eq(self.i.payload),
-                    wr.en.eq(self.i.valid & self.i.ready),
-                ]
+            with m.FSM(domain="sync", reset="IDLE") as fsm:
+
+                with m.State("IDLE"):
+                    with m.If(self.i.valid & self.i.ready):
+                        m.d.sync += [
+                            accepted_payload.eq(self.i.payload),
+                            accepted_head.eq(self.write_head),
+                        ]
+                        m.next = "READ3"
+
+                with m.State("READ3"):
+                    m.next = "READ2"
+
+                with m.State("READ2"):
+                    m.d.sync += tap[2].eq(rd.data)
+                    m.next = "READ1"
+
+                with m.State("READ1"):
+                    m.d.sync += tap[1].eq(rd.data)
+                    m.next = "OUT_PREP"
+
+                with m.State("OUT_PREP"):
+                    m.d.sync += tap[0].eq(rd.data)
+                    m.next = "OUTPUT"
+
+                with m.State("OUTPUT"):
+                    with m.If(self.o.ready):
+                        m.next = "IDLE"
+
+            m.d.comb += [
+                self.i.ready.eq(fsm.ongoing("IDLE")),
+                self.o.valid.eq(fsm.ongoing("OUTPUT")),
+                rd.en.eq(
+                    fsm.ongoing("READ3") | fsm.ongoing("READ2") | fsm.ongoing("READ1")
+                ),
+            ]
+
+            with m.If(fsm.ongoing("READ3")):
+                m.d.comb += rd.addr.eq(idx_accepted[2])
+            with m.Elif(fsm.ongoing("READ2")):
+                m.d.comb += rd.addr.eq(idx_accepted[1])
+            with m.Elif(fsm.ongoing("READ1")):
+                m.d.comb += rd.addr.eq(idx_accepted[0])
+
         else:
             m.d.comb += [
-                self.o.payload[0].eq(self.buffer[idx_3d]),
-                self.o.payload[1].eq(self.buffer[idx_2d]),
-                self.o.payload[2].eq(self.buffer[idx_1d]),
+                self.i.ready.eq(self.o.ready),
+                self.o.valid.eq(self.i.valid),
+                self.o.payload[0].eq(self.buffer[idx[2]]),
+                self.o.payload[1].eq(self.buffer[idx[1]]),
+                self.o.payload[2].eq(self.buffer[idx[0]]),
+                self.o.payload[3].eq(self.i.payload),
             ]
 
             with m.If(self.i.valid & self.i.ready):
