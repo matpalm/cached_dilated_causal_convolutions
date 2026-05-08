@@ -1,10 +1,11 @@
 changes compared to verilog_version
 
-* all stream based
+* all stream based; FP4.12 for all the neural net math
 * dynamic sizing based on qkeras weights
-* Memory or Array based activation caches
+* Memory or Array (EBR) based activation caches
 * pipelining for the elements of the multiply
 
+```
 Layer (type)                Output Shape              Param #
 =================================================================
  input_1 (InputLayer)        (None, 256,  4)          0
@@ -14,26 +15,19 @@ Layer (type)                Output Shape              Param #
  qconv_3_qb (QConv1D)        (None,   1,  4)          260
 =================================================================
 Total params: 992
+```
 
-Info: 	              DP16KD:      36/     56    64%
+```
+Info: 	              DP16KD:      36/     56    64%    # conv 1 and 2 activation caches
 Info: 	          MULT18X18D:       5/     28    17%
 ...
 Info: 	          TRELLIS_FF:    6306/  24288    25%
 Info: 	        TRELLIS_COMB:   10620/  24288    43%
+```
 
+TODO:
 
-_________________________________________________________________
- Layer (type)                Output Shape              Param #
-=================================================================
- input_1 (InputLayer)        [(None, 2560, 4)]         0
- qconv_0 (QConv1D)           (None, 2560, 16)          272
- qrelu_0 (QActivation)       (None, 2560, 16)          0
- qconv_1 (QConv1D)           (None, 2560, 16)          1040
- qrelu_1 (QActivation)       (None, 2560, 16)          0
- qconv_2 (QConv1D)           (None, 2560, 16)          1040
- qrelu_2 (QActivation)       (None, 2560, 16)          0
- qconv_3 (QConv1D)           (None, 2560, 4)           260
-
-=================================================================
-Total params: 2,612
-_________________________________________________________________
+* next botteneck is storing the activation cache for another layer depth; need to use PSRAM
+* fp35 branch has WIP with FP2.14 pretraining -> FP3.5 fine tuning
+* first mu_law test didn't do well ( but see there was a bug )
+* need to retry the po2 quantisation and logic gate nets
