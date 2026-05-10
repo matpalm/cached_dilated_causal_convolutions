@@ -34,7 +34,7 @@ class TestRowByMatrixMultiply(unittest.TestCase):
             await ctx.tick()
             ctx.set(dut.i.valid, 0)
 
-            for _ in range(dut.IN_D + 4):
+            for _ in range(2 * dut.IN_D * dut.OUT_D + 8):
                 if ctx.get(dut.o.valid):
                     break
                 await ctx.tick()

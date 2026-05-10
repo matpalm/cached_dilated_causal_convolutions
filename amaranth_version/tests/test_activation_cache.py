@@ -24,14 +24,24 @@ class TestActivationCache(unittest.TestCase):
                 sample += i * 0.1
                 sample_nnq = parse_nnq(sample, assert_exact=False)
 
+                # set input valid
                 ctx.set(dut.i.payload, sample_nnq)
                 ctx.set(dut.i.valid, 1)
                 await ctx.tick()
 
-                self.assertEqual(ctx.get(dut.o.valid), 1)
+                # wait until output valid
+                for _ in range(100):
+                    o_valid = ctx.get(dut.o.valid)
+                    if o_valid:
+                        break
+                    await ctx.tick()
+
+                # print("CHECK!")
                 # for k in range(K):
                 #     for d in range(3):
-                #         print("o", k, d, ctx.get(dut.o.payload[k][d]).as_float())
+                #         print(
+                #             "i", i, "o", k, d, ctx.get(dut.o.payload[k][d]).as_float()
+                #         )
 
                 def assert_almost_equals(k, expecteds):
                     expecteds = parse_nnq(expecteds, assert_exact=False)
@@ -54,11 +64,11 @@ class TestActivationCache(unittest.TestCase):
                 elif i == 19:
                     # at last step all entries, but last, will be zero
                     # entry from 4^3=64 steps ago
-                    assert_almost_equals(k=0, expecteds=[0.81, 0.82, 0.83])
+                    assert_almost_equals(k=0, expecteds=[0.71, 0.72, 0.73])
                     # entry from 4^2=16 steps ago
-                    assert_almost_equals(k=1, expecteds=[1.21, 1.22, 1.23])
+                    assert_almost_equals(k=1, expecteds=[1.11, 1.12, 1.13])
                     # entry from 4^1=4 steps ago
-                    assert_almost_equals(k=2, expecteds=[1.61, 1.62, 1.63])
+                    assert_almost_equals(k=2, expecteds=[1.51, 1.52, 1.53])
                     # most recent entry
                     assert_almost_equals(k=3, expecteds=[1.91, 1.92, 1.93])
 

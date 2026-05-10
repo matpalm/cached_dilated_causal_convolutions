@@ -97,7 +97,7 @@ class QKerasModelBuilder(object):
             padding="causal",
             dilation_rate=K**layer_number,
             kernel_quantizer=self.quantiser(),
-            bias_quantizer=self.quantiser(),
+            bias_quantizer=self.quantiser(double_width=True),
             kernel_regularizer=regularizers.L2(l2),
             bias_regularizer=regularizers.L2(l2),
         )(inp)
@@ -129,7 +129,7 @@ class QKerasModelBuilder(object):
             padding="causal",
             dilation_rate=K**layer_number,
             kernel_quantizer=self.quantiser(),
-            bias_quantizer=self.quantiser(),
+            bias_quantizer=self.quantiser(double_width=True),
             kernel_regularizer=regularizers.L2(l2),
             bias_regularizer=regularizers.L2(l2),
         )(inp)
@@ -150,7 +150,7 @@ class QKerasModelBuilder(object):
                 kernel_size=1,
                 padding="valid",
                 kernel_quantizer=self.quantiser(po2=True),
-                bias_quantizer=self.quantiser(),
+                bias_quantizer=self.quantiser(double_width=True),
             )(y_pred)
             self.layer_info.append({"type": "po2", "id": layer_id})
 
@@ -161,7 +161,7 @@ class QKerasModelBuilder(object):
                 kernel_size=1,
                 padding="valid",
                 kernel_quantizer=self.quantiser(po2=True),
-                bias_quantizer=self.quantiser(),
+                bias_quantizer=self.quantiser(double_width=True),
             )(y_pred)
             self.layer_info.append({"type": "po2", "id": layer_id})
 

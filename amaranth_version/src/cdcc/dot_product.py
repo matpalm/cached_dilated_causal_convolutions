@@ -9,7 +9,6 @@ from numpy.typing import NDArray
 from . import NNQ, NNQ_DW, parse_nnq
 
 
-@deprecated("all folded in conv1d")
 class DotProduct(wiring.Component):
 
     def __init__(self, np_weights: NDArray):
