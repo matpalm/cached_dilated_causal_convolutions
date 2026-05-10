@@ -50,7 +50,8 @@ class Conv1d(wiring.Component):
             }
         )
 
-        # K is fixed at 4 and MAC is fully unrolled across the kernel axis.
+        # we don't have enough MULT18X18D units anymore to run all kernels in parallel
+        # so instead run the K=4 sequentially.
 
         self.weights = Array(
             Array(Array(parse_nnq(np_weights[k, i])) for i in range(self.IN_D))
@@ -59,6 +60,7 @@ class Conv1d(wiring.Component):
         self.biases = Array(parse_nnq(np_biases, shape=NNQ_DW))
         self.apply_relu = apply_relu
 
+        self.k_idx = Signal(range(K), init=0)
         self.i_idx = Signal(range(self.IN_D), init=0)
         self.o_idx = Signal(range(self.OUT_D), init=0)
 
@@ -111,6 +113,7 @@ class Conv1d(wiring.Component):
                     for i in range(self.OUT_D):
                         m.d.sync += self.accum[i].eq(self.biases[i])
                     m.d.sync += [
+                        self.k_idx.eq(0),
                         self.i_idx.eq(0),
                         self.o_idx.eq(0),
                     ]
@@ -120,37 +123,20 @@ class Conv1d(wiring.Component):
                 m.d.sync += self.accum[self.o_idx].eq(
                     self.accum[self.o_idx].as_value().as_signed()
                     + (
-                        (
-                            self.input[0][self.i_idx].as_value().as_signed()
-                            * self.weights[0][self.i_idx][self.o_idx]
-                            .as_value()
-                            .as_signed()
-                        )
-                        + (
-                            self.input[1][self.i_idx].as_value().as_signed()
-                            * self.weights[1][self.i_idx][self.o_idx]
-                            .as_value()
-                            .as_signed()
-                        )
-                        + (
-                            self.input[2][self.i_idx].as_value().as_signed()
-                            * self.weights[2][self.i_idx][self.o_idx]
-                            .as_value()
-                            .as_signed()
-                        )
-                        + (
-                            self.input[3][self.i_idx].as_value().as_signed()
-                            * self.weights[3][self.i_idx][self.o_idx]
-                            .as_value()
-                            .as_signed()
-                        )
+                        self.input[self.k_idx][self.i_idx].as_value().as_signed()
+                        * self.weights[self.k_idx][self.i_idx][self.o_idx]
+                        .as_value()
+                        .as_signed()
                     )
                 )
                 with m.If(self.i_idx == self.IN_D - 1):
                     m.d.sync += self.i_idx.eq(0)
                     with m.If(self.o_idx == self.OUT_D - 1):
                         m.d.sync += self.o_idx.eq(0)
-                        m.next = "CLIP_LOWER"
+                        with m.If(self.k_idx == K - 1):
+                            m.next = "CLIP_LOWER"
+                        with m.Else():
+                            m.d.sync += self.k_idx.eq(self.k_idx + 1)
                     with m.Else():
                         m.d.sync += self.o_idx.eq(self.o_idx + 1)
                 with m.Else():
@@ -222,8 +208,8 @@ class Conv1d(wiring.Component):
             with m.State("OUTPUT"):
                 m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
-                    # do not accept next input until the current output
-                    # beat has been consumed.
+                    # Single in-flight transaction: do not accept next input
+                    # until the current output beat has been consumed.
                     m.next = "IDLE"
 
         return m
