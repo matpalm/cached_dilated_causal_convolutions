@@ -5,6 +5,7 @@ from numpy.typing import NDArray
 from amaranth_future import fixed
 
 from . import NNQ, NNQ_DW, K, parse_nnq
+from .row_by_matrix_multiply import RowByMatrixMultiply
 
 class Conv1d(wiring.Component):
 
@@ -50,19 +51,12 @@ class Conv1d(wiring.Component):
             }
         )
 
-        # we don't have enough MULT18X18D units anymore to run all kernels in parallel
-        # so instead run the K=4 sequentially.
-
-        self.weights = Array(
-            Array(Array(parse_nnq(np_weights[k, i])) for i in range(self.IN_D))
-            for k in range(K)
-        )
-        self.biases = Array(parse_nnq(np_biases, shape=NNQ_DW))
+        self.row_mults = [
+            RowByMatrixMultiply(np_weights[0], np_weights_alt=np_weights[2]),
+            RowByMatrixMultiply(np_weights[1], np_weights_alt=np_weights[3]),
+        ]
+        self.biases = Array(parse_nnq(b, shape=NNQ_DW) for b in np_biases)
         self.apply_relu = apply_relu
-
-        self.k_idx = Signal(range(K), init=0)
-        self.i_idx = Signal(range(self.IN_D), init=0)
-        self.o_idx = Signal(range(self.OUT_D), init=0)
 
         self.accum = Array(
             Signal(NNQ_DW, name=f"conv_accum_{i}", init=0) for i in range(self.OUT_D)
@@ -95,52 +89,78 @@ class Conv1d(wiring.Component):
         for i in range(self.OUT_D):
             m.d.comb += self.o.payload[i].eq(self.result[i])
 
-        # TODO: started with conv1d -* row_by_matrix_mult -* dot_product
-        # but it's been easier to fold everything into this state machine
-        # can go back to split classes later if need be, but for now it's simpler.
+        with m.FSM() as fsm:
 
-        with m.FSM():
+            all_rows_ready = 1
+            all_rows_valid = 1
+            phase1 = fsm.ongoing("START_PHASE1") | fsm.ongoing("WAIT_PHASE1")
+
+            for k, rbmm in enumerate(self.row_mults):
+                m.submodules[f"row_mm_{k}"] = rbmm
+
+                m.d.comb += [
+                    rbmm.phase.eq(phase1),
+                    rbmm.i.valid.eq(
+                        fsm.ongoing("START_PHASE0") | fsm.ongoing("START_PHASE1")
+                    ),
+                    rbmm.o.ready.eq(
+                        fsm.ongoing("WAIT_PHASE0") | fsm.ongoing("WAIT_PHASE1")
+                    ),
+                ]
+                for i in range(self.IN_D):
+                    m.d.comb += rbmm.i.payload[i].eq(
+                        Mux(phase1, self.input[k + 2][i], self.input[k][i])
+                    )
+
+                all_rows_ready = all_rows_ready & rbmm.i.ready
+                all_rows_valid = all_rows_valid & rbmm.o.valid
 
             frac_drop = NNQ_DW.f_bits - NNQ.f_bits
             out_width = NNQ.width
 
             with m.State("IDLE"):
-                m.d.comb += self.i.ready.eq(1)
+                m.d.comb += self.i.ready.eq(all_rows_ready)
                 with m.If(self.i.valid & self.i.ready):
                     for k in range(K):
                         for i in range(self.IN_D):
                             m.d.sync += self.input[k][i].eq(self.i.payload[k][i])
-                    for i in range(self.OUT_D):
-                        m.d.sync += self.accum[i].eq(self.biases[i])
-                    m.d.sync += [
-                        self.k_idx.eq(0),
-                        self.i_idx.eq(0),
-                        self.o_idx.eq(0),
-                    ]
-                    m.next = "MAT_MUL_RUNNING"
+                    m.next = "START_PHASE0"
 
-            with m.State("MAT_MUL_RUNNING"):
-                m.d.sync += self.accum[self.o_idx].eq(
-                    self.accum[self.o_idx].as_value().as_signed()
-                    + (
-                        self.input[self.k_idx][self.i_idx].as_value().as_signed()
-                        * self.weights[self.k_idx][self.i_idx][self.o_idx]
-                        .as_value()
-                        .as_signed()
-                    )
-                )
-                with m.If(self.i_idx == self.IN_D - 1):
-                    m.d.sync += self.i_idx.eq(0)
-                    with m.If(self.o_idx == self.OUT_D - 1):
-                        m.d.sync += self.o_idx.eq(0)
-                        with m.If(self.k_idx == K - 1):
-                            m.next = "CLIP_LOWER"
-                        with m.Else():
-                            m.d.sync += self.k_idx.eq(self.k_idx + 1)
-                    with m.Else():
-                        m.d.sync += self.o_idx.eq(self.o_idx + 1)
-                with m.Else():
-                    m.d.sync += self.i_idx.eq(self.i_idx + 1)
+            with m.State("START_PHASE0"):
+                with m.If(all_rows_ready):
+                    m.next = "WAIT_PHASE0"
+
+            with m.State("WAIT_PHASE0"):
+                with m.If(all_rows_valid):
+                    for i in range(self.OUT_D):
+                        row_sum = self.row_mults[0].o.payload[i].as_value().as_signed()
+                        for k in range(1, 2):
+                            row_sum = (
+                                row_sum
+                                + self.row_mults[k].o.payload[i].as_value().as_signed()
+                            )
+                        m.d.sync += self.accum[i].eq(
+                            self.biases[i].as_value().as_signed() + row_sum
+                        )
+                    m.next = "START_PHASE1"
+
+            with m.State("START_PHASE1"):
+                with m.If(all_rows_ready):
+                    m.next = "WAIT_PHASE1"
+
+            with m.State("WAIT_PHASE1"):
+                with m.If(all_rows_valid):
+                    for i in range(self.OUT_D):
+                        row_sum = self.row_mults[0].o.payload[i].as_value().as_signed()
+                        for k in range(1, 2):
+                            row_sum = (
+                                row_sum
+                                + self.row_mults[k].o.payload[i].as_value().as_signed()
+                            )
+                        m.d.sync += self.accum[i].eq(
+                            self.accum[i].as_value().as_signed() + row_sum
+                        )
+                    m.next = "CLIP_LOWER"
 
             with m.State("CLIP_LOWER"):
                 # TODO: combine CLIP_LOWER and _UPPER?
