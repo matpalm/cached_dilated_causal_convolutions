@@ -1,4 +1,4 @@
-from amaranth import Array, Cat, Module, Signal
+from amaranth import Array, Cat, Module, Mux, Signal
 from amaranth.lib import data, stream, wiring
 from amaranth.lib.memory import Memory
 
@@ -160,12 +160,27 @@ class ActivationCache(wiring.Component):
                 m.d.comb += rd.addr.eq(idx_accepted[0])
 
         else:
+            ff_read_head = Signal(range(n), init=0)
+            ff_idx = Array(Signal(range(n), name=f"ff_idx_{i}") for i in range(3))
+
             m.d.comb += [
+                # Align FF tap view with the accepted sample, matching EBR path
+                # semantics when i.valid/i.ready handshake in this cycle.
+                ff_read_head.eq(
+                    Mux(
+                        self.i.valid & self.i.ready,
+                        (self.write_head - 1) & ring_mask,
+                        self.write_head,
+                    )
+                ),
+                ff_idx[0].eq((ff_read_head - d) & ring_mask),
+                ff_idx[1].eq((ff_read_head - (2 * d)) & ring_mask),
+                ff_idx[2].eq((ff_read_head - (3 * d)) & ring_mask),
                 self.i.ready.eq(self.o.ready),
                 self.o.valid.eq(self.i.valid),
-                self.o.payload[0].eq(self.buffer[idx[2]]),
-                self.o.payload[1].eq(self.buffer[idx[1]]),
-                self.o.payload[2].eq(self.buffer[idx[0]]),
+                self.o.payload[0].eq(self.buffer[ff_idx[2]]),
+                self.o.payload[1].eq(self.buffer[ff_idx[1]]),
+                self.o.payload[2].eq(self.buffer[ff_idx[0]]),
                 self.o.payload[3].eq(self.i.payload),
             ]
 
