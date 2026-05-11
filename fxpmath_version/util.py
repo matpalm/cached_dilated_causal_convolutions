@@ -39,10 +39,13 @@ class FxpUtil(object):
                 except ValueError as ve:
                     raise Exception(f"value error [{ve}] from v={v}")
 
-    def check_all_qIF(self, a):
+    def check_all_qIF(self, a, double_width: bool = False):
         it = np.nditer(a, flags=['multi_index'])
         for v in it:
-            q_val = float(self.single_width(v))
+            if double_width:
+                q_val = float(self.double_width(v))
+            else:
+                q_val = float(self.single_width(v))
             if v != q_val:
                 raise Exception(f"value {v} [{it.multi_index}] not representable in"
                                 f" QI.F; it converted to {q_val}")

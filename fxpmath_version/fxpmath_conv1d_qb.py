@@ -11,7 +11,7 @@ class FxpMathConv1DQuantisedBitsBlock(object):
         self.K = 4
 
         self.fxp.check_all_qIF(weights)
-        self.fxp.check_all_qIF(biases)
+        self.fxp.check_all_qIF(biases, double_width=True)
 
         # weights from qkeras are [kernel, in_d, out_d] but we want
         # to slice first [kernel] then [out_d] so transpose now to

@@ -18,7 +18,7 @@ class FxpMathConv1DPO2Block(object):
 
         # double check weights
         self.fxp.check_all_log2_or_zero(weights)
-        self.fxp.check_all_qIF(biases)
+        self.fxp.check_all_qIF(biases, double_width=True)
 
         # BUT NOT FOR PO2
         # weights from qkeras are [kernel, in_d, out_d] but we want
@@ -110,7 +110,6 @@ class FxpMathConv1DPO2Block(object):
 
             DP_COUNT += 1
 
-
     def row_by_matrix_multiply(self, x, negative_weights, weights_log2, zero_weights, accumulators):
         # this loop represents what could be in the state machine
         # but can be pipelined
@@ -118,7 +117,6 @@ class FxpMathConv1DPO2Block(object):
             self.dot_product(x,
                 negative_weights[column], weights_log2[column], zero_weights[column],
                 accumulators[column])
-
 
     def apply(self, x):
 
@@ -193,7 +191,6 @@ class FxpMathConv1DPO2Block(object):
         # return as np array,
         return np.array(accums[0])
 
-
     def num_underflows(self):
         return self._num_underflows
 
@@ -247,7 +244,6 @@ class FxpMathConv1DPO2Block(object):
             for o in range(out_d):
                 f.write(double_width_hex_representation(self.biases[o]))
                 f.write(f" // {self.biases[o]}\n")
-
 
     def __str__(self):
         return self.layer_name + \
