@@ -14,6 +14,7 @@ class Conv1d(wiring.Component):
         np_weights: NDArray,
         np_biases: NDArray,
         apply_relu: bool,
+        relu_upper_bound: int = 6,
     ):
         """
         Args:
@@ -50,6 +51,8 @@ class Conv1d(wiring.Component):
                 "o": wiring.Out(stream.Signature(data.ArrayLayout(NNQ, self.OUT_D))),
             }
         )
+
+        self.relu_upper_bound = fixed.Const(relu_upper_bound, shape=NNQ)
 
         self.row_mults = [
             RowByMatrixMultiply(np_weights[0], np_weights_alt=np_weights[2]),
@@ -206,19 +209,19 @@ class Conv1d(wiring.Component):
                         trunc_toward_zero[frac_drop : frac_drop + out_width].as_signed()
                     )
                 if self.apply_relu:
-                    m.next = "APPLY_RELU_6"
+                    m.next = "APPLY_RELU"
                 else:
                     m.next = "OUTPUT"
 
-            with m.State("APPLY_RELU_6"):
+            with m.State("APPLY_RELU"):
                 for i in range(self.OUT_D):
                     m.d.sync += self.result[i].eq(
                         Mux(
                             self.result[i].as_value()[-1],
                             0,
                             Mux(
-                                self.result[i] > fixed.Const(6.0, shape=NNQ),
-                                fixed.Const(6.0, shape=NNQ),
+                                self.result[i] > self.relu_upper_bound,
+                                self.relu_upper_bound,
                                 self.result[i],
                             ),
                         )
