@@ -293,9 +293,26 @@ class TestEquivalences(unittest.TestCase):
         x = x.reshape(-1, x.shape[-1])
         self.assertEqual(x.shape[1], dut.IN_D)
 
-        y_pred_fxp = []
-        for sample in tqdm.tqdm(x, desc="fxpmath"):
-            y_pred_fxp.append(float(fxp_model.predict(sample)[0]))
+        # print("HACK: 50 x samples")
+        # x = x[:50]
+
+        y_pred_fxp_cache_fname = (
+            root_dir / "test_x_files/zigzag/test_network.y_pred_fxp.pkl"
+        )
+        if os.path.exists(y_pred_fxp_cache_fname):
+            print("using cached", y_pred_fxp_cache_fname)
+            with open(y_pred_fxp_cache_fname, "rb") as f:
+                y_pred_fxp = pickle.load(f)
+            if len(y_pred_fxp) != len(x):
+                raise Exception(
+                    f"cache invalid; |x|={len(x)} but cached |y_pred_fxp|={len(y_pred_fxp)}"
+                )
+        else:
+            y_pred_fxp = []
+            for sample in tqdm.tqdm(x, desc="fxpmath"):
+                y_pred_fxp.append(float(fxp_model.predict(sample)[0]))
+            with open(y_pred_fxp_cache_fname, "wb") as f:
+                pickle.dump(y_pred_fxp, f)
 
         y_pred_am = []
 
@@ -307,10 +324,14 @@ class TestEquivalences(unittest.TestCase):
                 while not ctx.get(dut.i.ready):
                     await ctx.tick()
 
+                raise Exception(
+                    "need to check this. tests show correctness, but this is faulty?"
+                )
+
                 ctx.set(dut.i.payload, parse_nnq(sample, assert_exact=False))
                 ctx.set(dut.i.valid, 1)
                 await ctx.tick()
-                ctx.set(dut.i.valid, 0)
+                # ctx.set(dut.i.valid, 0)  TOOD: we don't want this?
 
                 for _ in range(10000):
                     if ctx.get(dut.o.valid):
