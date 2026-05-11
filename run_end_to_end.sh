@@ -1,6 +1,6 @@
 set -ex
 
-export RUN=88_4_16_16_4
+export RUN=91_4_16_16_4
 export DRD=datalogger_firmware/data/2d_embed_interp/wide_freq_range/24kHz
 export FILTERS="4 16 16 4"
 
@@ -14,7 +14,8 @@ time uv run -m qkeras_version.train \
  --data-root-dir $DRD \
  --fp-int 4 --fp-frac 12 \
  --in-out-d 4 --filter-sizes $FILTERS \
- --num-train-egs 100 --epochs 1 --learning-rate 1e-3 --l2 0.0001 \
+ --alpha-mse 1.0 --beta-stft 0.1 --beta-stft-ramp-epochs 10 \
+ --num-train-egs 10000 --epochs 20 --learning-rate 1e-3 --l2 0.0001 \
  | tee runs/$RUN/qkeras_version.train.out
 
 # fine tune at FP4.4
@@ -41,11 +42,11 @@ time uv run -m qkeras_version.train \
 #uv run python -m unittest discover test_equivalences -k test_network
 
 # build & flash
-pushd /home/mat/dev/tiliqua/gateware
-rm -rf build/neural-waveshaper-r3/
-pdm neural_waveshaper build --hw r3 --fs-192khz
-grep -A30 ^Info:\ Devi build/neural-waveshaper-r3/top.tim
-openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit
-popd
+# pushd /home/mat/dev/tiliqua/gateware
+# rm -rf build/neural-waveshaper-r3/
+# pdm neural_waveshaper build --hw r3 --fs-192khz
+# grep -A30 ^Info:\ Devi build/neural-waveshaper-r3/top.tim
+# openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit
+# popd
 
 # #pdm flash archive build/neural-waveshaper-r3/neural-waveshaper*.tar.gz --slot 1 --noconfirm

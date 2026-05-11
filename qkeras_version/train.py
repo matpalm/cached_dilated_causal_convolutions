@@ -9,7 +9,8 @@ from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
-from .qkeras_model import QKerasModelBuilder, masked_mse
+from .qkeras_model import QKerasModelBuilder
+from .losses import combined_masked_loss_terms
 
 if __name__ == '__main__':
 
@@ -47,6 +48,24 @@ if __name__ == '__main__':
         help="path to keras weights used to initialize fine-tuning",
     )
     parser.add_argument("--relu-upper-bound", type=float, default=6)
+    parser.add_argument(
+        "--alpha-mse",
+        type=float,
+        default=1.0,
+        help="weight for masked MSE in combined loss",
+    )
+    parser.add_argument(
+        "--beta-stft",
+        type=float,
+        default=0.1,
+        help="target STFT-loss weight after ramp",
+    )
+    parser.add_argument(
+        "--beta-stft-ramp-epochs",
+        type=int,
+        default=10,
+        help="linearly ramp beta_stft from 0 to target over this many epochs",
+    )
     opts = parser.parse_args()
     print("opts", opts)
 
@@ -147,6 +166,30 @@ if __name__ == '__main__':
             os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
     save_quantised_weights_cb = SaveQuantisedWeights()
 
+    # beta_stft is captured by the loss closure and updated by callback.
+    beta_stft = tf.Variable(0.0, trainable=False, dtype=tf.float32)
+
+    class RampBetaStft(tf.keras.callbacks.Callback):
+        def __init__(self, beta_var: tf.Variable, target: float, ramp_epochs: int):
+            self.beta_var = beta_var
+            self.target = float(target)
+            self.ramp_epochs = max(1, int(ramp_epochs))
+
+        def on_epoch_begin(self, epoch, logs=None):
+            # epoch is 0-indexed; start at 0 and hit target at the end of ramp.
+            if self.ramp_epochs == 1:
+                value = self.target
+            else:
+                value = self.target * min(epoch / (self.ramp_epochs - 1), 1.0)
+            self.beta_var.assign(value)
+            print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
+
+    ramp_beta_stft_cb = RampBetaStft(
+        beta_var=beta_stft,
+        target=opts.beta_stft,
+        ramp_epochs=opts.beta_stft_ramp_epochs,
+    )
+
     # def lr_schedule(epoch, lr):
     #     if epoch <= 40:
     #         print(epoch, "1e-4")
@@ -157,10 +200,27 @@ if __name__ == '__main__':
     # lr_cb = tf.keras.callbacks.LearningRateScheduler(lr_schedule)
 
     # compile and train
-    train_model.compile(Adam(opts.learning_rate),
-                        loss=masked_mse(RECEPTIVE_FIELD_SIZE, filter_column_idx))
-    train_model.fit(train_ds,
-                    validation_data=validate_ds,
-                    callbacks=[tensorboard_cb, checkpoint_cb,
-                               check_y_pred_cb, save_quantised_weights_cb], #, lr_cb],
-                    epochs=opts.epochs)
+    combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
+        RECEPTIVE_FIELD_SIZE,
+        filter_column_idx=filter_column_idx,
+        alpha_mse=opts.alpha_mse,
+        beta_stft=beta_stft,
+    )
+
+    train_model.compile(
+        Adam(opts.learning_rate),
+        loss=combined_loss_fn,
+        metrics=[mse_loss_metric, stft_loss_metric],
+    )
+    train_model.fit(
+        train_ds,
+        validation_data=validate_ds,
+        callbacks=[
+            tensorboard_cb,
+            checkpoint_cb,
+            check_y_pred_cb,
+            save_quantised_weights_cb,
+            ramp_beta_stft_cb,
+        ],  # , lr_cb],
+        epochs=opts.epochs,
+    )
