@@ -56,14 +56,15 @@ def calculate_wave(
     num_samples: int,
     waveform1: Waveform,
     waveform2: Waveform = None,
-    interp: float = 0,
+    interp_start: float = 0,
+    interp_end: float = 0,
     scale: float = 0.8,
 ):
     if frequency_hz > (sample_rate_hz / 2.0):
         raise ValueError("faildog! nyquist limit")
 
     phase_step = 2.0 * np.pi * (frequency_hz / sample_rate_hz)
-    phase = starting_phase + (phase_step * np.arange(num_samples, dtype=np.float64))
+    phase = starting_phase + (phase_step * np.arange(num_samples))
     phase_sin = np.sin(phase)
     phase_cos = np.cos(phase)
     cycle = np.mod(phase / (2.0 * np.pi), 1.0)  # [0, 1)
@@ -79,13 +80,18 @@ def calculate_wave(
             case Waveform.RAMP:
                 return 1.0 - (2.0 * cycle)
 
-    if interp == 0 or waveform2 is None:
+    if waveform2 is None:
         result = wave(waveform1)
-    elif interp == 1:
-        result = wave(waveform2)
+        interp = None
     else:
-        # interpolate sample ( constant power cross fade interpolation)
-        # 0 => w1, 1 => w2.
+        # interp is _start for first 1/4, _end for last 1/4 and linear between
+        interp = np.full(num_samples, interp_start, dtype=np.float64)
+        i25 = int(0.25 * num_samples)
+        i65 = int(0.65 * num_samples)
+        if i65 > i25:
+            interp[i25:i65] = np.linspace(interp_start, interp_end, i65 - i25)
+        interp[i65:] = interp_end
+        interp = np.clip(interp, 0.0, 1.0)
         result1 = wave(waveform1)
         result2 = wave(waveform2)
         s1 = np.sin((1 - interp) * np.pi / 2)
@@ -99,6 +105,7 @@ def calculate_wave(
         "phase_sin": scale * phase_sin,
         "phase_cos": scale * phase_cos,
         "wave": scale * result,
+        "interp": interp,
     }
 
 
@@ -132,12 +139,11 @@ class Embed2DQuadratureData(object):
             seq_len,
             w1,
             waveform2=None,
-            interp=None,
         )
         embed_pt = w1.to_embed_pt()
         return data, embed_pt
 
-    def _sample_interpolated_wave(self, seq_len, w1, w2, interp):
+    def _sample_interpolated_wave(self, seq_len, w1, w2, interp_start, interp_end):
         data = calculate_wave(
             self.random_freq(),
             self.sample_rate_hz,
@@ -145,9 +151,13 @@ class Embed2DQuadratureData(object):
             seq_len,
             w1,
             w2,
-            interp,
+            interp_start,
+            interp_end,
         )
-        embed_pt = ((1.0 - interp) * w1.to_embed_pt()) + (interp * w2.to_embed_pt())
+        interp = data["interp"].astype(np.float32)
+        embed_pt = ((1.0 - interp)[:, None] * w1.to_embed_pt()) + (
+            interp[:, None] * w2.to_embed_pt()
+        )
         return data, embed_pt
 
     def _xy_from_data(self, data, embed_pt):
@@ -157,8 +167,12 @@ class Embed2DQuadratureData(object):
         y = np.zeros((N, IN_OUT_D), dtype=np.float32)
         x[:, 0] = data["phase_sin"]
         x[:, 1] = data["phase_cos"]
-        x[:, 2] = embed_pt[0]
-        x[:, 3] = embed_pt[1]
+        if np.ndim(embed_pt) == 1:
+            x[:, 2] = embed_pt[0]
+            x[:, 3] = embed_pt[1]
+        else:
+            x[:, 2] = embed_pt[:, 0]
+            x[:, 3] = embed_pt[:, 1]
         y[:, 0] = data["wave"]
         return x, y
 
@@ -191,8 +205,11 @@ class Embed2DQuadratureData(object):
                         yield self._sample_single_wave(seq_len, w1)
                         yield self._sample_single_wave(seq_len, w2)
                     if emit_interpolated_samples:
-                        interp = self.rng.random()
-                        yield self._sample_interpolated_wave(seq_len, w1, w2, interp)
+                        interp_start = self.rng.random()
+                        interp_end = self.rng.random()
+                        yield self._sample_interpolated_wave(
+                            seq_len, w1, w2, interp_start, interp_end
+                        )
 
         def gen_limited_number():
             g = gen_waves()
@@ -248,23 +265,25 @@ if __name__ == "__main__":
     # )
 
     for w1, w2 in WAVE_EDGES:
-        for interp in np.linspace(0, 1, 5):
-            seq_len = 300
-            data = calculate_wave(
-                frequency_hz=FREQS["A4"],
-                sample_rate_hz=64_000,
-                starting_phase=0,
-                num_samples=seq_len,
-                waveform1=w1,
-                waveform2=w2,
-                interp=interp,
-            )
-            df = pd.DataFrame()
-            df["n"] = range(seq_len)
-            df["wave"] = data["wave"]
-            p = sns.lineplot(df, x="n", y="wave", linewidth=5)
-            plt.savefig(f"interp_data_egs/{w1}_{w2}_{interp:0.3f}.png")
-            plt.clf()
+        seq_len = 1000
+        data = calculate_wave(
+            frequency_hz=FREQS["A4"],
+            sample_rate_hz=64_000,
+            starting_phase=0,
+            num_samples=seq_len,
+            waveform1=w1,
+            waveform2=w2,
+            interp_start=0.0,
+            interp_end=1.0,
+        )
+        df = pd.DataFrame()
+        df["n"] = range(seq_len)
+        df["wave"] = data["wave"]
+        df["interp"] = data["interp"]
+        p = sns.lineplot(df, x="n", y="wave", linewidth=5)
+        p = sns.lineplot(df, x="n", y="interp", linewidth=5)
+        plt.savefig(f"interp_data_egs/{w1}_{w2}.png")
+        plt.clf()
 
     # GRID_SIZE = 5
 
