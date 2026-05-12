@@ -160,9 +160,7 @@ if __name__ == "__main__":
     )
 
     # plotting examples of validation data ( in tensorboard )
-    check_y_pred_cb = CheckYPred(
-        tb_dir=tensorboard_dir, dataset=validate_ds, model=train_model
-    )
+    check_y_pred_cb = CheckYPred(tb_dir=tensorboard_dir, dataset=validate_ds)
 
     # exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):

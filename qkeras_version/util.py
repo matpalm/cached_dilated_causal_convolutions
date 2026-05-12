@@ -16,16 +16,13 @@ def ensure_dir_exists(d):
 
 class CheckYPred(tf.keras.callbacks.Callback):
 
-    def __init__(self, tb_dir, dataset, model):
+    def __init__(self, tb_dir, dataset):
         self.summary_writer = tf.summary.create_file_writer(tb_dir)
 
         for x, y in dataset:
             self.x = x
             self.y_true = y
             break  # just one batch
-
-        # tb pagination dft is 12
-        self.num_imgs_to_plot = min(24, len(self.x))
 
     def _plot_as_numpy(self, x, y_true, y_pred):
         df = pd.DataFrame()
@@ -54,10 +51,24 @@ class CheckYPred(tf.keras.callbacks.Callback):
         with self.summary_writer.as_default():
             with tf.name_scope("validation") as scope:
                 y_pred = self.model(self.x)
+
+                # tb pagination dft is 12, so take at most 2 pages
+                plot_x = self.x[:24]
+                y_pred = y_pred[:24]
+                plot_y_true = self.y_true[:24]
+
+                # never show more than 1000 samples in time
+                # and if trimming, pick the last
+                plot_x = plot_x[:, -1000:]
+                y_pred = y_pred[:, -1000:]
+                plot_y_true = plot_y_true[:, -1000:]
+
                 imgs = []
-                for i in range(self.num_imgs_to_plot):
-                    imgs.append(self._plot_as_numpy(
-                        self.x[i], self.y_true[i], y_pred[i]))
+                for i in range(len(plot_x)):
+                    imgs.append(
+                        self._plot_as_numpy(plot_x[i], plot_y_true[i], y_pred[i])
+                    )
                 imgs = np.stack(imgs)
-                tf.summary.image("check_ypred", imgs,
-                    max_outputs=self.num_imgs_to_plot, step=epoch)
+                tf.summary.image(
+                    "check_ypred", imgs, max_outputs=len(plot_x), step=epoch
+                )

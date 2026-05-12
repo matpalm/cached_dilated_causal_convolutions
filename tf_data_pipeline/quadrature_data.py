@@ -131,7 +131,7 @@ class Embed2DQuadratureData(object):
             self.random_phase(),
             seq_len,
             w1,
-            w2=None,
+            waveform2=None,
             interp=None,
         )
         embed_pt = w1.to_embed_pt()
