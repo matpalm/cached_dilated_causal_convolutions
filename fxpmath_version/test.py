@@ -12,7 +12,6 @@ import pickle
 import json
 
 from fxpmath_version.fxpmath_model import FxpModel
-# from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
 from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
 from . import util
 

@@ -12,14 +12,15 @@ from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import QKerasModelBuilder
 from .losses import combined_masked_loss_terms
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     import argparse
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument('--run', type=str, required=True)
-    parser.add_argument('--learning-rate', type=float, default=1e-3)
+    parser.add_argument("--run", type=str, required=True)
+    parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument(
         "--receptive-field-size",
@@ -28,7 +29,7 @@ if __name__ == '__main__':
         help="override RFS. if not set, use K^len(filter_sizes)",
     )
     parser.add_argument("--l2", type=float, default=0.0)
-    parser.add_argument('--in-out-d', type=int, default=4)
+    parser.add_argument("--in-out-d", type=int, default=4)
     parser.add_argument(
         "--filter-sizes",
         type=int,
@@ -36,8 +37,8 @@ if __name__ == '__main__':
         required=True,
         help="sfeature depths for each layer; last layer always 4",
     )
-    parser.add_argument('--po2-filter-size', type=int, default=None)
-    parser.add_argument('--num-train-egs', type=int, default=200_000)
+    parser.add_argument("--po2-filter-size", type=int, default=None)
+    parser.add_argument("--num-train-egs", type=int, default=200_000)
     parser.add_argument("--num-validate-egs", type=int, default=100)
     parser.add_argument("--fp-int", type=int, default=4)
     parser.add_argument("--fp-frac", type=int, default=12)
@@ -78,7 +79,6 @@ if __name__ == '__main__':
     data = Embed2DQuadratureData(
         min_note=opts.min_note,
         max_note=opts.max_note,
-        sample_rate_hz=192 * 1000,
         seed=456,
     )
 
@@ -91,7 +91,9 @@ if __name__ == '__main__':
     num_layers = len(opts.filter_sizes) + 1
 
     # note: kernel size and implied dilation rate always assumed K
+    # receptive field should be _at least_ 128, even for 2 layer models otherwise we get no useful debug result
     RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**num_layers
+    RECEPTIVE_FIELD_SIZE = max(128, RECEPTIVE_FIELD_SIZE)
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
@@ -159,14 +161,15 @@ if __name__ == '__main__':
 
     # plotting examples of validation data ( in tensorboard )
     check_y_pred_cb = CheckYPred(
-        tb_dir=tensorboard_dir, dataset=validate_ds, model=train_model)
+        tb_dir=tensorboard_dir, dataset=validate_ds, model=train_model
+    )
 
     # exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
             # save quantised weights dict pickled
             quantised_weights = model_save_quantized_weights(train_model)
-            with open(f"runs/{opts.run}/weights/qkeras/e{epoch:02d}.pkl", 'wb') as f:
+            with open(f"runs/{opts.run}/weights/qkeras/e{epoch:02d}.pkl", "wb") as f:
                 pickle.dump(quantised_weights, f, protocol=pickle.HIGHEST_PROTOCOL)
             #  add a latest symlink
             latest_symlink_fname = f"runs/{opts.run}/weights/qkeras/latest.pkl"
@@ -175,6 +178,7 @@ if __name__ == '__main__':
             except FileNotFoundError:
                 pass
             os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
+
     save_quantised_weights_cb = SaveQuantisedWeights()
 
     # beta_stft is captured by the loss closure and updated by callback.

@@ -197,10 +197,10 @@ class TestEquivalences(unittest.TestCase):
         sim.add_testbench(testbench)
         sim.run()
 
-    def test_activation_cache(self):
+    def _test_activation_cache(self, use_ebr: bool):
 
-        IN_OUT_D = 8
-        DILATION_LEVEL = 1
+        IN_OUT_D = 3
+        DILATION_LEVEL = 2
         K = 4
         DILATION = K**DILATION_LEVEL
 
@@ -213,7 +213,7 @@ class TestEquivalences(unittest.TestCase):
             values = fxp_util.nparray_to_fixed_point_floats(values)  # snap to closed FP
             return values
 
-        num_samples = 32
+        num_samples = 128
         samples = rnd01((num_samples, IN_OUT_D))
 
         fxp_cache = FxpActivationCache(
@@ -222,37 +222,34 @@ class TestEquivalences(unittest.TestCase):
             kernel_size=K,
         )
         fxp_results = []
-        for sample in samples:
-            fxp_results.append(fxp_cache.apply(sample))
+        for i, sample in enumerate(samples):
+            fxp_result = fxp_cache.apply(sample)
+            print("fxp_result", i, fxp_result)
+            fxp_results.append(fxp_result)
 
         dut = AmaranthActivationCache(
-            in_out_d=IN_OUT_D,
-            dilation_level=DILATION_LEVEL,
+            in_out_d=IN_OUT_D, dilation_level=DILATION_LEVEL, use_ebr=use_ebr
         )
         amaranth_results = []
 
         async def testbench(ctx):
-            ctx.set(dut.i.valid, 0)
             ctx.set(dut.o.ready, 1)
 
-            for sample in samples:
-                while not ctx.get(dut.i.ready):
-                    await ctx.tick()
-
+            for i, sample in enumerate(samples):
                 ctx.set(dut.i.payload, parse_nnq(sample, assert_exact=False))
                 ctx.set(dut.i.valid, 1)
+                await ctx.tick()
 
                 for _ in range(100):
                     if ctx.get(dut.o.valid):
                         break
                     await ctx.tick()
+                assert ctx.get(dut.o.valid)
 
                 am_output = ctx.get(dut.o.payload)
                 am_output = [[v.as_float() for v in row] for row in am_output]
+                print("am_output", i, am_output)
                 amaranth_results.append(np.asarray(am_output))
-
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
 
         sim = Simulator(dut)
         sim.add_clock(1e-6, domain="sync")
@@ -260,9 +257,18 @@ class TestEquivalences(unittest.TestCase):
         sim.run()
 
         self.assertEqual(len(fxp_results), len(amaranth_results))
-        np.testing.assert_allclose(
-            np.asarray(fxp_results), np.asarray(amaranth_results)
-        )
+        for i in range(len(fxp_results)):
+            np.testing.assert_allclose(
+                np.asarray(fxp_results[i]),
+                np.asarray(amaranth_results[i]),
+                err_msg=f"failed at i={i}",
+            )
+
+    def test_activation_cache_ebr(self):
+        self._test_activation_cache(use_ebr=True)
+
+    def test_activation_cache_ff(self):
+        self._test_activation_cache(use_ebr=False)
 
     def test_network(self):
 
@@ -273,7 +279,8 @@ class TestEquivalences(unittest.TestCase):
         print(">test_network root_dir", root_dir)
         trained_weights = root_dir / "weights/qkeras/latest.pkl"
         layer_info_fname = root_dir / "qkeras_model.layer_info.json"
-        test_data = root_dir / "test_x_files/zigzag/x_yp_yt.pkl"
+        test_wave = "triangle"
+        test_data = root_dir / "test_x_files" / test_wave / "x_yp_yt.pkl"
 
         with open(layer_info_fname, "r") as f:
             layer_info = json.load(f)
@@ -293,11 +300,8 @@ class TestEquivalences(unittest.TestCase):
         x = x.reshape(-1, x.shape[-1])
         self.assertEqual(x.shape[1], dut.IN_D)
 
-        # print("HACK: 50 x samples")
-        # x = x[:50]
-
         y_pred_fxp_cache_fname = (
-            root_dir / "test_x_files/zigzag/test_network.y_pred_fxp.pkl"
+            root_dir / "test_x_files" / test_wave / "test_network.y_pred_fxp.pkl"
         )
         if os.path.exists(y_pred_fxp_cache_fname):
             print("using cached", y_pred_fxp_cache_fname)
@@ -317,26 +321,18 @@ class TestEquivalences(unittest.TestCase):
         y_pred_am = []
 
         async def testbench(ctx):
-            ctx.set(dut.i.valid, 0)
             ctx.set(dut.o.ready, 1)
 
             for sample in tqdm.tqdm(x, desc="amaranth"):
-                while not ctx.get(dut.i.ready):
-                    await ctx.tick()
-
-                raise Exception(
-                    "need to check this. tests show correctness, but this is faulty?"
-                )
-
                 ctx.set(dut.i.payload, parse_nnq(sample, assert_exact=False))
                 ctx.set(dut.i.valid, 1)
                 await ctx.tick()
-                # ctx.set(dut.i.valid, 0)  TOOD: we don't want this?
 
                 for _ in range(10000):
                     if ctx.get(dut.o.valid):
                         break
                     await ctx.tick()
+                assert ctx.get(dut.o.valid)
 
                 y_pred_am.append(ctx.get(dut.o.payload).as_float())
 
@@ -346,7 +342,7 @@ class TestEquivalences(unittest.TestCase):
         sim.run()
 
         df = pd.DataFrame()
-        df["x"] = x[:, 0]
+        df["x"] = x[:, 0]  # just phase_sin
         df["y_pred_fxp"] = y_pred_fxp
         df["y_pred_am"] = y_pred_am
         df["n"] = range(len(x))
@@ -366,7 +362,7 @@ class TestEquivalences(unittest.TestCase):
             warnings.simplefilter(action="ignore", category=FutureWarning)
             p = sns.lineplot(wide_df, x="n", y="value", hue="variable")
             p.set(ylim=(-2, 2))
-            plt_fname = f"{root_dir}/amaranth.zigzag.png"
+            plt_fname = f"{root_dir}/amaranth.{test_wave}.jittered.png"
             print("saving plot to", plt_fname)
             plt.savefig(plt_fname)
             plt.clf()

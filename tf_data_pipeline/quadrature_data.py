@@ -102,12 +102,12 @@ class Embed2DQuadratureData(object):
         self,
         min_note: str,
         max_note: str,
-        sample_rate_hz: float = 24 * 1000,
+        # sample_rate_hz: float,
         seed: int = 123,
     ):
         self.min_note = min_note
         self.max_note = max_note
-        self.sample_rate_hz = sample_rate_hz
+        self.sample_rate_hz = 196 * 1000
         self.rng = random.Random(seed)
 
     def _sample_wave(self, seq_len, w1, w2=None, interp=None):
@@ -174,10 +174,14 @@ class Embed2DQuadratureData(object):
                 else:
                     assert emit_endpt_samples or emit_interpolated_samples
                     # samples two waves
-                    w1 = self.rng.choice(list(Waveform))
-                    w2 = w1
-                    while w2 == w1:
-                        w2 = self.rng.choice(list(Waveform))
+                    w1, w2 = self.rng.choice(
+                        [
+                            (Waveform.RAMP, Waveform.SQUARE),
+                            (Waveform.SQUARE, Waveform.TRIANGLE),
+                            (Waveform.TRIANGLE, Waveform.SINE),
+                            (Waveform.SINE, Waveform.RAMP),
+                        ]
+                    )
                     # emit either interpolated, or the two ends points
                     if emit_endpt_samples:
                         yield self._sample_wave(seq_len=seq_len, w1=w1, w2=None)
@@ -198,6 +202,7 @@ class Embed2DQuadratureData(object):
                 tf.TensorSpec(shape=(seq_len, IN_OUT_D), dtype=tf.float32),
             ),
         )
+        #        ds = ds.shuffle(batch_size * 5)
         ds = ds.batch(batch_size)
         return ds.prefetch(tf.data.AUTOTUNE)
 
@@ -212,7 +217,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--min-note", type=str, default="A3")
     parser.add_argument("--max-note", type=str, default="A5")
-    parser.add_argument("--sample-rate-hz", type=float, default=192 * 1000)
+    # parser.add_argument("--sample-rate-hz", type=float, default=192 * 1000)
     parser.add_argument("--starting-phase", type=float, default=0)
     parser.add_argument("--num_samples", type=int, default=1000)
     opts = parser.parse_args()
@@ -224,27 +229,29 @@ if __name__ == "__main__":
     data_source = Embed2DQuadratureData(
         min_note=opts.min_note,
         max_note=opts.max_note,
-        sample_rate_hz=opts.sample_rate_hz,
+        #        sample_rate_hz=opts.sample_rate_hz,
         seed=123,
     )
 
-    # tf_dataset emits (w1, w2, interp) in sequence; group every 3 samples.
     ds = data_source.tf_dataset(
         batch_size=1,
         seq_len=opts.num_samples,
         num_samples=300,
-    ).unbatch()
+        emit_endpt_samples=True,
+        emit_interpolated_samples=True,
+    )
 
-    lines = []
     plot_idx = 0
-    for _, y_i in ds.take(300):
-        lines.append(y_i.numpy()[:, 0])
-        if len(lines) == 3:
-            x = np.arange(len(lines[0]))
-            plt.clf()
-            sns.lineplot(x=x, y=lines[0], label="w1")
-            sns.lineplot(x=x, y=lines[1], label="w2")
-            sns.lineplot(x=x, y=lines[2], label="interp")
-            plt.savefig(f"interp_data_egs/{plot_idx:04d}.png")
-            plot_idx += 1
-            lines = []
+    for x, y in ds.take(100):
+        xs, xc = x[0, :, 0], x[0, :, 1]
+        e0, e1 = x[0, :, 2], x[0, :, 3]
+        yt = y[0, :, 0]
+        x = np.arange(len(xs))
+        plt.clf()
+        sns.lineplot(x=x, y=xs, label="xs")
+        sns.lineplot(x=x, y=xc, label="xc")
+        sns.lineplot(x=x, y=e0, label=f"e0 {e0[0]:0.2f}")
+        sns.lineplot(x=x, y=e1, label=f"e1 {e1[0]:0.2f}")
+        sns.lineplot(x=x, y=yt, label="yt")
+        plt.savefig(f"interp_data_egs/{plot_idx:04d}.png")
+        plot_idx += 1

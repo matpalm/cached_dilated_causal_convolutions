@@ -1,7 +1,7 @@
 set -ex
 
-export RUN=103_4_4_4_quadrature_24khZ
-export FILTERS="4 8 4"
+export RUN=105_8_8_quadrature
+export FILTERS="8 8"
 
 mkdir runs/$RUN || true
 
@@ -12,8 +12,16 @@ mkdir runs/$RUN || true
 #  --fp-int 4 --fp-frac 12 \
 #  --in-out-d 4 --filter-sizes $FILTERS \
 #  --alpha-mse 1.0 --beta-stft 0.0 --beta-stft-ramp-epochs 20 \
-#  --num-train-egs 1000 --epochs 20 --learning-rate 1e-3 --l2 0.0001 \
+#  --num-train-egs 10000 --epochs 10 --learning-rate 1e-3 --l2 0.0001 \
 #  | tee runs/$RUN/qkeras_version.train.out
+
+# time uv run -m qkeras_version.test \
+#  --fp-int 4 --fp-frac 12 \
+#  --filter-sizes $FILTERS \
+#  --load-weights runs/$RUN/weights/keras/020 \
+#  --wave sine --min-note A4 --max-note A4 \
+#  --test-seq-len 200 \
+#  | tee runs/$RUN/qkeras_version.test.out
 
 # fine tune at FP4.4
 # time uv run -m qkeras_version.train \
@@ -24,25 +32,25 @@ mkdir runs/$RUN || true
 #  --num-train-egs 20000 --epochs 5 --learning-rate 1e-4 --l2 0.0001 \
 #  | tee runs/$RUN/qkeras_version.finetune.out
 
-time uv run -m fxpmath_version.test \
- --min-note A4 --max-note A4 \
- --load-weights runs/$RUN/weights/qkeras/latest.pkl \
- --layer-info runs/$RUN/qkeras_model.layer_info.json \
- --test-x-dir runs/$RUN/test_x_files/ \
- --plot-dir runs/$RUN/ \
- --num-test-egs 100 --wave triangle \
- | tee runs/$RUN/fxpmath_version.test.out
+# time uv run -m fxpmath_version.test \
+#  --min-note A4 --max-note A4 \
+#  --load-weights runs/$RUN/weights/qkeras/latest.pkl \
+#  --layer-info runs/$RUN/qkeras_model.layer_info.json \
+#  --test-x-dir runs/$RUN/test_x_files/ \
+#  --plot-dir runs/$RUN/ \
+#  --num-test-egs 500 \
+#  | tee runs/$RUN/fxpmath_version.test.out
 
 # # quite slow, only required for big changes
-#rm runs/$RUN/test_x_files/zigzag/test_network.y_pred_fxp.pkl || true
-#uv run python -m unittest discover test_equivalences -k test_network
+# rm runs/$RUN/test_x_files/zigzag/test_network.y_pred_fxp.pkl || true
+# uv run python -m unittest discover test_equivalences -k test_network
 
 # build & flash
-# pushd /home/mat/dev/tiliqua/gateware
-# rm -rf build/neural-waveshaper-r3/
-# pdm neural_waveshaper build --hw r3 --fs-192khz
-# grep -A30 ^Info:\ Devi build/neural-waveshaper-r3/top.tim
-# openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit
-# popd
+pushd /home/mat/dev/tiliqua/gateware
+rm -rf build/neural-waveshaper-r3/
+pdm neural_waveshaper build --hw r3 --fs-192khz
+grep -A30 ^Info:\ Devi build/neural-waveshaper-r3/top.tim
+openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit
+popd
 
 # #pdm flash archive build/neural-waveshaper-r3/neural-waveshaper*.tar.gz --slot 1 --noconfirm
