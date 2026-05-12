@@ -30,14 +30,15 @@ class CheckYPred(tf.keras.callbacks.Callback):
 
     def _plot_as_numpy(self, x, y_true, y_pred):
         df = pd.DataFrame()
-        df['x'] = x[:,0]
-        df['e0'] = x[:,1]
-        df['e1'] = x[:,2]
+        df["phase_sin"] = x[:, 0]
+        df["e0"] = x[:, 2]
+        df["e1"] = x[:, 3]
         df['y_true'] = y_true[:,0]
         df['y_pred'] = y_pred[:,0]
         df['n'] = range(len(x))
-        wide_df = pd.melt(df, id_vars=['n'],
-                          value_vars=['x', 'y_pred', 'y_true', 'e0', 'e1'])
+        wide_df = pd.melt(
+            df, id_vars=["n"], value_vars=["phase_sin", "y_pred", "y_true", "e0", "e1"]
+        )
         with warnings.catch_warnings():
             warnings.simplefilter(action='ignore', category=FutureWarning)
             p = sns.lineplot(wide_df, x='n', y='value', hue='variable')

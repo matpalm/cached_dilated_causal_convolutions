@@ -61,7 +61,8 @@ print(f"|layers|={fxp_model.num_layers()} |dilated_layers|={fxp_model.num_dilate
 
 K = 4
 RECEPTIVE_FIELD_SIZE = K**(fxp_model.num_dilated_layers() + 1)
-TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
+# Generate enough samples to discard warmup and still evaluate num_test_egs points.
+TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE + opts.num_test_egs
 print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
@@ -80,16 +81,16 @@ fxp = util.FxpUtil()
 def process(wave):
 
     test_ds = data.tf_dataset(
-        batch_size=1,
-        seq_len=opts.num_test_egs,
+        batch_size=16,
+        seq_len=TEST_SEQ_LEN,
         num_samples=1,
         emit_specific_wave=wave,
     )
 
     for x, y_true in test_ds:
         x, y_true = x[0].numpy(), y_true[0].numpy()
-        assert x.shape == (opts.num_test_egs, fxp_model.in_dim), x.shape
-        assert y_true.shape == (opts.num_test_egs, fxp_model.in_dim), y_true.shape
+        assert x.shape == (TEST_SEQ_LEN, fxp_model.in_dim), x.shape
+        assert y_true.shape == (TEST_SEQ_LEN, fxp_model.in_dim), y_true.shape
         break
 
     # also write to file, if configured
@@ -125,6 +126,12 @@ def process(wave):
         #     print(" ".join(hex_outputs), file=test_x_hex_f)
     y_pred = np.stack(y_pred)
 
+    # Ignore the initial receptive field samples; these are affected by causal zero-padding.
+    valid_start_idx = RECEPTIVE_FIELD_SIZE
+    x_eval = x[valid_start_idx:]
+    y_true_eval = y_true[valid_start_idx:]
+    y_pred_eval = y_pred[valid_start_idx:]
+
     print(wave, fxp_model.under_and_overflow_counts())
 
     output_data_pkl_fname = os.path.join(opts.test_x_dir, wave, "x_yp_yt.pkl")
@@ -140,24 +147,28 @@ def process(wave):
         output_data_pkl_fname,
     )
     with open(output_data_pkl_fname, "wb") as f:
-        result = {"x": x, "y_true": y_true, "y_pred": y_pred}
+        result = {
+            "x": x,
+            "y_true": y_true,
+            "y_pred": y_pred,
+            "valid_start_idx": valid_start_idx,
+            "x_eval": x_eval,
+            "y_true_eval": y_true_eval,
+            "y_pred_eval": y_pred_eval,
+        }
         pickle.dump(result, f)
 
     # save plot
-    # Quadrature data layout is [phase_sin, phase_cos, e0, e1].
-    # y_true/y_pred waveform target remains column 0.
     df = pd.DataFrame()
-    df["phase_sin"] = x[:, 0]
-    df["phase_cos"] = x[:, 1]
-    df["e0"] = x[:, 2]
-    df["e1"] = x[:, 3]
-    df["y_pred"] = y_pred[:, 0]
-    df["y_true"] = y_true[:, 0]
-    df['n'] = range(len(y_pred))
+    df["phase_sin"] = x_eval[:, 0]
+    df["phase_cos"] = x_eval[:, 1]
+    df["y_pred"] = y_pred_eval[:, 0]
+    df["y_true"] = y_true_eval[:, 0]
+    df["n"] = range(len(y_pred_eval))
     wide_df = pd.melt(
         df,
         id_vars=["n"],
-        value_vars=["phase_sin", "phase_cos", "e0", "e1", "y_pred", "y_true"],
+        value_vars=["phase_sin", "phase_cos", "y_pred", "y_true"],
     )
     with warnings.catch_warnings():
         warnings.simplefilter(action='ignore', category=FutureWarning)

@@ -3,7 +3,6 @@ set -ex
 export RUN=103_4_4_4_quadrature_24khZ
 export FILTERS="4 8 4"
 
-
 mkdir runs/$RUN || true
 
 # pre train at FP4.12
@@ -31,7 +30,7 @@ time uv run -m fxpmath_version.test \
  --layer-info runs/$RUN/qkeras_model.layer_info.json \
  --test-x-dir runs/$RUN/test_x_files/ \
  --plot-dir runs/$RUN/ \
- --num-test-egs 100 --wave sine \
+ --num-test-egs 100 --wave triangle \
  | tee runs/$RUN/fxpmath_version.test.out
 
 # # quite slow, only required for big changes

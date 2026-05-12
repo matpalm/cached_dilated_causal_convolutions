@@ -146,7 +146,7 @@ class FxpModel(object):
         num_overflows = 0
         for l in self.layers:
             try:
-                num_underflows += l.num_overflows()
+                num_underflows += l.num_underflows()
                 num_overflows += l.num_overflows()
             except AttributeError:
                 pass

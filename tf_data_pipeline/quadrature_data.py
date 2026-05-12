@@ -48,6 +48,7 @@ def calculate_wave(
     waveform1: Waveform,
     waveform2: Waveform = None,
     interp: float = 0,
+    scale: float = 0.8,
 ):
     if frequency_hz > (sample_rate_hz / 2.0):
         raise ValueError("faildog! nyquist limit")
@@ -64,7 +65,7 @@ def calculate_wave(
                 # inverted c.f. others
                 return (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5)) - 1.0
             case Waveform.SQUARE:
-                return np.where(phase_cos >= 0.0, 1.0, -1.0)
+                return np.where(phase_cos >= 0.0, 1, -1)
             case Waveform.SINE:
                 # Cosine peaks at phase 0, aligning with triangle/ramp peaks.
                 return phase_cos
@@ -85,13 +86,13 @@ def calculate_wave(
         s2 = np.sin(interp * np.pi / 2)
         result = (s1 * result1) + (s2 * result2)
         # note doesn't ensure values stay in (-1, 1) so soft clip
-        result = soft_clip(result)
-        # and rescale back to (-1, 1)
+        # result = soft_clip(result)
+        result = np.clip(result, 0, 1)
 
     return {
-        "phase_sin": phase_sin,
-        "phase_cos": phase_cos,
-        "wave": result,
+        "phase_sin": scale * phase_sin,
+        "phase_cos": scale * phase_cos,
+        "wave": scale * result,
     }
 
 
