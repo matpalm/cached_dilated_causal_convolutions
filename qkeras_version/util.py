@@ -18,7 +18,6 @@ class CheckYPred(tf.keras.callbacks.Callback):
 
     def __init__(self, tb_dir, dataset, model):
         self.summary_writer = tf.summary.create_file_writer(tb_dir)
-        self.model = model
 
         for x, y in dataset:
             self.x = x

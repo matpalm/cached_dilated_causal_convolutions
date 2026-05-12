@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
     # checkpointing raw keras weights
     checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath=f"runs/{opts.run}/weights/keras/" + "{epoch:03d}",
+        filepath=f"runs/{opts.run}/weights/keras/" + "{epoch:03d}" + ".weights.h5",
         save_weights_only=True,
     )
 
