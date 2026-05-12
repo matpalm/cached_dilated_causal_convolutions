@@ -13,7 +13,7 @@ import json
 
 from fxpmath_version.fxpmath_model import FxpModel
 # from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
-from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
+from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
 from . import util
 
 import argparse
@@ -80,7 +80,7 @@ fxp = util.FxpUtil()
 def process(wave):
 
     test_ds = data.tf_dataset(
-        batch_size=16,
+        batch_size=1,
         seq_len=opts.num_test_egs,
         num_samples=1,
         emit_specific_wave=wave,
@@ -105,7 +105,7 @@ def process(wave):
 
     # run net
     y_pred = []
-    for i in tqdm.tqdm(range(len(x)), desc=f"{wave:6s}"):
+    for i in tqdm.tqdm(range(len(x)), desc=f"{wave:20s}"):
 
         # run through model
         y_pred.append(fxp_model.predict(x[i]))
@@ -144,12 +144,21 @@ def process(wave):
         pickle.dump(result, f)
 
     # save plot
+    # Quadrature data layout is [phase_sin, phase_cos, e0, e1].
+    # y_true/y_pred waveform target remains column 0.
     df = pd.DataFrame()
-    df["x"] = x[:, 0]  # just waveform, not e0 or e1
+    df["phase_sin"] = x[:, 0]
+    df["phase_cos"] = x[:, 1]
+    df["e0"] = x[:, 2]
+    df["e1"] = x[:, 3]
     df["y_pred"] = y_pred[:, 0]
     df["y_true"] = y_true[:, 0]
     df['n'] = range(len(y_pred))
-    wide_df = pd.melt(df, id_vars=["n"], value_vars=["x", "y_pred", "y_true"])
+    wide_df = pd.melt(
+        df,
+        id_vars=["n"],
+        value_vars=["phase_sin", "phase_cos", "e0", "e1", "y_pred", "y_true"],
+    )
     with warnings.catch_warnings():
         warnings.simplefilter(action='ignore', category=FutureWarning)
         p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
@@ -162,7 +171,7 @@ def process(wave):
 
 
 from multiprocessing import Pool
-waves = ['sine', 'ramp', 'square', 'zigzag']
+waves = ["sine", "ramp", "square", "triangle"]
 if opts.wave is None:
     p = Pool(len(waves))
     p.map(process, waves)

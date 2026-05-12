@@ -29,6 +29,8 @@ def soft_clip(x, drive=1.5):
 
 
 def sample_freq(min_freq, max_freq, alpha):
+    if min_freq == max_freq:
+        return min_freq
     assert min_freq < max_freq
     assert 0 <= alpha <= 1
     min_freq_2 = np.log2(min_freq)
@@ -97,8 +99,8 @@ class Embed2DQuadratureData(object):
 
     def __init__(
         self,
-        min_note: str = "A2",
-        max_note: str = "A4",
+        min_note: str,
+        max_note: str,
         sample_rate_hz: float = 24 * 1000,
         seed: int = 123,
     ):
@@ -108,6 +110,7 @@ class Embed2DQuadratureData(object):
         self.rng = random.Random(seed)
 
     def _sample_wave(self, seq_len, w1, w2=None, interp=None):
+
         frequency_hz = sample_freq(
             FREQS[self.min_note], FREQS[self.max_note], alpha=self.rng.random()
         )

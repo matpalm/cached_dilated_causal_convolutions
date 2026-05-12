@@ -1,20 +1,20 @@
 set -ex
 
 export RUN=103_4_4_4_quadrature_24khZ
-export FILTERS="4 4 4"
+export FILTERS="4 8 4"
 
 
 mkdir runs/$RUN || true
 
 # pre train at FP4.12
-time uv run -m qkeras_version.train \
- --run $RUN \
- --min-note A3 --max-note A4 \
- --fp-int 4 --fp-frac 12 \
- --in-out-d 4 --filter-sizes $FILTERS \
- --alpha-mse 1.0 --beta-stft 0.0 --beta-stft-ramp-epochs 20 \
- --num-train-egs 1000 --epochs 10 --learning-rate 1e-3 --l2 0.0001 \
- | tee runs/$RUN/qkeras_version.train.out
+# time uv run -m qkeras_version.train \
+#  --run $RUN \
+#  --min-note A4 --max-note A4 \
+#  --fp-int 4 --fp-frac 12 \
+#  --in-out-d 4 --filter-sizes $FILTERS \
+#  --alpha-mse 1.0 --beta-stft 0.0 --beta-stft-ramp-epochs 20 \
+#  --num-train-egs 1000 --epochs 20 --learning-rate 1e-3 --l2 0.0001 \
+#  | tee runs/$RUN/qkeras_version.train.out
 
 # fine tune at FP4.4
 # time uv run -m qkeras_version.train \
@@ -26,11 +26,12 @@ time uv run -m qkeras_version.train \
 #  | tee runs/$RUN/qkeras_version.finetune.out
 
 time uv run -m fxpmath_version.test \
+ --min-note A4 --max-note A4 \
  --load-weights runs/$RUN/weights/qkeras/latest.pkl \
  --layer-info runs/$RUN/qkeras_model.layer_info.json \
  --test-x-dir runs/$RUN/test_x_files/ \
  --plot-dir runs/$RUN/ \
- --num-test-egs 400 \
+ --num-test-egs 100 --wave sine \
  | tee runs/$RUN/fxpmath_version.test.out
 
 # # quite slow, only required for big changes
