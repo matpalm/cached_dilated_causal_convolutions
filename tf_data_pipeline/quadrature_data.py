@@ -7,6 +7,7 @@ FREQS = {"A2": 110, "A3": 220, "A4": 440, "A5": 880, "A6": 1760}
 
 IN_OUT_D = 4
 
+
 class Waveform(Enum):
     TRIANGLE = "triangle"
     SQUARE = "square"
@@ -20,6 +21,14 @@ class Waveform(Enum):
             Waveform.SINE: np.array([-1, -1]),
             Waveform.RAMP: np.array([-1, 1]),
         }[self]
+
+
+WAVE_EDGES = [
+    (Waveform.RAMP, Waveform.SQUARE),
+    (Waveform.SQUARE, Waveform.TRIANGLE),
+    (Waveform.TRIANGLE, Waveform.SINE),
+    (Waveform.SINE, Waveform.RAMP),
+]
 
 
 def soft_clip(x, drive=1.5):
@@ -62,15 +71,12 @@ def calculate_wave(
     def wave(w):
         match w:
             case Waveform.TRIANGLE:
-                # inverted c.f. others
-                return (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5)) - 1.0
+                return 1.0 - (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5))
             case Waveform.SQUARE:
-                return np.where(phase_cos >= 0.0, 1, -1)
+                return np.where(phase_sin >= 0.0, 1, -1)
             case Waveform.SINE:
-                # Cosine peaks at phase 0, aligning with triangle/ramp peaks.
-                return phase_cos
+                return phase_sin
             case Waveform.RAMP:
-                # Descending ramp with peak at phase 0.
                 return 1.0 - (2.0 * cycle)
 
     if interp == 0 or waveform2 is None:
@@ -110,33 +116,38 @@ class Embed2DQuadratureData(object):
         self.sample_rate_hz = 196 * 1000
         self.rng = random.Random(seed)
 
-    def _sample_wave(self, seq_len, w1, w2=None, interp=None):
-
-        frequency_hz = sample_freq(
+    def random_freq(self):
+        return sample_freq(
             FREQS[self.min_note], FREQS[self.max_note], alpha=self.rng.random()
         )
-        starting_phase = self.rng.random() * 2 * np.pi
 
-        if w2 is None:
-            interp = 0.0
-        elif interp is None:
-            interp = self.rng.random()
+    def random_phase(self):
+        return self.rng.random() * 2 * np.pi
 
+    def _sample_single_wave(self, seq_len, w1):
         data = calculate_wave(
-            frequency_hz,
+            self.random_freq(),
             self.sample_rate_hz,
-            starting_phase,
+            self.random_phase(),
+            seq_len,
+            w1,
+            w2=None,
+            interp=None,
+        )
+        embed_pt = w1.to_embed_pt()
+        return data, embed_pt
+
+    def _sample_interpolated_wave(self, seq_len, w1, w2, interp):
+        data = calculate_wave(
+            self.random_freq(),
+            self.sample_rate_hz,
+            self.random_phase(),
             seq_len,
             w1,
             w2,
             interp,
         )
-
-        if w2 is None:
-            embed_pt = w1.to_embed_pt()
-        else:
-            embed_pt = ((1.0 - interp) * w1.to_embed_pt()) + (interp * w2.to_embed_pt())
-
+        embed_pt = ((1.0 - interp) * w1.to_embed_pt()) + (interp * w2.to_embed_pt())
         return data, embed_pt
 
     def _xy_from_data(self, data, embed_pt):
@@ -174,20 +185,14 @@ class Embed2DQuadratureData(object):
                 else:
                     assert emit_endpt_samples or emit_interpolated_samples
                     # samples two waves
-                    w1, w2 = self.rng.choice(
-                        [
-                            (Waveform.RAMP, Waveform.SQUARE),
-                            (Waveform.SQUARE, Waveform.TRIANGLE),
-                            (Waveform.TRIANGLE, Waveform.SINE),
-                            (Waveform.SINE, Waveform.RAMP),
-                        ]
-                    )
+                    w1, w2 = self.rng.choice(WAVE_EDGES)
                     # emit either interpolated, or the two ends points
                     if emit_endpt_samples:
-                        yield self._sample_wave(seq_len=seq_len, w1=w1, w2=None)
-                        yield self._sample_wave(seq_len=seq_len, w1=w2, w2=None)
+                        yield self._sample_single_wave(seq_len, w1)
+                        yield self._sample_single_wave(seq_len, w2)
                     if emit_interpolated_samples:
-                        yield self._sample_wave(seq_len=seq_len, w1=w1, w2=w2)
+                        interp = self.rng.random()
+                        yield self._sample_interpolated_wave(seq_len, w1, w2, interp)
 
         def gen_limited_number():
             g = gen_waves()
@@ -211,6 +216,7 @@ if __name__ == "__main__":
     import argparse
     import matplotlib.pyplot as plt
     import seaborn as sns
+    import pandas as pd
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -233,25 +239,64 @@ if __name__ == "__main__":
         seed=123,
     )
 
-    ds = data_source.tf_dataset(
-        batch_size=1,
-        seq_len=opts.num_samples,
-        num_samples=300,
-        emit_endpt_samples=True,
-        emit_interpolated_samples=True,
-    )
+    # ds = data_source.tf_dataset(
+    #     batch_size=1,
+    #     seq_len=opts.num_samples,
+    #     num_samples=300,
+    #     emit_endpt_samples=True,
+    #     emit_interpolated_samples=True,
+    # )
 
-    plot_idx = 0
-    for x, y in ds.take(100):
-        xs, xc = x[0, :, 0], x[0, :, 1]
-        e0, e1 = x[0, :, 2], x[0, :, 3]
-        yt = y[0, :, 0]
-        x = np.arange(len(xs))
-        plt.clf()
-        sns.lineplot(x=x, y=xs, label="xs")
-        sns.lineplot(x=x, y=xc, label="xc")
-        sns.lineplot(x=x, y=e0, label=f"e0 {e0[0]:0.2f}")
-        sns.lineplot(x=x, y=e1, label=f"e1 {e1[0]:0.2f}")
-        sns.lineplot(x=x, y=yt, label="yt")
-        plt.savefig(f"interp_data_egs/{plot_idx:04d}.png")
-        plot_idx += 1
+    for w1, w2 in WAVE_EDGES:
+        for interp in np.linspace(0, 1, 5):
+            seq_len = 300
+            data = calculate_wave(
+                frequency_hz=FREQS["A4"],
+                sample_rate_hz=64_000,
+                starting_phase=0,
+                num_samples=seq_len,
+                waveform1=w1,
+                waveform2=w2,
+                interp=interp,
+            )
+            df = pd.DataFrame()
+            df["n"] = range(seq_len)
+            df["wave"] = data["wave"]
+            p = sns.lineplot(df, x="n", y="wave", linewidth=5)
+            plt.savefig(f"interp_data_egs/{w1}_{w2}_{interp:0.3f}.png")
+            plt.clf()
+
+    # GRID_SIZE = 5
+
+    # for i0, e0 in enumerate(np.linspace(-1, 1, GRID_SIZE)):
+
+    #     for i1, e1 in enumerate(np.linspace(-1, 1, GRID_SIZE)):
+
+    #         print("i", i0, i1, "=> e", e0, e1)
+    #         x[0, :, 2] = e0
+    #         x[0, :, 3] = e1
+
+    #         y_pred = test_model.predict(x)
+
+    #         # axis 0 ; just take first element ( single batch )
+    #         # axis 1 ; drop first receptive field items ( warm up )
+    #         # axis 2 ; just first element ( single dim output )
+    #         y_pred = y_pred[0, RECEPTIVE_FIELD_SIZE:, 0]
+
+    #         # save plot
+    #         df = pd.DataFrame()
+    #         df["n"] = range(len(y_pred))
+    #         df["y_pred"] = y_pred
+    #         with warnings.catch_warnings():
+    #             warnings.simplefilter(action="ignore", category=FutureWarning)
+    #             p = sns.lineplot(df, x="n", y="y_pred", linewidth=5)
+    #             p.set(xticklabels=[])
+    #             p.set(xlabel=None)
+    #             p.set(yticklabels=[])
+    #             p.set(ylabel=None)
+    #             p.tick_params(bottom=False, left=False)
+    #             p.set(ylim=(-2, 2))
+    #             plt_fname = f"foo_{i0:02d}_{i1:02d}.png"
+    #             print("saving plot to", plt_fname)
+    #             plt.savefig(plt_fname)
+    #             plt.clf()
