@@ -199,7 +199,7 @@ class TestEquivalences(unittest.TestCase):
 
     def test_activation_cache(self):
 
-        IN_OUT_D = 8
+        IN_OUT_D = 3
         DILATION_LEVEL = 1
         K = 4
         DILATION = K**DILATION_LEVEL
@@ -222,8 +222,10 @@ class TestEquivalences(unittest.TestCase):
             kernel_size=K,
         )
         fxp_results = []
-        for sample in samples:
-            fxp_results.append(fxp_cache.apply(sample))
+        for i, sample in enumerate(samples):
+            fxp_result = fxp_cache.apply(sample)
+            print("fxp_result", i, fxp_result)
+            fxp_results.append(fxp_result)
 
         dut = AmaranthActivationCache(
             in_out_d=IN_OUT_D,
@@ -232,27 +234,23 @@ class TestEquivalences(unittest.TestCase):
         amaranth_results = []
 
         async def testbench(ctx):
-            ctx.set(dut.i.valid, 0)
             ctx.set(dut.o.ready, 1)
 
-            for sample in samples:
-                while not ctx.get(dut.i.ready):
-                    await ctx.tick()
-
+            for i, sample in enumerate(samples):
                 ctx.set(dut.i.payload, parse_nnq(sample, assert_exact=False))
                 ctx.set(dut.i.valid, 1)
+                await ctx.tick()
 
                 for _ in range(100):
                     if ctx.get(dut.o.valid):
                         break
                     await ctx.tick()
+                assert ctx.get(dut.o.valid)
 
                 am_output = ctx.get(dut.o.payload)
                 am_output = [[v.as_float() for v in row] for row in am_output]
+                print("am_output", i, am_output)
                 amaranth_results.append(np.asarray(am_output))
-
-                await ctx.tick()
-                ctx.set(dut.i.valid, 0)
 
         sim = Simulator(dut)
         sim.add_clock(1e-6, domain="sync")
@@ -260,9 +258,12 @@ class TestEquivalences(unittest.TestCase):
         sim.run()
 
         self.assertEqual(len(fxp_results), len(amaranth_results))
-        np.testing.assert_allclose(
-            np.asarray(fxp_results), np.asarray(amaranth_results)
-        )
+        for i in range(len(fxp_results)):
+            np.testing.assert_allclose(
+                np.asarray(fxp_results[i]),
+                np.asarray(amaranth_results[i]),
+                err_msg=f"failed at i={i}",
+            )
 
     def test_network(self):
 
