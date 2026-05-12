@@ -12,7 +12,8 @@ import pickle
 import json
 
 from fxpmath_version.fxpmath_model import FxpModel
-from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
+# from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
+from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
 from . import util
 
 import argparse
@@ -20,8 +21,10 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--wave', type=str, default=None,
     help='single wave to test, if not set, test all')
-parser.add_argument('--data-root-dir', type=str, required=True)
+# parser.add_argument('--data-root-dir', type=str, required=True)
 # parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
+parser.add_argument("--min-note", type=str, default="A2")
+parser.add_argument("--max-note", type=str, default="A4")
 parser.add_argument('--load-weights', type=str)
 parser.add_argument('--layer-info', type=str)
 parser.add_argument('--test-x-dir', type=str, default=".")
@@ -62,8 +65,10 @@ TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
 print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-data = Embed2DInterpolatedWaveFormData(
-    root_dir=opts.data_root_dir, pad_size=fxp_model.in_dim, seed=123
+data = Embed2DQuadratureData(
+    min_note=opts.min_note,
+    max_note=opts.max_note,
+    seed=123,
 )
 
 fxp = util.FxpUtil()
@@ -74,10 +79,12 @@ fxp = util.FxpUtil()
 
 def process(wave):
 
-    test_ds = data.tf_dataset_for_split('test',
-                        seq_len=opts.num_test_egs,
-                        max_samples=1,
-                        specific_wave=wave)
+    test_ds = data.tf_dataset(
+        batch_size=16,
+        seq_len=opts.num_test_egs,
+        num_samples=1,
+        emit_specific_wave=wave,
+    )
 
     for x, y_true in test_ds:
         x, y_true = x[0].numpy(), y_true[0].numpy()

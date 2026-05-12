@@ -1,7 +1,11 @@
 import numpy as np
 from enum import Enum
+import random
+import tensorflow as tf
 
 FREQS = {"A2": 110, "A3": 220, "A4": 440, "A5": 880, "A6": 1760}
+
+IN_OUT_D = 4
 
 class Waveform(Enum):
     TRIANGLE = "triangle"
@@ -66,7 +70,7 @@ def calculate_wave(
                 # Descending ramp with peak at phase 0.
                 return 1.0 - (2.0 * cycle)
 
-    if interp == 0:
+    if interp == 0 or waveform2 is None:
         result = wave(waveform1)
     elif interp == 1:
         result = wave(waveform2)
@@ -89,6 +93,111 @@ def calculate_wave(
     }
 
 
+class Embed2DQuadratureData(object):
+
+    def __init__(
+        self,
+        min_note: str = "A2",
+        max_note: str = "A4",
+        sample_rate_hz: float = 24 * 1000,
+        seed: int = 123,
+    ):
+        self.min_note = min_note
+        self.max_note = max_note
+        self.sample_rate_hz = sample_rate_hz
+        self.rng = random.Random(seed)
+
+    def _sample_wave(self, seq_len, w1, w2=None, interp=None):
+        frequency_hz = sample_freq(
+            FREQS[self.min_note], FREQS[self.max_note], alpha=self.rng.random()
+        )
+        starting_phase = self.rng.random() * 2 * np.pi
+
+        if w2 is None:
+            interp = 0.0
+        elif interp is None:
+            interp = self.rng.random()
+
+        data = calculate_wave(
+            frequency_hz,
+            self.sample_rate_hz,
+            starting_phase,
+            seq_len,
+            w1,
+            w2,
+            interp,
+        )
+
+        if w2 is None:
+            embed_pt = w1.to_embed_pt()
+        else:
+            embed_pt = ((1.0 - interp) * w1.to_embed_pt()) + (interp * w2.to_embed_pt())
+
+        return data, embed_pt
+
+    def _xy_from_data(self, data, embed_pt):
+        # TODO: this could be a map in tf
+        N = len(data["phase_sin"])
+        x = np.zeros((N, IN_OUT_D), dtype=np.float32)
+        y = np.zeros((N, IN_OUT_D), dtype=np.float32)
+        x[:, 0] = data["phase_sin"]
+        x[:, 1] = data["phase_cos"]
+        x[:, 2] = embed_pt[0]
+        x[:, 3] = embed_pt[1]
+        y[:, 0] = data["wave"]
+        return x, y
+
+    def tf_dataset(
+        self,
+        batch_size: int,
+        seq_len: int,
+        num_samples: int,
+        emit_endpt_samples: bool = True,
+        emit_interpolated_samples: bool = True,
+        emit_specific_wave: Waveform = None,
+    ):
+
+        if type(emit_specific_wave) == str:
+            emit_specific_wave = Waveform(emit_specific_wave)
+
+        def gen_waves():
+            while True:
+                if emit_specific_wave is not None:
+                    # just emit data for this specific wave
+                    yield self._sample_wave(
+                        seq_len=seq_len, w1=emit_specific_wave, w2=None
+                    )
+                else:
+                    assert emit_endpt_samples or emit_interpolated_samples
+                    # samples two waves
+                    w1 = self.rng.choice(list(Waveform))
+                    w2 = w1
+                    while w2 == w1:
+                        w2 = self.rng.choice(list(Waveform))
+                    # emit either interpolated, or the two ends points
+                    if emit_endpt_samples:
+                        yield self._sample_wave(seq_len=seq_len, w1=w1, w2=None)
+                        yield self._sample_wave(seq_len=seq_len, w1=w2, w2=None)
+                    if emit_interpolated_samples:
+                        yield self._sample_wave(seq_len=seq_len, w1=w1, w2=w2)
+
+        def gen_limited_number():
+            g = gen_waves()
+            for _ in range(num_samples):
+                data, embed_pt = next(g)
+                yield self._xy_from_data(data, embed_pt)
+
+        ds = tf.data.Dataset.from_generator(
+            gen_limited_number,
+            output_signature=(
+                tf.TensorSpec(shape=(seq_len, IN_OUT_D), dtype=tf.float32),
+                tf.TensorSpec(shape=(seq_len, IN_OUT_D), dtype=tf.float32),
+            ),
+        )
+        ds = ds.batch(batch_size)
+        return ds.prefetch(tf.data.AUTOTUNE)
+
+
 if __name__ == "__main__":
     import argparse
     import matplotlib.pyplot as plt
@@ -104,94 +213,34 @@ if __name__ == "__main__":
     parser.add_argument("--num_samples", type=int, default=1000)
     opts = parser.parse_args()
     print("opts", opts)
+    import os
 
-    # all waves
+    os.makedirs("interp_data_egs", exist_ok=True)
 
-    # x = None
-    # for wave in [Waveform.TRIANGLE, Waveform.SQUARE, Waveform.RAMP, Waveform.SINE]:
-    #     data = calculate_interp_wave(
-    #         opts.frequency_hz,
-    #         opts.sample_rate_hz,
-    #         opts.starting_phase,
-    #         opts.num_samples,
-    #         wave,
-    #         None,
-    #         interp=0,
-    #     )
+    data_source = Embed2DQuadratureData(
+        min_note=opts.min_note,
+        max_note=opts.max_note,
+        sample_rate_hz=opts.sample_rate_hz,
+        seed=123,
+    )
 
-    #     if x is None:
-    #         x = np.arange(len(data["phase_sin"]))
-    #         sns.set_theme(style="whitegrid")
-    #         fig, (ax_top, ax_bottom) = plt.subplots(
-    #             2,
-    #             1,
-    #             sharex=True,
-    #             figsize=(12, 8),
-    #             constrained_layout=True,
-    #         )
-    #         sns.lineplot(x=x, y=data["phase_sin"], ax=ax_top, label="phase_sin")
-    #         sns.lineplot(x=x, y=data["phase_cos"], ax=ax_top, label="phase_cos")
-    #         ax_top.set_ylabel("phase")
-    #         ax_top.set_title("Quadrature Phase")
+    # tf_dataset emits (w1, w2, interp) in sequence; group every 3 samples.
+    ds = data_source.tf_dataset(
+        batch_size=1,
+        seq_len=opts.num_samples,
+        num_samples=300,
+    ).unbatch()
 
-    #     sns.lineplot(x=x, y=data["wave"], ax=ax_bottom, label=str(wave))
-
-    # ax_bottom.set_ylabel("amplitude")
-    # ax_bottom.set_xlabel("sample index")
-    # ax_bottom.set_title("single waves")
-
-    # fig.savefig("single_waves.png")
-
-    # interp wave egs
-    import random
-
-    rng = random.Random(123)
-
-    for i in range(100):
-        frequency_hz = sample_freq(FREQS["A2"], FREQS["A4"], alpha=rng.random())
-        starting_phase = rng.random() * 2 * np.pi
-        all_waves = [Waveform.TRIANGLE, Waveform.SQUARE, Waveform.RAMP, Waveform.SINE]
-        w1 = rng.choice(all_waves)
-        w2 = w1
-        while w2 == w1:
-            w2 = rng.choice(all_waves)
-        interp = rng.random()
-
-        data_w1 = calculate_wave(
-            frequency_hz,
-            opts.sample_rate_hz,
-            starting_phase,
-            opts.num_samples,
-            w1,
-        )
-
-        data_w2 = calculate_wave(
-            frequency_hz,
-            opts.sample_rate_hz,
-            starting_phase,
-            opts.num_samples,
-            w2,
-        )
-
-        data_interp = calculate_wave(
-            frequency_hz,
-            opts.sample_rate_hz,
-            starting_phase,
-            opts.num_samples,
-            w1,
-            w2,
-            interp,
-        )
-
-        x = np.arange(len(data_w1["phase_sin"]))
-
-        # sns.lineplot(x=x, y=data[["phase_sin"], ax=ax_top, label="phase_sin")
-        # sns.lineplot(x=x, y=data[0]["phase_cos"], ax=ax_top, label="phase_cos")
-        # ax_top.set_ylabel("phase")
-        # ax_top.set_title("Quadrature Phase")
-        plt.clf()
-        sns.lineplot(x=x, y=data_w1["wave"], label=f"w1={w1.value}")
-        sns.lineplot(x=x, y=data_w2["wave"], label=f"w2={w2.value}")
-        sns.lineplot(x=x, y=data_interp["wave"], label=f"interp={interp:0.2f}")
-        plt.title(f"frequency_hz={frequency_hz:.2f}")
-        plt.savefig(f"interp_data_egs/{i:04d}.png")
+    lines = []
+    plot_idx = 0
+    for _, y_i in ds.take(300):
+        lines.append(y_i.numpy()[:, 0])
+        if len(lines) == 3:
+            x = np.arange(len(lines[0]))
+            plt.clf()
+            sns.lineplot(x=x, y=lines[0], label="w1")
+            sns.lineplot(x=x, y=lines[1], label="w2")
+            sns.lineplot(x=x, y=lines[2], label="interp")
+            plt.savefig(f"interp_data_egs/{plot_idx:04d}.png")
+            plot_idx += 1
+            lines = []

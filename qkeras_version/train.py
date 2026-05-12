@@ -4,7 +4,7 @@ from tensorflow.keras.optimizers import Adam
 import pickle, os, json, contextlib
 
 # from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
-from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
+from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
 
 from qkeras.utils import model_save_quantized_weights
 
@@ -16,8 +16,8 @@ if __name__ == '__main__':
 
     import argparse
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--data-root-dir', type=str, required=True)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument('--run', type=str, required=True)
     parser.add_argument('--learning-rate', type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=5)
@@ -48,6 +48,8 @@ if __name__ == '__main__':
         help="path to keras weights used to initialize fine-tuning",
     )
     parser.add_argument("--relu-upper-bound", type=float, default=6)
+    parser.add_argument("--min-note", type=str, default="A2")
+    parser.add_argument("--max-note", type=str, default="A4")
     parser.add_argument(
         "--alpha-mse",
         type=float,
@@ -73,9 +75,10 @@ if __name__ == '__main__':
     for w in ["keras", "qkeras"]:
         ensure_dir_exists(f"runs/{opts.run}/weights/{w}")
 
-    data = Embed2DInterpolatedWaveFormData(
-        root_dir=opts.data_root_dir,
-        pad_size=opts.in_out_d,
+    data = Embed2DQuadratureData(
+        min_note=opts.min_note,
+        max_note=opts.max_note,
+        sample_rate_hz=192 * 1000,
         seed=456,
     )
 
@@ -127,11 +130,19 @@ if __name__ == '__main__':
         )
 
     # make tf datasets
-    train_ds = data.tf_dataset_for_split(
-        "train", TRAIN_SEQ_LEN, opts.num_train_egs, interpolated_samples=True
+    train_ds = data.tf_dataset(
+        batch_size=64,
+        seq_len=TRAIN_SEQ_LEN,
+        num_samples=opts.num_train_egs,
+        emit_endpt_samples=True,
+        emit_interpolated_samples=True,
     )
-    validate_ds = data.tf_dataset_for_split(
-        "validate", TRAIN_SEQ_LEN, opts.num_validate_egs, interpolated_samples=True
+    validate_ds = data.tf_dataset(
+        batch_size=64,
+        seq_len=TRAIN_SEQ_LEN,
+        num_samples=opts.num_validate_egs,
+        emit_endpt_samples=True,
+        emit_interpolated_samples=True,
     )
 
     # construct some callbacks...
