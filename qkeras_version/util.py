@@ -37,6 +37,7 @@ class CheckYPred(tf.keras.callbacks.Callback):
         )
         with warnings.catch_warnings():
             warnings.simplefilter(action='ignore', category=FutureWarning)
+            plt.figure(figsize=(14, 4))
             p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
             p.set_ylim((-2, 2))
             # TODO better to do this direct with bytesio object...
@@ -59,9 +60,9 @@ class CheckYPred(tf.keras.callbacks.Callback):
 
                 # never show more than 1000 samples in time
                 # and if trimming, pick the last
-                plot_x = plot_x[:, -1000:]
-                y_pred = y_pred[:, -1000:]
-                plot_y_true = plot_y_true[:, -1000:]
+                # plot_x = plot_x[:, -1000:]
+                # y_pred = y_pred[:, -1000:]
+                # plot_y_true = plot_y_true[:, -1000:]
 
                 imgs = []
                 for i in range(len(plot_x)):
