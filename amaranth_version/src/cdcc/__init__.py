@@ -4,6 +4,7 @@ from typing import List
 
 # model fixed point config
 # note: tiliqua codec is FP1.15 but we have model working in FP4.12
+# ( branch fp3_5 has work in progress version at lower size )
 N_INT = 4
 N_FRAC = 12
 NNQ = fixed.SQ(N_INT, N_FRAC)

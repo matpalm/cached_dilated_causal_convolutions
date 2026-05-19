@@ -8,12 +8,6 @@ from tensorflow.keras import regularizers
 import qkeras
 from qkeras import quantized_bits, quantized_po2, QConv1D, QActivation
 
-# N_WORD = 16
-# N_INT = 4
-# N_FRAC = 12
-# assert N_WORD == N_INT + N_FRAC
-
-
 def masked_mse(receptive_field_size, filter_column_idx=None):
     '''
     Calculates masked version of mean square error
