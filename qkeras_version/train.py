@@ -37,7 +37,7 @@ if __name__ == "__main__":
         required=True,
         help="sfeature depths for each layer; last layer always 4",
     )
-    parser.add_argument("--po2-filter-size", type=int, default=None)
+    # parser.add_argument("--po2-filter-size", type=int, default=None)
     parser.add_argument("--num-train-egs", type=int, default=200_000)
     parser.add_argument("--num-validate-egs", type=int, default=100)
     parser.add_argument("--fp-int", type=int, default=4)
@@ -51,6 +51,7 @@ if __name__ == "__main__":
     parser.add_argument("--relu-upper-bound", type=float, default=6)
     parser.add_argument("--min-note", type=str, default="A2")
     parser.add_argument("--max-note", type=str, default="A4")
+    parser.add_argument("--sample-rate-khz", type=float, default=192)
     parser.add_argument(
         "--alpha-mse",
         type=float,
@@ -79,6 +80,7 @@ if __name__ == "__main__":
     data = Embed2DQuadratureData(
         min_note=opts.min_note,
         max_note=opts.max_note,
+        sample_rate_khz=opts.sample_rate_khz,
         seed=456,
     )
 
@@ -94,11 +96,9 @@ if __name__ == "__main__":
     # receptive field should be _at least_ 128, even for 2 layer models otherwise we get no useful debug result
     RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**num_layers
     RECEPTIVE_FIELD_SIZE = max(128, RECEPTIVE_FIELD_SIZE)
-    TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
-    print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
     # construct model
     builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
@@ -148,19 +148,23 @@ if __name__ == "__main__":
     )
 
     # construct some callbacks...
+    callbacks = []
 
     # tensorboard
     tensorboard_dir = f"runs/{opts.run}/tb"
     tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
+    callbacks.append(tensorboard_cb)
 
     # checkpointing raw keras weights
-    checkpoint_cb = tf.keras.callbacks.ModelCheckpoint(
-        filepath=f"runs/{opts.run}/weights/keras/" + "{epoch:03d}" + ".weights.h5",
-        save_weights_only=True,
+    callbacks.append(
+        tf.keras.callbacks.ModelCheckpoint(
+            filepath=f"runs/{opts.run}/weights/keras/" + "{epoch:03d}" + ".weights.h5",
+            save_weights_only=True,
+        )
     )
 
     # plotting examples of validation data ( in tensorboard )
-    check_y_pred_cb = CheckYPred(tb_dir=tensorboard_dir, dataset=validate_ds)
+    callbacks.append(CheckYPred(tb_dir=tensorboard_dir, dataset=validate_ds))
 
     # exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
@@ -176,32 +180,35 @@ if __name__ == "__main__":
             except FileNotFoundError:
                 pass
             os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
-
-    save_quantised_weights_cb = SaveQuantisedWeights()
+    callbacks.append(SaveQuantisedWeights())
 
     # beta_stft is captured by the loss closure and updated by callback.
+    # stays at zero if no config around being updated by callback
     beta_stft = tf.Variable(0.0, trainable=False, dtype=tf.float32)
+    if opts.beta_stft_ramp_epochs > 0:
 
-    class RampBetaStft(tf.keras.callbacks.Callback):
-        def __init__(self, beta_var: tf.Variable, target: float, ramp_epochs: int):
-            self.beta_var = beta_var
-            self.target = float(target)
-            self.ramp_epochs = max(1, int(ramp_epochs))
+        class RampBetaStft(tf.keras.callbacks.Callback):
+            def __init__(self, beta_var: tf.Variable, target: float, ramp_epochs: int):
+                self.beta_var = beta_var
+                self.target = float(target)
+                self.ramp_epochs = max(1, int(ramp_epochs))
 
-        def on_epoch_begin(self, epoch, logs=None):
-            # epoch is 0-indexed; start at 0 and hit target at the end of ramp.
-            if self.ramp_epochs == 1:
-                value = self.target
-            else:
-                value = self.target * min(epoch / (self.ramp_epochs - 1), 1.0)
-            self.beta_var.assign(value)
-            print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
+            def on_epoch_begin(self, epoch, logs=None):
+                # epoch is 0-indexed; start at 0 and hit target at the end of ramp.
+                if self.ramp_epochs == 1:
+                    value = self.target
+                else:
+                    value = self.target * min(epoch / (self.ramp_epochs - 1), 1.0)
+                self.beta_var.assign(value)
+                print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
 
-    ramp_beta_stft_cb = RampBetaStft(
-        beta_var=beta_stft,
-        target=opts.beta_stft,
-        ramp_epochs=opts.beta_stft_ramp_epochs,
-    )
+        callbacks.append(
+            RampBetaStft(
+                beta_var=beta_stft,
+                target=opts.beta_stft,
+                ramp_epochs=opts.beta_stft_ramp_epochs,
+            )
+        )
 
     # def lr_schedule(epoch, lr):
     #     if epoch <= 40:
@@ -228,12 +235,6 @@ if __name__ == "__main__":
     train_model.fit(
         train_ds,
         validation_data=validate_ds,
-        callbacks=[
-            tensorboard_cb,
-            checkpoint_cb,
-            check_y_pred_cb,
-            save_quantised_weights_cb,
-            ramp_beta_stft_cb,
-        ],  # , lr_cb],
+        callbacks=callbacks,
         epochs=opts.epochs,
     )

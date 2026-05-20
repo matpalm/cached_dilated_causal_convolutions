@@ -1,4 +1,5 @@
 import os
+import io
 
 import pandas as pd
 import seaborn as sns
@@ -35,17 +36,17 @@ class CheckYPred(tf.keras.callbacks.Callback):
         wide_df = pd.melt(
             df, id_vars=["n"], value_vars=["phase_sin", "y_pred", "y_true", "e0", "e1"]
         )
-        with warnings.catch_warnings():
-            warnings.simplefilter(action='ignore', category=FutureWarning)
-            plt.figure(figsize=(14, 4))
-            p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
-            p.set_ylim((-2, 2))
-            # TODO better to do this direct with bytesio object...
-            plt_fname = f"/dev/shm/__{random.random()}.png"
-            plt.savefig(plt_fname)
-            plt.clf()
-        pil_img = Image.open(plt_fname).convert('RGB')
-        os.remove(plt_fname)
+        with io.BytesIO() as img_buffer:
+            with warnings.catch_warnings():
+                warnings.simplefilter(action="ignore", category=FutureWarning)
+                plt.figure(figsize=(14, 4))
+                p = sns.lineplot(wide_df, x="n", y="value", hue="variable")
+                p.set_ylim((-2, 2))
+                img_buffer = io.BytesIO()
+                plt.savefig(img_buffer, format="png")
+                plt.clf()
+            img_buffer.seek(0)
+            pil_img = Image.open(img_buffer).convert("RGB")
         return np.array(pil_img)
 
     def on_epoch_end(self, epoch, logs=None):

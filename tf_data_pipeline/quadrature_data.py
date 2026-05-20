@@ -115,12 +115,12 @@ class Embed2DQuadratureData(object):
         self,
         min_note: str,
         max_note: str,
-        # sample_rate_hz: float,
+        sample_rate_khz: float,
         seed: int = 123,
     ):
         self.min_note = min_note
         self.max_note = max_note
-        self.sample_rate_hz = 196 * 1000
+        self.sample_rate_hz = sample_rate_khz * 1000
         self.rng = random.Random(seed)
 
     def random_freq(self):
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--min-note", type=str, default="A3")
     parser.add_argument("--max-note", type=str, default="A5")
-    # parser.add_argument("--sample-rate-hz", type=float, default=192 * 1000)
+    parser.add_argument("--sample-rate-hz", type=float, default=192 * 1000)
     parser.add_argument("--starting-phase", type=float, default=0)
     parser.add_argument("--num_samples", type=int, default=1000)
     opts = parser.parse_args()
@@ -252,7 +252,7 @@ if __name__ == "__main__":
     data_source = Embed2DQuadratureData(
         min_note=opts.min_note,
         max_note=opts.max_note,
-        #        sample_rate_hz=opts.sample_rate_hz,
+        sample_rate_hz=opts.sample_rate_hz,
         seed=123,
     )
 
