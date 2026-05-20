@@ -70,6 +70,11 @@ if __name__ == "__main__":
         default=10,
         help="linearly ramp beta_stft from 0 to target over this many epochs",
     )
+    parser.add_argument(
+        "--train-interp",
+        action="store_true",
+        help="whether to train with interpolated samples",
+    )
     opts = parser.parse_args()
     print("opts", opts)
 
@@ -137,14 +142,14 @@ if __name__ == "__main__":
         seq_len=TRAIN_SEQ_LEN,
         num_samples=opts.num_train_egs,
         emit_endpt_samples=True,
-        emit_interpolated_samples=True,
+        emit_interpolated_samples=opts.train_interp,
     )
     validate_ds = data.tf_dataset(
         batch_size=64,
         seq_len=TRAIN_SEQ_LEN,
         num_samples=opts.num_validate_egs,
         emit_endpt_samples=True,
-        emit_interpolated_samples=True,
+        emit_interpolated_samples=opts.train_interp,
     )
 
     # construct some callbacks...

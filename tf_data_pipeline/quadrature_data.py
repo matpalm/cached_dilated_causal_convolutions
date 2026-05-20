@@ -12,22 +12,22 @@ class Waveform(Enum):
     TRIANGLE = "triangle"
     SQUARE = "square"
     SINE = "sine"
-    RAMP = "ramp"
+    SAW = "saw"
 
     def to_embed_pt(self):
         return {
-            Waveform.TRIANGLE: np.array([1, -1]),
-            Waveform.SQUARE: np.array([1, 1]),
+            Waveform.TRIANGLE: np.array([1, 1]),
+            Waveform.SQUARE: np.array([1, -1]),
             Waveform.SINE: np.array([-1, -1]),
-            Waveform.RAMP: np.array([-1, 1]),
+            Waveform.SAW: np.array([-1, 1]),
         }[self]
 
 
 WAVE_EDGES = [
-    (Waveform.RAMP, Waveform.SQUARE),
-    (Waveform.SQUARE, Waveform.TRIANGLE),
-    (Waveform.TRIANGLE, Waveform.SINE),
-    (Waveform.SINE, Waveform.RAMP),
+    (Waveform.TRIANGLE, Waveform.SQUARE),
+    (Waveform.SQUARE, Waveform.SINE),
+    (Waveform.SINE, Waveform.SAW),
+    (Waveform.SAW, Waveform.TRIANGLE),
 ]
 
 
@@ -57,7 +57,7 @@ def calculate_wave(
     waveform1: Waveform,
     waveform2: Waveform = None,
     interp_start: float = 0,
-    interp_end: float = 0,
+    interp_end: float = None,
     scale: float = 0.8,
 ):
     if frequency_hz > (sample_rate_hz / 2.0):
@@ -76,30 +76,33 @@ def calculate_wave(
             case Waveform.SQUARE:
                 return np.where(phase_sin >= 0.0, 1, -1)
             case Waveform.SINE:
-                return phase_sin
-            case Waveform.RAMP:
-                return 1.0 - (2.0 * cycle)
+                return -phase_sin
+            case Waveform.SAW:
+                return (2.0 * cycle) - 1.0
 
     if waveform2 is None:
         result = wave(waveform1)
         interp = None
     else:
-        # interp is _start for first 1/4, _end for last 1/4 and linear between
+        if interp_end is None:
+            interp_end = interp_start
         interp = np.full(num_samples, interp_start, dtype=np.float64)
         i25 = int(0.25 * num_samples)
-        i65 = int(0.65 * num_samples)
-        if i65 > i25:
-            interp[i25:i65] = np.linspace(interp_start, interp_end, i65 - i25)
-        interp[i65:] = interp_end
+        i75 = int(0.75 * num_samples)
+        if i75 > i25:
+            interp[i25:i75] = np.linspace(interp_start, interp_end, i75 - i25)
+        interp[i75:] = interp_end
         interp = np.clip(interp, 0.0, 1.0)
         result1 = wave(waveform1)
         result2 = wave(waveform2)
         s1 = np.sin((1 - interp) * np.pi / 2)
         s2 = np.sin(interp * np.pi / 2)
         result = (s1 * result1) + (s2 * result2)
-        # note doesn't ensure values stay in (-1, 1) so soft clip
-        # result = soft_clip(result)
-        result = np.clip(result, 0, 1)
+
+    # note combos of interp don't ensure values stay in (-1, 1)
+    # so hard or soft clip
+    # result = soft_clip(result)
+    result = np.clip(result, -1, 1)
 
     return {
         "phase_sin": scale * phase_sin,
@@ -122,6 +125,8 @@ class Embed2DQuadratureData(object):
         self.max_note = max_note
         self.sample_rate_hz = sample_rate_khz * 1000
         self.rng = random.Random(seed)
+        print("!" * 400)
+        print("HACK in1 = 0  instead of cosine!!")
 
     def random_freq(self):
         return sample_freq(
@@ -166,14 +171,16 @@ class Embed2DQuadratureData(object):
         x = np.zeros((N, IN_OUT_D), dtype=np.float32)
         y = np.zeros((N, IN_OUT_D), dtype=np.float32)
         x[:, 0] = data["phase_sin"]
-        x[:, 1] = data["phase_cos"]
+        # x[:, 1] = data["phase_cos"]  # hack, leave at zero for now...
         if np.ndim(embed_pt) == 1:
             x[:, 2] = embed_pt[0]
             x[:, 3] = embed_pt[1]
         else:
             x[:, 2] = embed_pt[:, 0]
             x[:, 3] = embed_pt[:, 1]
+
         y[:, 0] = data["wave"]
+
         return x, y
 
     def tf_dataset(
@@ -183,36 +190,63 @@ class Embed2DQuadratureData(object):
         num_samples: int,
         emit_endpt_samples: bool = True,
         emit_interpolated_samples: bool = True,
+        emit_double_interpolated_samples: bool = False,
         emit_specific_wave: Waveform = None,
     ):
+        """
+        Generate num_samples samples of shape (batch_size, seq_len, 4)
 
-        if type(emit_specific_wave) == str:
-            emit_specific_wave = Waveform(emit_specific_wave)
+        Args:
+            batch_size: dim 0 of output
+            seq_len: dim 1 of output
+            num_samples: total number samples from dataset
+            emit_endpt_samples: if true there's a chance of sampling ( uninterpolated ) endpts
+            emit_interpolated_samples: if true there's a cchange of sampling an interpolate wave ( on edge )
+            emit_double_interpolated_samples: if true then vary interpolation over seq_len for interp samples
+            emit_specific_wave: if set just emit this wave
+        """
 
-        def gen_waves():
+        # TODO: this switching of generators is kinda clumsy :/
+
+        def gen_specific_wave(wave):
             while True:
-                if emit_specific_wave is not None:
-                    # just emit data for this specific wave
-                    yield self._sample_wave(
-                        seq_len=seq_len, w1=emit_specific_wave, w2=None
-                    )
-                else:
-                    assert emit_endpt_samples or emit_interpolated_samples
-                    # samples two waves
-                    w1, w2 = self.rng.choice(WAVE_EDGES)
-                    # emit either interpolated, or the two ends points
-                    if emit_endpt_samples:
-                        yield self._sample_single_wave(seq_len, w1)
-                        yield self._sample_single_wave(seq_len, w2)
-                    if emit_interpolated_samples:
+                yield self._sample_single_wave(seq_len, wave)
+
+        def gen_interp_waves():
+            assert emit_endpt_samples or emit_interpolated_samples
+
+            samples_types = []
+            if emit_endpt_samples:
+                samples_types.append("endpt")
+            if emit_interpolated_samples:
+                samples_types.append("interp")
+
+            while True:
+                sample_type = self.rng.choice(samples_types)
+                match sample_type:
+                    case "endpt":
+                        wave = self.rng.choice(list(Waveform))
+                        yield self._sample_single_wave(seq_len, wave)
+                    case "interp":
+                        # samples an edge of the simplex
+                        w1, w2 = self.rng.choice(WAVE_EDGES)
+                        # emit interpolated; either with fixed start/end interp
+                        # or a blend from start -> end if emit_double_interpolated_samples
                         interp_start = self.rng.random()
-                        interp_end = self.rng.random()
+                        interp_end = (
+                            self.rng.random()
+                            if emit_double_interpolated_samples
+                            else None
+                        )
                         yield self._sample_interpolated_wave(
                             seq_len, w1, w2, interp_start, interp_end
                         )
 
         def gen_limited_number():
-            g = gen_waves()
+            if type(emit_specific_wave) == str:
+                g = gen_specific_wave(Waveform(emit_specific_wave))
+            else:
+                g = gen_interp_waves()
             for _ in range(num_samples):
                 data, embed_pt = next(g)
                 yield self._xy_from_data(data, embed_pt)
@@ -240,7 +274,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--min-note", type=str, default="A3")
     parser.add_argument("--max-note", type=str, default="A5")
-    parser.add_argument("--sample-rate-hz", type=float, default=192 * 1000)
+    parser.add_argument("--sample-rate-khz", type=float, default=192)
     parser.add_argument("--starting-phase", type=float, default=0)
     parser.add_argument("--num_samples", type=int, default=1000)
     opts = parser.parse_args()
@@ -249,12 +283,12 @@ if __name__ == "__main__":
 
     os.makedirs("interp_data_egs", exist_ok=True)
 
-    data_source = Embed2DQuadratureData(
-        min_note=opts.min_note,
-        max_note=opts.max_note,
-        sample_rate_hz=opts.sample_rate_hz,
-        seed=123,
-    )
+    # data_source = Embed2DQuadratureData(
+    #     min_note=opts.min_note,
+    #     max_note=opts.max_note,
+    #     sample_rate_hz=opts.sample_rate_hz,
+    #     seed=123,
+    # )
 
     # ds = data_source.tf_dataset(
     #     batch_size=1,
@@ -268,13 +302,13 @@ if __name__ == "__main__":
         seq_len = 1000
         data = calculate_wave(
             frequency_hz=FREQS["A4"],
-            sample_rate_hz=64_000,
+            sample_rate_hz=128_000,
             starting_phase=0,
             num_samples=seq_len,
             waveform1=w1,
             waveform2=w2,
-            interp_start=0.0,
-            interp_end=1.0,
+            interp_start=0.5,
+            interp_end=0.5,
         )
         df = pd.DataFrame()
         df["n"] = range(seq_len)
