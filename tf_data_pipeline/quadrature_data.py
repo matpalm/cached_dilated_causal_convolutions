@@ -143,8 +143,7 @@ class Embed2DQuadratureData(object):
             s2 = np.sin(interp * np.pi / 2)
             result = (s1 * result1) + (s2 * result2)
 
-        # note combos of interp don't ensure values stay in (-1, 1)
-        # so hard or soft clip
+        # note: combos of interp don't ensure values stay in (-1, 1) so clip
         if self.soft_clip:
             result = soft_clip(result, drive=2)
         else:

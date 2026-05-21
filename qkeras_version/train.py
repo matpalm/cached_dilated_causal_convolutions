@@ -51,6 +51,8 @@ if __name__ == "__main__":
     parser.add_argument("--relu-upper-bound", type=float, default=6)
     parser.add_argument("--min-note", type=str, default="A2")
     parser.add_argument("--max-note", type=str, default="A4")
+    parser.add_argument("--harsh-waves", action="store_true")
+    parser.add_argument("--soft-clip", action="store_true")
     parser.add_argument("--sample-rate-khz", type=float, default=192)
     parser.add_argument(
         "--alpha-mse",
@@ -67,8 +69,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--beta-stft-ramp-epochs",
         type=int,
-        default=10,
-        help="linearly ramp beta_stft from 0 to target over this many epochs",
+        default=0,
+        help="linearly ramp beta_stft from 0 to target over this many epochs. 0 denotes no sftf",
     )
     parser.add_argument(
         "--train-interp",
@@ -86,6 +88,8 @@ if __name__ == "__main__":
         min_note=opts.min_note,
         max_note=opts.max_note,
         sample_rate_khz=opts.sample_rate_khz,
+        harsh=opts.harsh_waves,
+        soft_clip=opts.soft_clip,
         seed=456,
     )
 
