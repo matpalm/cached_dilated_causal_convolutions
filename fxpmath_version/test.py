@@ -13,13 +13,18 @@ import json
 
 from fxpmath_version.fxpmath_model import FxpModel
 from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
+
 from . import util
 
 import argparse
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--wave', type=str, default=None,
-    help='single wave to test, if not set, test all')
+parser.add_argument(
+    "--wave",
+    type=Waveform,
+    default=None,
+    help="single wave to test, if not set, test all",
+)
 # parser.add_argument('--data-root-dir', type=str, required=True)
 # parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
 parser.add_argument("--min-note", type=str, default="A2")
@@ -68,6 +73,7 @@ print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 data = Embed2DQuadratureData(
     min_note=opts.min_note,
     max_note=opts.max_note,
+    sample_rate_khz=192,
     seed=123,
 )
 
@@ -181,7 +187,8 @@ def process(wave):
 
 
 from multiprocessing import Pool
-waves = ["sine", "ramp", "square", "triangle"]
+
+waves = [w.value for w in Waveform]
 if opts.wave is None:
     p = Pool(len(waves))
     p.map(process, waves)
