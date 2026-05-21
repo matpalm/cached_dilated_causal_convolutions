@@ -5,8 +5,13 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
 import tqdm
+import os
 import warnings
 import json
+from pathlib import Path
+import tempfile
+
+print("tf", tf.__version__)
 
 from qkeras_version.qkeras_model import QKerasModelBuilder
 
@@ -15,6 +20,7 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--min-note", type=str, default="A2")
 parser.add_argument("--max-note", type=str, default="A4")
+parser.add_argument("--sample-rate-khz", type=float, default=192)
 parser.add_argument(
     "--fp-int",
     type=int,
@@ -29,7 +35,7 @@ parser.add_argument(
 )
 parser.add_argument("--filter-sizes", type=int, nargs="+", required=True)
 parser.add_argument("--relu-upper-bound", type=float, default=6)
-parser.add_argument("--load-weights", type=str, required=True)
+parser.add_argument("--load-weights", type=Path, required=True)
 parser.add_argument(
     "--wave", type=str, default=None, help="single wave to test, if not set, test all"
 )
@@ -40,6 +46,7 @@ print("opts", opts)
 data = Embed2DQuadratureData(
     min_note=opts.min_note,
     max_note=opts.max_note,
+    sample_rate_khz=opts.sample_rate_khz,
     seed=123,
 )
 
@@ -62,7 +69,12 @@ test_model = builder.create_dilated_model(
     relu_upper_bound=opts.relu_upper_bound,
 )
 test_model.summary()
-test_model.load_weights(opts.load_weights)
+
+if opts.load_weights.is_dir():
+    latest_weight_fname = sorted(os.listdir(opts.load_weights))[-1]
+    test_model.load_weights(opts.load_weights / latest_weight_fname)
+else:
+    test_model.load_weights(opts.load_weights)
 
 # load a test set using sine wave, we'll clobber the
 # embedding points so doesn't matter what this is..

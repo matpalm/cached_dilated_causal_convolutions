@@ -231,8 +231,6 @@ class Conv1d(wiring.Component):
             with m.State("OUTPUT"):
                 m.d.comb += self.o.valid.eq(1)
                 with m.If(self.o.ready):
-                    # Single in-flight transaction: do not accept next input
-                    # until the current output beat has been consumed.
                     m.next = "IDLE"
 
         return m

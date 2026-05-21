@@ -31,7 +31,7 @@ WAVE_EDGES = [
 ]
 
 
-def soft_clip(x, drive=1.5):
+def soft_clip(x, drive: float):
     x_ref = max(1.0, np.max(np.abs(x))) + 1e-10
     x_rescaled = x / x_ref
     return np.tanh(drive * x_rescaled) / np.tanh(drive)
@@ -49,69 +49,6 @@ def sample_freq(min_freq, max_freq, alpha):
     return 2**sample_freq_2
 
 
-def calculate_wave(
-    frequency_hz: float,
-    sample_rate_hz: float,
-    starting_phase: float,
-    num_samples: int,
-    waveform1: Waveform,
-    waveform2: Waveform = None,
-    interp_start: float = 0,
-    interp_end: float = None,
-    scale: float = 0.8,
-):
-    if frequency_hz > (sample_rate_hz / 2.0):
-        raise ValueError("faildog! nyquist limit")
-
-    phase_step = 2.0 * np.pi * (frequency_hz / sample_rate_hz)
-    phase = starting_phase + (phase_step * np.arange(num_samples))
-    phase_sin = np.sin(phase)
-    phase_cos = np.cos(phase)
-    cycle = np.mod(phase / (2.0 * np.pi), 1.0)  # [0, 1)
-
-    def wave(w):
-        match w:
-            case Waveform.TRIANGLE:
-                return 1.0 - (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5))
-            case Waveform.SQUARE:
-                return np.where(phase_sin >= 0.0, 1, -1)
-            case Waveform.SINE:
-                return -phase_sin
-            case Waveform.SAW:
-                return (2.0 * cycle) - 1.0
-
-    if waveform2 is None:
-        result = wave(waveform1)
-        interp = None
-    else:
-        if interp_end is None:
-            interp_end = interp_start
-        interp = np.full(num_samples, interp_start, dtype=np.float64)
-        i25 = int(0.25 * num_samples)
-        i75 = int(0.75 * num_samples)
-        if i75 > i25:
-            interp[i25:i75] = np.linspace(interp_start, interp_end, i75 - i25)
-        interp[i75:] = interp_end
-        interp = np.clip(interp, 0.0, 1.0)
-        result1 = wave(waveform1)
-        result2 = wave(waveform2)
-        s1 = np.sin((1 - interp) * np.pi / 2)
-        s2 = np.sin(interp * np.pi / 2)
-        result = (s1 * result1) + (s2 * result2)
-
-    # note combos of interp don't ensure values stay in (-1, 1)
-    # so hard or soft clip
-    # result = soft_clip(result)
-    result = np.clip(result, -1, 1)
-
-    return {
-        "phase_sin": scale * phase_sin,
-        "phase_cos": scale * phase_cos,
-        "wave": scale * result,
-        "interp": interp,
-    }
-
-
 class Embed2DQuadratureData(object):
 
     def __init__(
@@ -119,14 +56,106 @@ class Embed2DQuadratureData(object):
         min_note: str,
         max_note: str,
         sample_rate_khz: float,
+        harsh: bool = False,
+        soft_clip: bool = False,
         seed: int = 123,
     ):
         self.min_note = min_note
         self.max_note = max_note
+        if sample_rate_khz > 1_000:
+            print("WARNING sample_rate_khz! not sample_rate_hz")
         self.sample_rate_hz = sample_rate_khz * 1000
+        self.harsh = harsh
+        self.soft_clip = soft_clip
         self.rng = random.Random(seed)
-        print("!" * 400)
-        print("HACK in1 = 0  instead of cosine!!")
+
+    def calculate_wave(
+        self,
+        frequency_hz: float,
+        seq_len: int,
+        starting_phase: float,
+        waveform1: Waveform,
+        waveform2: Waveform = None,
+        interp_start: float = 0,
+        interp_end: float = None,
+        scale: float = 0.8,
+    ):
+
+        if frequency_hz > (self.sample_rate_hz / 2.0):
+            raise ValueError("faildog! nyquist limit")
+
+        phase_step = 2.0 * np.pi * (frequency_hz / self.sample_rate_hz)
+        phase = starting_phase + (phase_step * np.arange(seq_len))
+        phase_sin = np.sin(phase)
+        phase_cos = np.cos(phase)
+        cycle = np.mod(phase / (2.0 * np.pi), 1.0)  # [0, 1)
+
+        saw_rising = False  # vs falling
+
+        if self.harsh:
+            # harsh waves
+            wavefolded_triangle = True
+            inverted_sine = True
+        else:
+            # cleaner waves
+            wavefolded_triangle = False
+            inverted_sine = False
+
+        def wave(w):
+            match w:
+                case Waveform.TRIANGLE:
+                    if wavefolded_triangle:
+                        tri = 1.0 - (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5))
+                        fold_at = 0.75
+                        over = np.maximum(np.abs(tri) - fold_at, 0.0)
+                        return np.sign(tri) * (np.abs(tri) - (2.0 * over))
+                    else:
+                        return 1.0 - (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5))
+                case Waveform.SQUARE:
+                    return np.where(phase_sin >= 0.0, 1, -1)
+                case Waveform.SINE:
+                    if inverted_sine:
+                        return -phase_sin
+                    else:
+                        return phase_sin
+                case Waveform.SAW:
+                    if saw_rising:
+                        return (2.0 * cycle) - 1.0
+                    else:
+                        return 1.0 - (2.0 * cycle)
+
+        if waveform2 is None:
+            result = wave(waveform1)
+            interp = None
+        else:
+            if interp_end is None:
+                interp_end = interp_start
+            interp = np.full(seq_len, interp_start, dtype=np.float64)
+            i25 = int(0.25 * seq_len)
+            i75 = int(0.75 * seq_len)
+            if i75 > i25:
+                interp[i25:i75] = np.linspace(interp_start, interp_end, i75 - i25)
+            interp[i75:] = interp_end
+            interp = np.clip(interp, 0.0, 1.0)
+            result1 = wave(waveform1)
+            result2 = wave(waveform2)
+            s1 = np.sin((1 - interp) * np.pi / 2)
+            s2 = np.sin(interp * np.pi / 2)
+            result = (s1 * result1) + (s2 * result2)
+
+        # note combos of interp don't ensure values stay in (-1, 1)
+        # so hard or soft clip
+        if self.soft_clip:
+            result = soft_clip(result, drive=2)
+        else:
+            result = np.clip(result, -1, 1)
+
+        return {
+            "phase_sin": scale * phase_sin,
+            "phase_cos": scale * phase_cos,
+            "wave": scale * result,
+            "interp": interp,
+        }
 
     def random_freq(self):
         return sample_freq(
@@ -137,11 +166,10 @@ class Embed2DQuadratureData(object):
         return self.rng.random() * 2 * np.pi
 
     def _sample_single_wave(self, seq_len, w1):
-        data = calculate_wave(
+        data = self.calculate_wave(
             self.random_freq(),
-            self.sample_rate_hz,
-            self.random_phase(),
             seq_len,
+            self.random_phase(),
             w1,
             waveform2=None,
         )
@@ -149,11 +177,10 @@ class Embed2DQuadratureData(object):
         return data, embed_pt
 
     def _sample_interpolated_wave(self, seq_len, w1, w2, interp_start, interp_end):
-        data = calculate_wave(
+        data = self.calculate_wave(
             self.random_freq(),
-            self.sample_rate_hz,
-            self.random_phase(),
             seq_len,
+            self.random_phase(),
             w1,
             w2,
             interp_start,
@@ -171,7 +198,7 @@ class Embed2DQuadratureData(object):
         x = np.zeros((N, IN_OUT_D), dtype=np.float32)
         y = np.zeros((N, IN_OUT_D), dtype=np.float32)
         x[:, 0] = data["phase_sin"]
-        # x[:, 1] = data["phase_cos"]  # hack, leave at zero for now...
+        x[:, 1] = data["phase_cos"]
         if np.ndim(embed_pt) == 1:
             x[:, 2] = embed_pt[0]
             x[:, 3] = embed_pt[1]
@@ -198,8 +225,6 @@ class Embed2DQuadratureData(object):
 
         Args:
             batch_size: dim 0 of output
-            seq_len: dim 1 of output
-            num_samples: total number samples from dataset
             emit_endpt_samples: if true there's a chance of sampling ( uninterpolated ) endpts
             emit_interpolated_samples: if true there's a cchange of sampling an interpolate wave ( on edge )
             emit_double_interpolated_samples: if true then vary interpolation over seq_len for interp samples
@@ -272,16 +297,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--min-note", type=str, default="A3")
-    parser.add_argument("--max-note", type=str, default="A5")
-    parser.add_argument("--sample-rate-khz", type=float, default=192)
+    parser.add_argument("--min-note", type=str, default="A4")
+    parser.add_argument("--max-note", type=str, default="A4")
     parser.add_argument("--starting-phase", type=float, default=0)
-    parser.add_argument("--num_samples", type=int, default=1000)
+    parser.add_argument("--seq-len", type=int, default=1000)
     opts = parser.parse_args()
     print("opts", opts)
-    import os
-
-    os.makedirs("interp_data_egs", exist_ok=True)
+    import io
 
     # data_source = Embed2DQuadratureData(
     #     min_note=opts.min_note,
@@ -298,26 +320,93 @@ if __name__ == "__main__":
     #     emit_interpolated_samples=True,
     # )
 
-    for w1, w2 in WAVE_EDGES:
-        seq_len = 1000
-        data = calculate_wave(
+    PLOT_W = 320
+    PLOT_H = 240
+    from PIL import Image
+
+    # 5x5 images, with only border set
+    collage = Image.new(size=(PLOT_W * 6, PLOT_H * 6), mode="RGB")
+    plot_data_source = Embed2DQuadratureData(
+        min_note=opts.min_note,
+        max_note=opts.max_note,
+        sample_rate_khz=192,
+        harsh=True,
+        soft_clip=True,
+        seed=123,
+    )
+
+    def plot_interp(w1, w2, interp):
+        data = plot_data_source.calculate_wave(
             frequency_hz=FREQS["A4"],
-            sample_rate_hz=128_000,
+            seq_len=opts.seq_len,
             starting_phase=0,
-            num_samples=seq_len,
             waveform1=w1,
             waveform2=w2,
-            interp_start=0.5,
-            interp_end=0.5,
+            interp_start=interp,
+            interp_end=interp,
         )
         df = pd.DataFrame()
-        df["n"] = range(seq_len)
+        df["n"] = range(len(data["wave"]))
         df["wave"] = data["wave"]
-        df["interp"] = data["interp"]
+        # df["interp"] = data["interp"]
         p = sns.lineplot(df, x="n", y="wave", linewidth=5)
-        p = sns.lineplot(df, x="n", y="interp", linewidth=5)
-        plt.savefig(f"interp_data_egs/{w1}_{w2}.png")
+        p.set_xlabel("")
+        p.set_ylabel("")
+        p.set_title("")
+        p.set_xticks([])
+        p.set_yticks([])
+        for spine in p.spines.values():
+            spine.set_visible(False)
+        p.set_frame_on(False)
+        p.figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        # p = sns.lineplot(df, x="n", y="interp", linewidth=5)
+        with io.BytesIO() as b:
+            plt.savefig(b, format="png", bbox_inches="tight", pad_inches=0)
+            b.seek(0)
+            pil_img = Image.open(b).convert("RGB").copy()
+            pil_img = pil_img.resize((PLOT_W, PLOT_H))
         plt.clf()
+        return pil_img
+
+    def plot_single(w1):
+        return plot_interp(w1, None, None)
+
+    #  def to_embed_pt(self):
+    #         return {
+    #             Waveform.TRIANGLE: np.array([1, 1]),
+    #             Waveform.SQUARE: np.array([1, -1]),
+    #             Waveform.SINE: np.array([-1, -1]),
+    #             Waveform.SAW: np.array([-1, 1]),
+    #         }[self]
+
+    top_left = Waveform.SAW
+    top_right = Waveform.TRIANGLE
+    bottom_right = Waveform.SQUARE
+    bottom_left = Waveform.SINE
+
+    # corners
+    collage.paste(plot_single(top_left), (0, 0))
+    collage.paste(plot_single(top_right), (5 * PLOT_W, 0))
+    collage.paste(plot_single(bottom_right), (5 * PLOT_W, 5 * PLOT_H))
+    collage.paste(plot_single(bottom_left), (0, 5 * PLOT_H))
+
+    # edges
+    for i in [0.25, 0.5, 0.75]:
+        interp_img = plot_interp(top_left, top_right, interp=i)
+        collage.paste(interp_img, (int(PLOT_W * 5 * i), 0))
+        interp_img = plot_interp(top_right, bottom_right, interp=i)
+        collage.paste(interp_img, (5 * PLOT_W, int(PLOT_H * 5 * i)))
+        interp_img = plot_interp(bottom_left, bottom_right, interp=i)
+        collage.paste(interp_img, (int(PLOT_W * 5 * i), PLOT_H * 5))
+        interp_img = plot_interp(top_left, bottom_left, interp=i)
+        collage.paste(interp_img, (0, int(PLOT_H * 5 * i)))
+
+    # top_left = Waveform.SAW  #: np.array([-1, 1]),
+    # top_right = Waveform.TRIANGLE  #: np.array([1, 1]),  # top
+    # bottom_right = Waveform.SQUARE  #: np.array([1, -1]),
+    # bottom_left = Waveform.SINE  #: np.array([-1, -1]),
+
+    collage.save("foo.png")
 
     # GRID_SIZE = 5
 
