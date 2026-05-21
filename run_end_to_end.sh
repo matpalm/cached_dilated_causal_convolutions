@@ -3,20 +3,20 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export RUN=135_8_16_4_quadrature_harsh_softclip
+export RUN=137_8_16_4_quadrature_harsh_softclip
 export FILTERS="8 16 4"
 
 mkdir runs/$RUN || true
 
 # pre train at FP4.12
-# time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
-#  --run $RUN \
-#  --min-note A4 --max-note A5 --sample-rate-khz 192 --train-interp \
-#  --fp-int 4 --fp-frac 12 \
-#  --in-out-d 4 --filter-sizes $FILTERS \
-#  --alpha-mse 1.0 --beta-stft 0.1 --beta-stft-ramp-epochs 0 \
-#  --num-train-egs 1000 --epochs 1 --learning-rate 1e-3 --l2 0.0001 \
-#  | tee runs/$RUN/qkeras_version.train.out
+time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
+ --run $RUN \
+ --min-note A4 --max-note A5 --sample-rate-khz 192 --train-interp \
+ --fp-int 4 --fp-frac 12 \
+ --in-out-d 4 --filter-sizes $FILTERS \
+ --alpha-mse 1.0 --beta-stft 0.1 --beta-stft-ramp-epochs 10 \
+ --num-train-egs 20000 --epochs 20 --learning-rate 1e-3 --l2 0.0001 \
+ | tee runs/$RUN/qkeras_version.train.out
 
 # time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.test \
 #  --fp-int 4 --fp-frac 12 \
