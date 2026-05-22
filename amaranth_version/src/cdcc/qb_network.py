@@ -54,7 +54,7 @@ class QbNetwork(wiring.Component):
             last_layer = i == self.num_layers - 1
 
             w, b = self.conv_weights_biases_for(f"qconv_{i}_qb")
-            print(f"{i} CONV apply_relu={not last_layer}")
+            print(f"{i} CONV apply_relu={not last_layer} w {w.shape} b {b.shape}")
             conv = Conv1d(w, b, apply_relu=(not last_layer))
             m.submodules += conv
             convs.append(conv)

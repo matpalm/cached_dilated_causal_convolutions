@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
-
 import pickle, os, json, contextlib
+from pathlib import Path
 
 # from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
@@ -29,7 +29,8 @@ if __name__ == "__main__":
         help="override RFS. if not set, use K^len(filter_sizes)",
     )
     parser.add_argument("--l2", type=float, default=0.0)
-    parser.add_argument("--in-out-d", type=int, default=4)
+    parser.add_argument("--in-d", type=int, default=4)
+    parser.add_argument("--out-d", type=int, default=1)
     parser.add_argument(
         "--filter-sizes",
         type=int,
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     parser.add_argument("--fp-frac", type=int, default=12)
     parser.add_argument(
         "--init-weights",
-        type=str,
+        type=Path,
         default=None,
         help="path to keras weights used to initialize fine-tuning",
     )
@@ -113,16 +114,21 @@ if __name__ == "__main__":
     builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
     train_model = builder.create_dilated_model(
         TRAIN_SEQ_LEN,
-        in_out_d=opts.in_out_d,
+        in_d=opts.in_d,
+        out_d=opts.out_d,
         filter_sizes=opts.filter_sizes,
         # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
         l2=opts.l2,
         relu_upper_bound=opts.relu_upper_bound,
     )
 
-    if opts.init_weights is not None:
-        print(f"loading initial weights from {opts.init_weights}")
-        train_model.load_weights(opts.init_weights)
+    if opts.init_weights and opts.init_weights.is_dir():
+        init_weight_fname = sorted(os.listdir(opts.init_weights))[-1]
+        init_weights_path = str(opts.init_weights / init_weight_fname)
+        print("init weights from", init_weights_path)
+        train_model.load_weights(init_weights_path)
+    else:
+        init_weights_path = None
 
     train_model.summary()
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
@@ -135,7 +141,7 @@ if __name__ == "__main__":
             {
                 "n_int": builder.n_int,
                 "n_frac": builder.n_frac,
-                "init_weights": opts.init_weights,
+                "init_weights_path": init_weights_path,
             },
             f,
         )

@@ -140,7 +140,8 @@ class QKerasModelBuilder(object):
     def create_dilated_model(
         self,
         seq_len: int,
-        in_out_d: int,
+        in_d: int,
+        out_d: int,
         filter_sizes: List[int],
         # po2_filter_size: int,
         l2: float,
@@ -151,7 +152,8 @@ class QKerasModelBuilder(object):
 
         Parameters:
             seq_len: the length of the input sequence.
-            in_out_d: the feature dim of both the input and the output)
+            in_d: the feature dim of the input
+            out_d: the feature dim of the output
             filter_sizes: output depth for each convolution layer. Number of
                 layers is inferred from len(filter_sizes).
             l2: l2 penality for convolution kerne & bias
@@ -168,7 +170,7 @@ class QKerasModelBuilder(object):
         num_layers = len(filter_sizes)
         self.layer_info = []
 
-        inp = Input((seq_len, in_out_d))
+        inp = Input((seq_len, in_d))
         y_pred = inp
 
         for layer_num in range(num_layers):
@@ -179,7 +181,7 @@ class QKerasModelBuilder(object):
             y_pred = self.add_quantized_bits_conv_block(
                 y_pred,
                 layer_number=layer_num,
-                out_filters=in_out_d if last_layer else layer_filter_size,
+                out_filters=out_d if last_layer else layer_filter_size,
                 l2=l2,
                 relu=(not last_layer),
                 relu_upper_bound=relu_upper_bound,

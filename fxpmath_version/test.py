@@ -95,7 +95,7 @@ def process(wave):
     for x, y_true in test_ds:
         x, y_true = x[0].numpy(), y_true[0].numpy()
         assert x.shape == (TEST_SEQ_LEN, fxp_model.in_dim), x.shape
-        assert y_true.shape == (TEST_SEQ_LEN, fxp_model.in_dim), y_true.shape
+        assert y_true.shape == (TEST_SEQ_LEN, fxp_model.out_dim), y_true.shape
         break
 
     # also write to file, if configured

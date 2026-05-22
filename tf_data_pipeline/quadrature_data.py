@@ -5,7 +5,8 @@ import tensorflow as tf
 
 FREQS = {"A2": 110, "A3": 220, "A4": 440, "A5": 880, "A6": 1760}
 
-IN_OUT_D = 4
+IN_D = 4
+OUT_D = 1
 
 
 class Waveform(Enum):
@@ -194,8 +195,8 @@ class Embed2DQuadratureData(object):
     def _xy_from_data(self, data, embed_pt):
         # TODO: this could be a map in tf
         N = len(data["phase_sin"])
-        x = np.zeros((N, IN_OUT_D), dtype=np.float32)
-        y = np.zeros((N, IN_OUT_D), dtype=np.float32)
+        x = np.zeros((N, IN_D), dtype=np.float32)
+        y = np.zeros((N, OUT_D), dtype=np.float32)
         x[:, 0] = data["phase_sin"]
         x[:, 1] = data["phase_cos"]
         if np.ndim(embed_pt) == 1:
@@ -278,8 +279,8 @@ class Embed2DQuadratureData(object):
         ds = tf.data.Dataset.from_generator(
             gen_limited_number,
             output_signature=(
-                tf.TensorSpec(shape=(seq_len, IN_OUT_D), dtype=tf.float32),
-                tf.TensorSpec(shape=(seq_len, IN_OUT_D), dtype=tf.float32),
+                tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float32),
+                tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float32),
             ),
         )
         #        ds = ds.shuffle(batch_size * 5)

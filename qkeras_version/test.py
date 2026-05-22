@@ -33,6 +33,8 @@ parser.add_argument(
     default=12,
     help="fractional bits for FP config",
 )
+parser.add_argument("--in-d", type=int, default=4)
+parser.add_argument("--out-d", type=int, default=1)
 parser.add_argument("--filter-sizes", type=int, nargs="+", required=True)
 parser.add_argument("--relu-upper-bound", type=float, default=6)
 parser.add_argument("--load-weights", type=Path, required=True)
@@ -63,7 +65,8 @@ print("TEST_SEQ_LEN", opts.test_seq_len)
 builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
 test_model = builder.create_dilated_model(
     opts.test_seq_len,
-    in_out_d=4,
+    in_d=opts.in_d,
+    out_d=opts.out_d,
     filter_sizes=opts.filter_sizes,
     l2=None,
     relu_upper_bound=opts.relu_upper_bound,

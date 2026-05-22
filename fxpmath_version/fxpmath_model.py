@@ -60,7 +60,7 @@ class FxpModel(object):
         self._num_layers = len(weight_ids)
         print("|layers|", self._num_layers)
 
-        # scan each conv to derive in/out size
+        # scan each conv to derive in/out dims
         in_ds = {}
         out_ds = {}
         for weight_id in weight_ids:
@@ -75,9 +75,12 @@ class FxpModel(object):
                 assert num_kernels in [1, 4]
 
         print(f"in_ds={in_ds} & out_ds={out_ds}")
-        if in_ds[weight_ids[0]] != out_ds[weight_ids[-1]]:
-            raise Exception(f"expected first layer in_d to be same as last layer out_d"
-                            f" but was in_ds={in_ds} out_ds={out_ds}")
+
+        # overall model in_d is in_d of first conv &
+        # model out_d is out_d of last conv.
+        self.in_dim = in_ds[weight_ids[0]]
+        self.out_dim = out_ds[weight_ids[-1]]
+        print("in_dim", self.in_dim, "out_dim", self.out_dim)
 
         # general fxp util
         self.fxp = FxpUtil()
@@ -89,7 +92,6 @@ class FxpModel(object):
         )
 
         # buffer for layer0 input
-        self.in_dim = in_ds[weight_ids[0]]
         self.input = np.zeros((K, self.in_dim), dtype=np.float32)
 
         self.verbose = verbose
