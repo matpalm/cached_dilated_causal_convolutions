@@ -109,6 +109,8 @@ class Embed2DInterpolatedWaveFormData(object):
 
     def __init__(self, root_dir, seed=None, pad_size=8):
 
+        raise Exception("replaced Embed2DQuadratureData")
+
         if seed is None:
             seed = int(time.time())
 
