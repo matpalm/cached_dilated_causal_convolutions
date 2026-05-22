@@ -6,10 +6,9 @@ def masked_mse(receptive_field_size, filter_column_idx=None):
     Calculates masked version of mean square error
 
     Parameters:
-        receptive_field_size: the number of leading elements to ignore in loss as
-                              these are "polluted" by the 0 padding during training.
+        receptive_field_size: number of initial time steps to ignore
         filter_column_idx: only calculate loss w.r.t this column in output. done since
-                           the output has 4 outs, but we might only care about one.
+                           the output has 4 outs, but we might only care about one
     Returns:
         keras loss function
     """
@@ -41,8 +40,21 @@ def masked_multires_stft_loss(
     w_time=0.5,
     w_mag=0.4,
     w_sc=0.1,
-    eps=1e-6,
 ):
+    """
+    Calculates masked multi-resolution STFT loss
+
+    Args:
+        receptive_field_size: number of initial time steps to ignore
+        filter_column_idx: output channel index to train against
+        fft_sizes: FFT sizes used at each STFT res
+        hop_sizes: STFT hop sizes for each res
+        win_lengths: STFT window lengths for each res
+        w_time: Weight for time-domain MSE term
+        w_mag: Weight for log-magnitude spectral term
+        w_sc: Weight for spectral-convergence term
+    """
+
     assert len(fft_sizes) == len(hop_sizes) == len(win_lengths)
 
     def _stft_mag(x, fft_size, hop, win):
@@ -84,6 +96,7 @@ def masked_multires_stft_loss(
             m_pred = _stft_mag(y_pred_1d, fft_size, hop, win)
 
             # log-mag L1 is usually more perceptual than linear-mag MSE
+            eps = 1e-6
             log_true = tf.math.log(m_true + eps)
             log_pred = tf.math.log(m_pred + eps)
             mr_mag += tf.reduce_mean(tf.abs(log_true - log_pred))
@@ -124,7 +137,8 @@ def combined_masked_loss_terms(
 ):
     mse_fn = masked_mse(receptive_field_size, filter_column_idx)
 
-    # Make STFT term spectral-only to avoid counting time MSE twice.
+    # actually, STFT term can be spectral-only to avoid counting time MSE twice ?
+    # so can remove w_time completely (?)
     stft_fn = masked_multires_stft_loss(
         receptive_field_size,
         filter_column_idx=filter_column_idx,

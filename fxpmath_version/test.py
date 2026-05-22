@@ -12,16 +12,23 @@ import pickle
 import json
 
 from fxpmath_version.fxpmath_model import FxpModel
-from tf_data_pipeline.interp_data import Embed2DInterpolatedWaveFormData
+from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
+
 from . import util
 
 import argparse
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--wave', type=str, default=None,
-    help='single wave to test, if not set, test all')
-parser.add_argument('--data-root-dir', type=str, required=True)
+parser.add_argument(
+    "--wave",
+    type=Waveform,
+    default=None,
+    help="single wave to test, if not set, test all",
+)
+# parser.add_argument('--data-root-dir', type=str, required=True)
 # parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
+parser.add_argument("--min-note", type=str, default="A2")
+parser.add_argument("--max-note", type=str, default="A4")
 parser.add_argument('--load-weights', type=str)
 parser.add_argument('--layer-info', type=str)
 parser.add_argument('--test-x-dir', type=str, default=".")
@@ -58,12 +65,16 @@ print(f"|layers|={fxp_model.num_layers()} |dilated_layers|={fxp_model.num_dilate
 
 K = 4
 RECEPTIVE_FIELD_SIZE = K**(fxp_model.num_dilated_layers() + 1)
-TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE
+# Generate enough samples to discard warmup and still evaluate num_test_egs points.
+TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE + opts.num_test_egs
 print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
 print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-data = Embed2DInterpolatedWaveFormData(
-    root_dir=opts.data_root_dir, pad_size=fxp_model.in_dim, seed=123
+data = Embed2DQuadratureData(
+    min_note=opts.min_note,
+    max_note=opts.max_note,
+    sample_rate_khz=192,
+    seed=123,
 )
 
 fxp = util.FxpUtil()
@@ -74,15 +85,17 @@ fxp = util.FxpUtil()
 
 def process(wave):
 
-    test_ds = data.tf_dataset_for_split('test',
-                        seq_len=opts.num_test_egs,
-                        max_samples=1,
-                        specific_wave=wave)
+    test_ds = data.tf_dataset(
+        batch_size=16,
+        seq_len=TEST_SEQ_LEN,
+        num_samples=1,
+        emit_specific_wave=wave,
+    )
 
     for x, y_true in test_ds:
         x, y_true = x[0].numpy(), y_true[0].numpy()
-        assert x.shape == (opts.num_test_egs, fxp_model.in_dim), x.shape
-        assert y_true.shape == (opts.num_test_egs, fxp_model.in_dim), y_true.shape
+        assert x.shape == (TEST_SEQ_LEN, fxp_model.in_dim), x.shape
+        assert y_true.shape == (TEST_SEQ_LEN, fxp_model.out_dim), y_true.shape
         break
 
     # also write to file, if configured
@@ -98,7 +111,7 @@ def process(wave):
 
     # run net
     y_pred = []
-    for i in tqdm.tqdm(range(len(x)), desc=f"{wave:6s}"):
+    for i in tqdm.tqdm(range(len(x)), desc=f"{wave:20s}"):
 
         # run through model
         y_pred.append(fxp_model.predict(x[i]))
@@ -118,6 +131,12 @@ def process(wave):
         #     print(" ".join(hex_outputs), file=test_x_hex_f)
     y_pred = np.stack(y_pred)
 
+    # Ignore the initial receptive field samples; these are affected by causal zero-padding.
+    valid_start_idx = RECEPTIVE_FIELD_SIZE
+    x_eval = x[valid_start_idx:]
+    y_true_eval = y_true[valid_start_idx:]
+    y_pred_eval = y_pred[valid_start_idx:]
+
     print(wave, fxp_model.under_and_overflow_counts())
 
     output_data_pkl_fname = os.path.join(opts.test_x_dir, wave, "x_yp_yt.pkl")
@@ -133,16 +152,29 @@ def process(wave):
         output_data_pkl_fname,
     )
     with open(output_data_pkl_fname, "wb") as f:
-        result = {"x": x, "y_true": y_true, "y_pred": y_pred}
+        result = {
+            "x": x,
+            "y_true": y_true,
+            "y_pred": y_pred,
+            "valid_start_idx": valid_start_idx,
+            "x_eval": x_eval,
+            "y_true_eval": y_true_eval,
+            "y_pred_eval": y_pred_eval,
+        }
         pickle.dump(result, f)
 
     # save plot
     df = pd.DataFrame()
-    df["x"] = x[:, 0]  # just waveform, not e0 or e1
-    df["y_pred"] = y_pred[:, 0]
-    df["y_true"] = y_true[:, 0]
-    df['n'] = range(len(y_pred))
-    wide_df = pd.melt(df, id_vars=["n"], value_vars=["x", "y_pred", "y_true"])
+    df["phase_sin"] = x_eval[:, 0]
+    df["phase_cos"] = x_eval[:, 1]
+    df["y_pred"] = y_pred_eval[:, 0]
+    df["y_true"] = y_true_eval[:, 0]
+    df["n"] = range(len(y_pred_eval))
+    wide_df = pd.melt(
+        df,
+        id_vars=["n"],
+        value_vars=["phase_sin", "phase_cos", "y_pred", "y_true"],
+    )
     with warnings.catch_warnings():
         warnings.simplefilter(action='ignore', category=FutureWarning)
         p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
@@ -155,7 +187,8 @@ def process(wave):
 
 
 from multiprocessing import Pool
-waves = ['sine', 'ramp', 'square', 'zigzag']
+
+waves = [w.value for w in Waveform]
 if opts.wave is None:
     p = Pool(len(waves))
     p.map(process, waves)

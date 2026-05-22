@@ -8,43 +8,7 @@ from tensorflow.keras import regularizers
 import qkeras
 from qkeras import quantized_bits, quantized_po2, QSeparableConv1D, QActivation
 
-# N_WORD = 16
-# N_INT = 4
-# N_FRAC = 12
-# assert N_WORD == N_INT + N_FRAC
-
-
-def masked_mse(receptive_field_size, filter_column_idx=None):
-    '''
-    Calculates masked version of mean square error
-
-    Parameters:
-        receptive_field_size: the number of leading elements to ignore in loss as
-                              these are "polluted" by the 0 padding during training.
-        filter_column_idx: only calculate loss w.r.t this column in output. done since
-                           the output has 4 outs, but we might only care about one.
-    Returns:
-        keras loss function
-    '''
-
-    def loss_fn(y_true, y_pred):
-        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
-        if filter_column_idx is not None:
-            # consider only a single column from output for loss
-            y_true = y_true[:,:,filter_column_idx:filter_column_idx+1]
-            y_pred = y_pred[:,:,filter_column_idx:filter_column_idx+1]
-        assert y_true.shape == y_pred.shape
-        # average over elements of y
-        mse = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
-        # we want to ignore the first elements of the loss since they
-        # have been fed with left padded data
-        mse = mse[:,receptive_field_size:]
-        # return average over batch and sequence
-        return tf.reduce_mean(mse)
-    return loss_fn
-
 K = 4
-
 
 class QKerasModelBuilder(object):
 
@@ -184,7 +148,8 @@ class QKerasModelBuilder(object):
     def create_dilated_model(
         self,
         seq_len: int,
-        in_out_d: int,
+        in_d: int,
+        out_d: int,
         filter_sizes: List[int],
         # po2_filter_size: int,
         l2: float,
@@ -195,7 +160,8 @@ class QKerasModelBuilder(object):
 
         Parameters:
             seq_len: the length of the input sequence.
-            in_out_d: the feature dim of both the input and the output)
+            in_d: the feature dim of the input
+            out_d: the feature dim of the output
             filter_sizes: output depth for each convolution layer. Number of
                 layers is inferred from len(filter_sizes).
             l2: l2 penality for convolution kerne & bias
@@ -212,7 +178,7 @@ class QKerasModelBuilder(object):
         num_layers = len(filter_sizes)
         self.layer_info = []
 
-        inp = Input((seq_len, in_out_d))
+        inp = Input((seq_len, in_d))
         y_pred = inp
 
         for layer_num in range(num_layers):
@@ -223,7 +189,7 @@ class QKerasModelBuilder(object):
             y_pred = self.add_quantized_bits_conv_block(
                 y_pred,
                 layer_number=layer_num,
-                out_filters=in_out_d if last_layer else layer_filter_size,
+                out_filters=out_d if last_layer else layer_filter_size,
                 l2=l2,
                 relu=(not last_layer),
                 relu_upper_bound=relu_upper_bound,
