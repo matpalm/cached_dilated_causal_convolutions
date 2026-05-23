@@ -1,11 +1,11 @@
 import json
 from numpy.typing import NDArray
+from typing_extensions import deprecated
 
 from amaranth import Array, Module, Signal
 from amaranth.lib import data, stream, wiring
 from amaranth_future import fixed
 import numpy as np
-from warnings import deprecated
 
 from . import NNQ, NNQ_DW, parse_nnq
 
