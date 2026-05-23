@@ -34,9 +34,9 @@ def masked_mse(receptive_field_size, filter_column_idx=None):
 def masked_multires_stft_loss(
     receptive_field_size,
     filter_column_idx=None,
-    fft_sizes=(64, 128, 256),
-    hop_sizes=(16, 32, 64),
-    win_lengths=(64, 128, 256),
+    fft_sizes=(512, 1024, 2048),
+    hop_sizes=(128, 256, 512),
+    win_lengths=(512, 1024, 2048),
     w_time=0.5,
     w_mag=0.4,
     w_sc=0.1,
@@ -64,7 +64,8 @@ def masked_multires_stft_loss(
             frame_step=hop,
             fft_length=fft_size,
             window_fn=tf.signal.hann_window,
-            pad_end=False,
+            # pad short tails (and very short sequences) to avoid empty STFT outputs
+            pad_end=True,
         )
         return tf.abs(s)
 
@@ -87,16 +88,16 @@ def masked_multires_stft_loss(
 
         time_mse = tf.reduce_mean(tf.square(y_true_1d - y_pred_1d))
 
-        mr_mag = 0.0
-        mr_sc = 0.0
-        n = float(len(fft_sizes))
+        mr_mag = tf.constant(0.0, dtype=tf.float32)
+        mr_sc = tf.constant(0.0, dtype=tf.float32)
+        eps = tf.constant(1e-6, dtype=tf.float32)
+        n = tf.constant(float(len(fft_sizes)), dtype=tf.float32)
 
         for fft_size, hop, win in zip(fft_sizes, hop_sizes, win_lengths):
             m_true = _stft_mag(y_true_1d, fft_size, hop, win)
             m_pred = _stft_mag(y_pred_1d, fft_size, hop, win)
 
             # log-mag L1 is usually more perceptual than linear-mag MSE
-            eps = 1e-6
             log_true = tf.math.log(m_true + eps)
             log_pred = tf.math.log(m_pred + eps)
             mr_mag += tf.reduce_mean(tf.abs(log_true - log_pred))
@@ -104,12 +105,13 @@ def masked_multires_stft_loss(
             # spectral convergence
             num = tf.norm(m_true - m_pred, ord="euclidean", axis=[-2, -1])
             den = tf.norm(m_true, ord="euclidean", axis=[-2, -1]) + eps
-            mr_sc += tf.reduce_mean(num / den)
+            mr_sc += tf.reduce_mean(tf.math.divide_no_nan(num, den))
 
-        mr_mag /= n
-        mr_sc /= n
+        mr_mag = tf.math.divide_no_nan(mr_mag, n)
+        mr_sc = tf.math.divide_no_nan(mr_sc, n)
 
-        return w_time * time_mse + w_mag * mr_mag + w_sc * mr_sc
+        total = w_time * time_mse + w_mag * mr_mag + w_sc * mr_sc
+        return tf.where(tf.math.is_finite(total), total, tf.zeros_like(total))
 
     return loss_fn
 

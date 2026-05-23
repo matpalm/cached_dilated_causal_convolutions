@@ -10,14 +10,14 @@ OUT_D = 1
 
 
 class Waveform(Enum):
-    TRIANGLE = "triangle"
+    ZIGZAG = "triangle"
     SQUARE = "square"
     SINE = "sine"
     SAW = "saw"
 
     def to_embed_pt(self):
         return {
-            Waveform.TRIANGLE: np.array([1, 1]),
+            Waveform.ZIGZAG: np.array([1, 1]),
             Waveform.SQUARE: np.array([1, -1]),
             Waveform.SINE: np.array([-1, -1]),
             Waveform.SAW: np.array([-1, 1]),
@@ -25,10 +25,10 @@ class Waveform(Enum):
 
 
 WAVE_EDGES = [
-    (Waveform.TRIANGLE, Waveform.SQUARE),
+    (Waveform.ZIGZAG, Waveform.SQUARE),
     (Waveform.SQUARE, Waveform.SINE),
     (Waveform.SINE, Waveform.SAW),
-    (Waveform.SAW, Waveform.TRIANGLE),
+    (Waveform.SAW, Waveform.ZIGZAG),
 ]
 
 
@@ -95,23 +95,20 @@ class Embed2DQuadratureData(object):
 
         if self.harsh:
             # harsh waves
-            wavefolded_triangle = True
+            inverted_zigzag = True
             inverted_sine = True
         else:
             # cleaner waves
-            wavefolded_triangle = False
+            inverted_zigzag = False
             inverted_sine = False
 
         def wave(w):
             match w:
-                case Waveform.TRIANGLE:
-                    if wavefolded_triangle:
-                        tri = 1.0 - (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5))
-                        fold_at = 0.75
-                        over = np.maximum(np.abs(tri) - fold_at, 0.0)
-                        return np.sign(tri) * (np.abs(tri) - (2.0 * over))
-                    else:
-                        return 1.0 - (4.0 * np.abs(np.mod(cycle + 0.5, 1.0) - 0.5))
+                case Waveform.ZIGZAG:
+                    zigzag = np.where(cycle < 0.5, 2.0 * cycle, -(2.0 * (cycle - 0.5)))
+                    if inverted_zigzag:
+                        zigzag *= -1
+                    return zigzag
                 case Waveform.SQUARE:
                     return np.where(phase_sin >= 0.0, 1, -1)
                 case Waveform.SINE:
@@ -290,9 +287,17 @@ class Embed2DQuadratureData(object):
 
 if __name__ == "__main__":
     import argparse
+    import warnings
     import matplotlib.pyplot as plt
     import seaborn as sns
     import pandas as pd
+    import io
+
+    warnings.filterwarnings(
+        "ignore",
+        message=".*",
+        category=FutureWarning,
+    )
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -301,9 +306,11 @@ if __name__ == "__main__":
     parser.add_argument("--max-note", type=str, default="A4")
     parser.add_argument("--starting-phase", type=float, default=0)
     parser.add_argument("--seq-len", type=int, default=1000)
+    parser.add_argument("--harsh", action="store_true")
+    parser.add_argument("--soft-clip", action="store_true")
+    parser.add_argument("--output-png", type=str, default="foo.png")
     opts = parser.parse_args()
     print("opts", opts)
-    import io
 
     # data_source = Embed2DQuadratureData(
     #     min_note=opts.min_note,
@@ -322,16 +329,17 @@ if __name__ == "__main__":
 
     PLOT_W = 320
     PLOT_H = 240
-    from PIL import Image
+    from PIL import Image, ImageDraw
 
-    # 5x5 images, with only border set
-    collage = Image.new(size=(PLOT_W * 6, PLOT_H * 6), mode="RGB")
+    # NxN images, with only border set
+    N = 7
+    collage = Image.new(size=(PLOT_W * N, PLOT_H * N), mode="RGB")
     plot_data_source = Embed2DQuadratureData(
         min_note=opts.min_note,
         max_note=opts.max_note,
         sample_rate_khz=192,
-        harsh=True,
-        soft_clip=True,
+        harsh=opts.harsh,
+        soft_clip=opts.soft_clip,
         seed=123,
     )
 
@@ -348,65 +356,78 @@ if __name__ == "__main__":
         df = pd.DataFrame()
         df["n"] = range(len(data["wave"]))
         df["wave"] = data["wave"]
-        # df["interp"] = data["interp"]
-        p = sns.lineplot(df, x="n", y="wave", linewidth=5)
-        p.set_xlabel("")
-        p.set_ylabel("")
-        p.set_title("")
-        p.set_xticks([])
-        p.set_yticks([])
-        for spine in p.spines.values():
-            spine.set_visible(False)
-        p.set_frame_on(False)
-        p.figure.subplots_adjust(left=0, right=1, top=1, bottom=0)
-        # p = sns.lineplot(df, x="n", y="interp", linewidth=5)
+        fig, ax = plt.subplots(figsize=(6.4, 4.8), dpi=100)
+        fig.patch.set_facecolor("white")
+        ax.set_facecolor("white")
         with io.BytesIO() as b:
-            plt.savefig(b, format="png", bbox_inches="tight", pad_inches=0)
+            p = sns.lineplot(df, x="n", y="wave", linewidth=5, ax=ax)
+            p.set(xticklabels=[])
+            p.set(xlabel=None)
+            p.set(yticklabels=[])
+            p.set(ylabel=None)
+            p.tick_params(bottom=False, left=False)
+            p.set(ylim=(-2, 2))
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+            fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+            fig.savefig(
+                b,
+                format="png",
+                bbox_inches="tight",
+                pad_inches=0,
+                facecolor="white",
+                edgecolor="white",
+                transparent=False,
+            )
             b.seek(0)
             pil_img = Image.open(b).convert("RGB").copy()
             pil_img = pil_img.resize((PLOT_W, PLOT_H))
-        plt.clf()
+            pil_img.save("FFFF.png")
+        plt.close(fig)
         return pil_img
 
     def plot_single(w1):
         return plot_interp(w1, None, None)
 
-    #  def to_embed_pt(self):
-    #         return {
-    #             Waveform.TRIANGLE: np.array([1, 1]),
-    #             Waveform.SQUARE: np.array([1, -1]),
-    #             Waveform.SINE: np.array([-1, -1]),
-    #             Waveform.SAW: np.array([-1, 1]),
-    #         }[self]
-
+    # points based on grid
     top_left = Waveform.SAW
-    top_right = Waveform.TRIANGLE
+    top_right = Waveform.ZIGZAG
     bottom_right = Waveform.SQUARE
     bottom_left = Waveform.SINE
 
     # corners
     collage.paste(plot_single(top_left), (0, 0))
-    collage.paste(plot_single(top_right), (5 * PLOT_W, 0))
-    collage.paste(plot_single(bottom_right), (5 * PLOT_W, 5 * PLOT_H))
-    collage.paste(plot_single(bottom_left), (0, 5 * PLOT_H))
+    collage.paste(plot_single(top_right), ((N - 1) * PLOT_W, 0))
+    collage.paste(plot_single(bottom_right), ((N - 1) * PLOT_W, (N - 1) * PLOT_H))
+    collage.paste(plot_single(bottom_left), (0, (N - 1) * PLOT_H))
 
     # edges
-    for i in [0.25, 0.5, 0.75]:
+    for i in [k / (N - 1) for k in range(1, N - 1)]:
         interp_img = plot_interp(top_left, top_right, interp=i)
-        collage.paste(interp_img, (int(PLOT_W * 5 * i), 0))
+        collage.paste(interp_img, (int(PLOT_W * (N - 1) * i), 0))
         interp_img = plot_interp(top_right, bottom_right, interp=i)
-        collage.paste(interp_img, (5 * PLOT_W, int(PLOT_H * 5 * i)))
+        collage.paste(interp_img, ((N - 1) * PLOT_W, int(PLOT_H * (N - 1) * i)))
         interp_img = plot_interp(bottom_left, bottom_right, interp=i)
-        collage.paste(interp_img, (int(PLOT_W * 5 * i), PLOT_H * 5))
+        collage.paste(interp_img, (int(PLOT_W * (N - 1) * i), PLOT_H * (N - 1)))
         interp_img = plot_interp(top_left, bottom_left, interp=i)
-        collage.paste(interp_img, (0, int(PLOT_H * 5 * i)))
+        collage.paste(interp_img, (0, int(PLOT_H * (N - 1) * i)))
+
+    # draw borders between outputs
+    draw = ImageDraw.Draw(collage)
+    max_x = (N * PLOT_W) - 1
+    max_y = (N * PLOT_H) - 1
+    for k in range(1, N):
+        x = k * PLOT_W
+        y = k * PLOT_H
+        draw.line([(x, 0), (x, max_y)], fill="black", width=1)
+        draw.line([(0, y), (max_x, y)], fill="black", width=1)
 
     # top_left = Waveform.SAW  #: np.array([-1, 1]),
     # top_right = Waveform.TRIANGLE  #: np.array([1, 1]),  # top
     # bottom_right = Waveform.SQUARE  #: np.array([1, -1]),
     # bottom_left = Waveform.SINE  #: np.array([-1, -1]),
 
-    collage.save("foo.png")
+    collage.save(opts.output_png)
 
     # GRID_SIZE = 5
 
