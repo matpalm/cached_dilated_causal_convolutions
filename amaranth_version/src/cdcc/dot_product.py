@@ -1,17 +1,20 @@
 import json
+from numpy.typing import NDArray
 
 from amaranth import Array, Module, Signal
 from amaranth.lib import data, stream, wiring
 from amaranth_future import fixed
 import numpy as np
-from numpy.typing import NDArray
+from warnings import deprecated
 
 from . import NNQ, NNQ_DW, parse_nnq
 
 
+@deprecated("inlined into RowByMatrixMultiply")
 class DotProduct(wiring.Component):
 
     def __init__(self, np_weights: NDArray):
+        raise Exception("NOT CURRENTLY USED")
 
         if len(np_weights.shape) != 1:
             raise Exception(

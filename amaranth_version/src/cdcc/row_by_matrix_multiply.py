@@ -80,7 +80,7 @@ class RowByMatrixMultiply(wiring.Component):
 
     def elaborate(self, platform):
         m = Module()
-        m.submodules.weight_mem = self.weight_mem
+        m.submodules["weight_mem"] = self.weight_mem
 
         rd = self.weight_mem.read_port(domain="sync")
 

@@ -3,7 +3,8 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export RUN=146_4_8_8_16_finetune
+#export RUN=146_4_8_8_16_finetune
+export RUN=147_4_8_8_16_finetune_new_waves
 export FILTERS="4 8 8 16"
 
 mkdir -p runs/$RUN/{pretrain,fine_tune} || true
@@ -15,7 +16,7 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
  --fp-int 4 --fp-frac 12 \
  --in-d 4 --out-d 1 --filter-sizes $FILTERS \
  --alpha-mse 1.0 --beta-stft 0.1 --beta-stft-ramp-epochs 15 \
- --num-train-egs 40000 --epochs 20 --learning-rate 1e-3 --l2 0.0001 \
+ --num-train-egs 50000 --epochs 30 --learning-rate 1e-3 --l2 0.0001 \
  | tee runs/$RUN/pretrain/qkeras_version.train.out
 
 # time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.test \
@@ -34,7 +35,7 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
  --in-d 4 --out-d 1 --filter-sizes $FILTERS \
  --init-weights runs/$RUN/pretrain/weights/keras/ \
  --alpha-mse 1.0 --beta-stft 0.1 --beta-stft-ramp-epochs 5 \
- --num-train-egs 40000 --epochs 15 --learning-rate 1e-4 --l2 0.0001 \
+ --num-train-egs 50000 --epochs 15 --learning-rate 1e-4 --l2 0.0001 \
  | tee runs/$RUN/fine_tune/qkeras_version.train.out
 
 # time uv run -m fxpmath_version.test \

@@ -66,7 +66,7 @@ class ActivationCache(wiring.Component):
         ]
 
         if self.use_ebr:
-            m.submodules.ac_mem = self.ebr_memory
+            m.submodules["ac_mem"] = self.ebr_memory
 
             # read and write
             rd = self.ebr_memory.read_port(domain="sync")

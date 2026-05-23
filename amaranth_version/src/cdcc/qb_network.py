@@ -40,10 +40,7 @@ class QbNetwork(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules.lsb = lsb = LeftShiftBuffer()
-
-        # TODO: rather than just += module we could name them
-        #  e.g. m.submodules[f"conv{i}"] = conv
+        m.submodules["lsb"] = lsb = LeftShiftBuffer()
 
         # build convolutions as well as activation caches
         # for all but the last
@@ -56,18 +53,18 @@ class QbNetwork(wiring.Component):
             w, b = self.conv_weights_biases_for(f"qconv_{i}_qb")
             print(f"{i} CONV apply_relu={not last_layer} w {w.shape} b {b.shape}")
             conv = Conv1d(w, b, apply_relu=(not last_layer))
-            m.submodules += conv
+            m.submodules[f"conv{i}"] = conv
             convs.append(conv)
 
             if not last_layer:
-                print(f"{i} ACT CACHE use_ebr={not first_layer}")
+                print(f"{i} ACT CACHE use_ebr=True")
                 num_filters = len(b)
                 activation_cache = ActivationCache(
                     in_out_d=num_filters,
                     dilation_level=(i + 1),
-                    use_ebr=(not first_layer),
+                    use_ebr=True,
                 )
-                m.submodules += activation_cache
+                m.submodules[f"act{i}"] = activation_cache
                 activation_caches.append(activation_cache)
 
         # inject cuts after each activation cache
@@ -78,7 +75,7 @@ class QbNetwork(wiring.Component):
         for i in range(self.num_layers - 1):  # ie. NOT last layer
             print(f"{i} cut_act_convs")
             cut_act_conv = StreamCut(activation_caches[i].output_layout)
-            m.submodules += cut_act_conv
+            m.submodules[f"cut_act_conv{i}"] = cut_act_conv
             cut_act_convs.append(cut_act_conv)
 
         # do wiring; inp -> left shift -> first conv

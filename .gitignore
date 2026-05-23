@@ -17,3 +17,4 @@ keras_weights/
 sverilog_version/src/network.sv
 runs/
 *~
+runs
