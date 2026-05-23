@@ -131,22 +131,6 @@ if __name__ == "__main__":
     else:
         init_weights_path = None
 
-    train_model.summary()
-    with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
-        with contextlib.redirect_stdout(f):
-            train_model.summary()
-    with open(f"runs/{opts.run}/qkeras_model.layer_info.json", "w") as f:
-        json.dump(builder.layer_info, f)
-    with open(f"runs/{opts.run}/qkeras_model.fp_config.json", "w") as f:
-        json.dump(
-            {
-                "n_int": builder.n_int,
-                "n_frac": builder.n_frac,
-                "init_weights_path": init_weights_path,
-            },
-            f,
-        )
-
     # make tf datasets
     train_ds = data.tf_dataset(
         batch_size=opts.batch_size,
@@ -198,9 +182,9 @@ if __name__ == "__main__":
             os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
     callbacks.append(SaveQuantisedWeights())
 
-    # beta_stft is captured by the loss closure and updated by callback.
-    # stays at zero if no config around being updated by callback
-    beta_stft = tf.Variable(0.0, trainable=False, dtype=tf.float32)
+    # just set opts.beta_stft from start if beta_stft_ramp_epochs is 0
+    beta_stft_init = opts.beta_stft if opts.beta_stft_ramp_epochs == 0 else 0.0
+    beta_stft = tf.Variable(beta_stft_init, trainable=False, dtype=tf.float32)
     if opts.beta_stft_ramp_epochs > 0:
 
         class RampBetaStft(tf.keras.callbacks.Callback):
@@ -254,3 +238,18 @@ if __name__ == "__main__":
         callbacks=callbacks,
         epochs=opts.epochs,
     )
+
+    with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
+        with contextlib.redirect_stdout(f):
+            train_model.summary()
+    with open(f"runs/{opts.run}/qkeras_model.layer_info.json", "w") as f:
+        json.dump(builder.layer_info, f)
+    with open(f"runs/{opts.run}/qkeras_model.fp_config.json", "w") as f:
+        json.dump(
+            {
+                "n_int": builder.n_int,
+                "n_frac": builder.n_frac,
+                "init_weights_path": init_weights_path,
+            },
+            f,
+        )
