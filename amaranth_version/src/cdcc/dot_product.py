@@ -14,7 +14,6 @@ from . import NNQ, NNQ_DW, parse_nnq
 class DotProduct(wiring.Component):
 
     def __init__(self, np_weights: NDArray):
-        raise Exception("NOT CURRENTLY USED")
 
         if len(np_weights.shape) != 1:
             raise Exception(

@@ -14,7 +14,7 @@ class Conv1d(wiring.Component):
         np_weights: NDArray,
         np_biases: NDArray,
         apply_relu: bool,
-        relu_upper_bound: int = 6,
+        relu_upper_bound: int,
     ):
         """
         Args:
@@ -52,7 +52,7 @@ class Conv1d(wiring.Component):
             }
         )
 
-        self.relu_upper_bound = fixed.Const(relu_upper_bound, shape=NNQ)
+        self.relu_upper_bound = fixed.Const(relu_upper_bound, shape=NNQ_DW)
 
         self.row_mults = [
             RowByMatrixMultiply(np_weights[0], np_weights_alt=np_weights[2]),
@@ -117,9 +117,6 @@ class Conv1d(wiring.Component):
 
                 all_rows_ready = all_rows_ready & rbmm.i.ready
                 all_rows_valid = all_rows_valid & rbmm.o.valid
-
-            frac_drop = NNQ_DW.f_bits - NNQ.f_bits
-            out_width = NNQ.width
 
             with m.State("IDLE"):
                 m.d.comb += self.i.ready.eq(all_rows_ready)
@@ -186,13 +183,33 @@ class Conv1d(wiring.Component):
                             self.accum[i],
                         )
                     )
+                if self.apply_relu:
+                    m.next = "APPLY_RELU"
+                else:
+                    m.next = "SINGLE_W"
+
+            with m.State("APPLY_RELU"):
+                for i in range(self.OUT_D):
+                    m.d.sync += self.accum[i].eq(
+                        Mux(  # if negative, return 0
+                            self.accum[i].as_value()[-1],
+                            0,
+                            Mux(  # if > upper bound, return upper bound
+                                self.accum[i] > self.relu_upper_bound,
+                                self.relu_upper_bound,
+                                self.accum[i],
+                            ),
+                        )
+                    )
                 m.next = "SINGLE_W"
 
             with m.State("SINGLE_W"):
+                frac_drop = NNQ_DW.f_bits - NNQ.f_bits
+                out_width = NNQ.width
                 for i in range(self.OUT_D):
                     # TODO: had to include this because of a weird diff with narrowing
                     # to match fxpmath :/ ( specifically difference in truncate toward zero
-                    # behaviour )
+                    # behaviour ) i still don't think this is quite right :/
                     acc = self.accum[i].as_value()
                     acc_clipped = Mux(
                         acc < self.lower_bound,
@@ -207,24 +224,6 @@ class Conv1d(wiring.Component):
                     )
                     m.d.sync += self.result[i].eq(
                         trunc_toward_zero[frac_drop : frac_drop + out_width].as_signed()
-                    )
-                if self.apply_relu:
-                    m.next = "APPLY_RELU"
-                else:
-                    m.next = "OUTPUT"
-
-            with m.State("APPLY_RELU"):
-                for i in range(self.OUT_D):
-                    m.d.sync += self.result[i].eq(
-                        Mux(
-                            self.result[i].as_value()[-1],
-                            0,
-                            Mux(
-                                self.result[i] > self.relu_upper_bound,
-                                self.relu_upper_bound,
-                                self.result[i],
-                            ),
-                        )
                     )
                 m.next = "OUTPUT"
 

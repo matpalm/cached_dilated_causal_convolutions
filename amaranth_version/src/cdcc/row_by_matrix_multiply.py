@@ -11,6 +11,7 @@ class RowByMatrixMultiply(wiring.Component):
 
     multiples vector (IN_D) by weights of (OUT_D, IN_D)
     resulting in output (OUT_D)
+    assumes IN_D and OUT_D are multiples of 4
     computes each output column sequentially.
     """
 
@@ -35,7 +36,14 @@ class RowByMatrixMultiply(wiring.Component):
                     f"{np_weights.shape}, but received {np_weights_alt.shape}"
                 )
 
+        # TODO: i think NUM_BANKS is overkill; changing back to just single would be good
+
         self.IN_D, self.OUT_D = np_weights.shape
+        if (self.IN_D % 4 != 0) or (self.OUT_D % 4 != 0):
+            raise Exception(
+                f"in_d={self.IN_D} and out_d={self.OUT_D} ; these must be multiples of 4"
+            )
+
         self.NUM_WEIGHTS = self.IN_D * self.OUT_D
         self.NUM_BANKS = 2 if np_weights_alt is not None else 1
         self.phase = Signal(range(self.NUM_BANKS), init=0)

@@ -71,7 +71,7 @@ class QKerasModelBuilder(object):
             y_pred = QActivation(
                 self.quant_relu(relu_upper_bound), name=f"qrelu_{layer_number}"
             )(y_pred)
-            self.layer_info.append({'type': 'relu'})
+            self.layer_info.append({"type": "relu", "upper_bound": relu_upper_bound})
 
         return y_pred
 
@@ -102,7 +102,7 @@ class QKerasModelBuilder(object):
         y_pred = QActivation(
             self.quant_relu(relu_upper_bound), name=f"qrelu_{layer_number}"
         )(y_pred)
-        self.layer_info.append({"type": "relu"})
+        self.layer_info.append({"type": "relu", "upper_bound": relu_upper_bound})
 
         # then a pair of 1x1 _po2 convs; expand to po2_filters, contract back to out_filters
         for sublayer in [1, 2]:
@@ -133,7 +133,7 @@ class QKerasModelBuilder(object):
                 self.quant_relu(relu_upper_bound),
                 name=f"qrelu_{layer_number}_{sublayer}",
             )(y_pred)
-            self.layer_info.append({"type": "relu"})
+            self.layer_info.append({"type": "relu", "upper_bound": relu_upper_bound})
 
         return y_pred
 

@@ -16,7 +16,7 @@ class TestConv1d(unittest.TestCase):
 
     def _general_test(self, weights, biases, apply_relu, inputs, expected):
 
-        dut = Conv1d(weights, biases, apply_relu)
+        dut = Conv1d(weights, biases, apply_relu, relu_upper_bound=4)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
@@ -26,8 +26,7 @@ class TestConv1d(unittest.TestCase):
             await ctx.tick()
             ctx.set(dut.i.valid, 0)
 
-            max_wait_cycles = (len(inputs) * dut.IN_D * dut.OUT_D) + 16
-            for _ in range(max_wait_cycles):
+            for _ in range(1000):
                 if ctx.get(dut.o.valid):
                     break
                 await ctx.tick()
@@ -49,21 +48,23 @@ class TestConv1d(unittest.TestCase):
     def test_conv1d_with_only_one_non_zero_set_of_weights(self):
         # should be the same as the test_row_by_multiply
 
-        # weights for a in_d=2 out_d=3 mult
-        K, IN_D, OUT_D = 4, 2, 3
+        # weights for a in_d=4 out_d=8 mult
+        K, IN_D, OUT_D = 4, 4, 8
         weights = np.zeros((K, IN_D, OUT_D))
-        weights[0] = np.array([[-2, 1, 0], [0.5, -1, 0.25]])
+        weights[0] = np.array(
+            [
+                [-2, 1, 0, 0, 0, 0, 0, 0],
+                [0.5, -1, 0.25, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+            ]
+        )
 
-        biases = np.array([0, 0, 0])
+        biases = np.zeros((OUT_D,))
 
-        inputs = [
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-        ]
+        inputs = [parse_nnq([0.5, -1.0, 0, 0]) for _ in range(IN_D)]
 
-        expected = parse_nnq([-1.5, 1.5, -0.25])
+        expected = parse_nnq([-1.5, 1.5, -0.25, 0, 0, 0, 0, 0])
 
         apply_relu = True
         self._general_test(weights, biases, not apply_relu, inputs, expected)
@@ -71,24 +72,18 @@ class TestConv1d(unittest.TestCase):
     def test_conv1d_with_pos_neg_ones_weights(self):
         # should be the same as the test_row_by_multiply
 
-        # weights for a in_d=2 out_d=3 mult
-        K, IN_D, OUT_D = 4, 2, 3
+        K, IN_D, OUT_D = 4, 4, 8
         weights = np.empty((K, IN_D, OUT_D))
         weights[0] = np.ones((IN_D, OUT_D))
         weights[1] = -np.ones((IN_D, OUT_D))
         weights[2] = np.ones((IN_D, OUT_D))
         weights[3] = -np.ones((IN_D, OUT_D))
 
-        biases = np.array([0, 0, 0])
+        biases = np.zeros((OUT_D,))
 
-        inputs = [
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-        ]
+        inputs = [parse_nnq([0.5, -1.0, 0, 0]) for _ in range(IN_D)]
 
-        expected = parse_nnq([0, 0, 0])
+        expected = parse_nnq(np.zeros((OUT_D,)))
 
         apply_relu = True
         self._general_test(weights, biases, not apply_relu, inputs, expected)
@@ -96,24 +91,18 @@ class TestConv1d(unittest.TestCase):
     def test_conv1d_with_pos_neg_ones_weights_with_bias(self):
         # should be the same as the test_row_by_multiply
 
-        # weights for a in_d=2 out_d=3 mult
-        K, IN_D, OUT_D = 4, 2, 3
+        K, IN_D, OUT_D = 4, 4, 8
         weights = np.empty((K, IN_D, OUT_D))
         weights[0] = np.ones((IN_D, OUT_D))
         weights[1] = -np.ones((IN_D, OUT_D))
         weights[2] = np.ones((IN_D, OUT_D))
         weights[3] = -np.ones((IN_D, OUT_D))
 
-        biases = np.array([0.25, -0.125, 0])
+        biases = np.array([0.25, -0.125, 0, 0, 0, 0, 0, 0])
 
-        inputs = [
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-            parse_nnq([0.5, -1.0]),
-        ]
+        inputs = [parse_nnq([0.5, -1.0, 0, 0]) for _ in range(IN_D)]
 
-        expected = parse_nnq([0.25, -0.125, 0])
+        expected = parse_nnq([0.25, -0.125, 0, 0, 0, 0, 0, 0])
 
         apply_relu = True
         self._general_test(weights, biases, not apply_relu, inputs, expected)

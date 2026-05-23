@@ -20,6 +20,7 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("--run", type=str, required=True)
+    parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument(
@@ -148,14 +149,14 @@ if __name__ == "__main__":
 
     # make tf datasets
     train_ds = data.tf_dataset(
-        batch_size=64,
+        batch_size=opts.batch_size,
         seq_len=TRAIN_SEQ_LEN,
         num_samples=opts.num_train_egs,
         emit_endpt_samples=True,
         emit_interpolated_samples=opts.train_interp,
     )
     validate_ds = data.tf_dataset(
-        batch_size=64,
+        batch_size=opts.batch_size,
         seq_len=TRAIN_SEQ_LEN,
         num_samples=opts.num_validate_egs,
         emit_endpt_samples=True,

@@ -21,7 +21,6 @@ class QbNetwork(wiring.Component):
             return QbNetwork(data)
 
     def __init__(self, qkeras_weights: dict):
-
         self.qkeras_weights = qkeras_weights
         self.num_layers = len(self.qkeras_weights.keys())
         self.IN_D = 4
@@ -52,7 +51,10 @@ class QbNetwork(wiring.Component):
 
             w, b = self.conv_weights_biases_for(f"qconv_{i}_qb")
             print(f"{i} CONV apply_relu={not last_layer} w {w.shape} b {b.shape}")
-            conv = Conv1d(w, b, apply_relu=(not last_layer))
+            # TODO: hardcoded upper bound here!
+            # see https://github.com/matpalm/cached_dilated_causal_convolutions/issues/24
+            print("!" * 100, "ASSUMING RELU4")
+            conv = Conv1d(w, b, apply_relu=(not last_layer), relu_upper_bound=4.0)
             m.submodules[f"conv{i}"] = conv
             convs.append(conv)
 

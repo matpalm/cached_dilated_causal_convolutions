@@ -3,21 +3,25 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-#export RUN=146_4_8_8_16_finetune
-export RUN=147_4_8_8_16_finetune_new_waves
-export FILTERS="4 8 8 16"
+export MIN_NOTE=A4
+export MAX_NOTE=A4
+
+export RUN=152_4_8_16_16_relu4_fp3_6
+export FILTERS="4 8 16 16"
 
 mkdir -p runs/$RUN/{pretrain,fine_tune} || true
 
-# pre train at FP4.12
+# pre train at FP3.15 ( relu4 )
 time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
  --run $RUN/pretrain \
- --min-note A3 --max-note A5 --sample-rate-khz 192 --train-interp --harsh-waves --soft-clip \
- --fp-int 4 --fp-frac 12 \
- --in-d 4 --out-d 1 --filter-sizes $FILTERS \
- --alpha-mse 1.0 --beta-stft 0.1 --beta-stft-ramp-epochs 15 \
- --num-train-egs 50000 --epochs 30 --learning-rate 1e-3 --l2 0.0001 \
+ --min-note $MIN_NOTE --max-note $MAX_NOTE --train-interp --soft-clip \
+ --fp-int 3 --fp-frac 15 \
+ --filter-sizes $FILTERS --relu-upper-bound 4 \
+ --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-ramp-epochs 10 \
+ --num-train-egs 1000 --epochs 1 --learning-rate 1e-3 --l2 0.0001 \
  | tee runs/$RUN/pretrain/qkeras_version.train.out
+
+# --harsh-waves --soft-clip \
 
 # time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.test \
 #  --fp-int 4 --fp-frac 12 \
@@ -27,15 +31,15 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
 #  --test-seq-len 1000 \
 #  | tee runs/$RUN/pretrain/qkeras_version.test.out
 
-# fine tune at FP 4.8
+# fine tune at FP3.6 ( relu4 )
 time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
  --run ${RUN}/fine_tune \
- --min-note A3 --max-note A5 --sample-rate-khz 192 --train-interp --harsh-waves --soft-clip \
- --fp-int 4 --fp-frac 8 \
- --in-d 4 --out-d 1 --filter-sizes $FILTERS \
+ --min-note $MIN_NOTE --max-note $MAX_NOTE --train-interp --soft-clip \
+ --fp-int 3 --fp-frac 6 \
+ --filter-sizes $FILTERS --relu-upper-bound 4 \
  --init-weights runs/$RUN/pretrain/weights/keras/ \
- --alpha-mse 1.0 --beta-stft 0.1 --beta-stft-ramp-epochs 5 \
- --num-train-egs 50000 --epochs 15 --learning-rate 1e-4 --l2 0.0001 \
+ --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-ramp-epochs 15 \
+ --num-train-egs 1000 --epochs 1 --batch-size 128 --learning-rate 1e-5 --l2 0.0001 \
  | tee runs/$RUN/fine_tune/qkeras_version.train.out
 
 # time uv run -m fxpmath_version.test \
@@ -52,8 +56,8 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
 # uv run python -m unittest discover test_equivalences -k test_network
 
 # build & flash
-export N_INT=4
-export N_FRAC=8
+export N_INT=3
+export N_FRAC=6
 export WEIGHTS_PKL=runs/${RUN}/fine_tune/weights/qkeras/latest.pkl
 pushd /home/mat/dev/tiliqua/gateware
 rm -rf build/neural-waveshaper-r3/
