@@ -73,7 +73,6 @@ class RowByMatrixMultiply(wiring.Component):
         self.output = Array(
             Signal(NNQ_DW, name=f"rbmm_out_{j}", init=0) for j in range(self.OUT_D)
         )
-        self.product = Signal(NNQ_DW, name="rbmm_product", init=0)
         self.bank_latched = Signal(range(self.NUM_BANKS), init=0)
         self.input = Array(
             Signal(NNQ, name=f"rbmm_in_{i}", init=0) for i in range(self.IN_D)
@@ -127,19 +126,15 @@ class RowByMatrixMultiply(wiring.Component):
                         + self.i_idx
                     ),
                 ]
-                m.next = "MUL"
+                m.next = "MAC"
 
-            with m.State("MUL"):
-                m.d.sync += self.product.eq(
-                    self.input[self.i_idx].as_value().as_signed()
-                    * rd.data.as_value().as_signed()
-                )
-                m.next = "ACCUM"
-
-            with m.State("ACCUM"):
+            with m.State("MAC"):
                 m.d.sync += self.running_accum.eq(
                     self.running_accum.as_value().as_signed()
-                    + self.product.as_value().as_signed()
+                    + (
+                        self.input[self.i_idx].as_value().as_signed()
+                        * rd.data.as_value().as_signed()
+                    )
                 )
                 with m.If(self.i_idx == self.IN_D - 1):
                     m.next = "WRITE_OUTPUT"
@@ -154,7 +149,7 @@ class RowByMatrixMultiply(wiring.Component):
                             + 1
                         ),
                     ]
-                    m.next = "MUL"
+                    m.next = "MAC"
 
             with m.State("WRITE_OUTPUT"):
                 m.d.sync += self.output[self.o_idx].eq(self.running_accum)
@@ -173,7 +168,7 @@ class RowByMatrixMultiply(wiring.Component):
                             + (self.o_idx + 1) * self.IN_D
                         ),
                     ]
-                    m.next = "MUL"
+                    m.next = "MAC"
 
             with m.State("DONE"):
                 m.d.comb += self.o.valid.eq(1)
