@@ -5,7 +5,7 @@ from numpy.typing import NDArray
 from amaranth_future import fixed
 
 from . import NNQ, NNQ_DW, K, parse_nnq
-from .row_by_matrix_multiply import RowByMatrixMultiply, RowByMatrixMultiplyAlu54b
+from .row_by_matrix_multiply import RowByMatrixMultiply
 
 class Conv1d(wiring.Component):
 
@@ -58,8 +58,8 @@ class Conv1d(wiring.Component):
         self.relu_upper_bound = fixed.Const(relu_upper_bound, shape=NNQ_DW)
 
         self.row_mults = [
-            RowByMatrixMultiplyAlu54b(np_weights[0], np_weights_alt=np_weights[2]),
-            RowByMatrixMultiplyAlu54b(np_weights[1], np_weights_alt=np_weights[3]),
+            RowByMatrixMultiply(np_weights[0], np_weights_alt=np_weights[2]),
+            RowByMatrixMultiply(np_weights[1], np_weights_alt=np_weights[3]),
         ]
         self.biases = Array(parse_nnq(b, shape=NNQ_DW) for b in np_biases)
         self.apply_relu = apply_relu
