@@ -10,7 +10,7 @@ state = "START"
 
 
 def interesting_du_line(line):
-    for s in ["DP16KD", "MULT18X18D", "TRELLIS_FF", "TRELLIS_COMB"]:
+    for s in ["DP16KD", "MULT18X18D", "ALU54B", "TRELLIS_FF", "TRELLIS_COMB"]:
         if s in line:
             return True
     return False
