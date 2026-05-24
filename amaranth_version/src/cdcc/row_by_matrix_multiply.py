@@ -1,6 +1,6 @@
 from numpy.typing import NDArray
 
-from amaranth import Array, Module, Signal
+from amaranth import Array, Module, Signal, signed
 from amaranth.lib import data, stream, wiring
 from amaranth.lib.memory import Memory
 
@@ -90,6 +90,8 @@ class RowByMatrixMultiply(wiring.Component):
         m.submodules["weight_mem"] = self.weight_mem
 
         rd = self.weight_mem.read_port(domain="sync")
+        mul_a = Signal(signed(NNQ.width), name="rbmm_mul_a")
+        mul_b = Signal(signed(NNQ.width), name="rbmm_mul_b")
 
         m.d.comb += [
             self.i.ready.eq(0),
@@ -126,15 +128,18 @@ class RowByMatrixMultiply(wiring.Component):
                         + self.i_idx
                     ),
                 ]
+                m.next = "LOAD_MUL_INPUTS"
+
+            with m.State("LOAD_MUL_INPUTS"):
+                m.d.sync += [
+                    mul_a.eq(self.input[self.i_idx].as_value().as_signed()),
+                    mul_b.eq(rd.data.as_value().as_signed()),
+                ]
                 m.next = "MAC"
 
             with m.State("MAC"):
                 m.d.sync += self.running_accum.eq(
-                    self.running_accum.as_value().as_signed()
-                    + (
-                        self.input[self.i_idx].as_value().as_signed()
-                        * rd.data.as_value().as_signed()
-                    )
+                    self.running_accum.as_value().as_signed() + (mul_a * mul_b)
                 )
                 with m.If(self.i_idx == self.IN_D - 1):
                     m.next = "WRITE_OUTPUT"
@@ -149,7 +154,7 @@ class RowByMatrixMultiply(wiring.Component):
                             + 1
                         ),
                     ]
-                    m.next = "MAC"
+                    m.next = "LOAD_MUL_INPUTS"
 
             with m.State("WRITE_OUTPUT"):
                 m.d.sync += self.output[self.o_idx].eq(self.running_accum)
@@ -168,7 +173,7 @@ class RowByMatrixMultiply(wiring.Component):
                             + (self.o_idx + 1) * self.IN_D
                         ),
                     ]
-                    m.next = "MAC"
+                    m.next = "LOAD_MUL_INPUTS"
 
             with m.State("DONE"):
                 m.d.comb += self.o.valid.eq(1)
