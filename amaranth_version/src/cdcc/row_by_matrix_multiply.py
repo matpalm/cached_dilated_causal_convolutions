@@ -89,18 +89,13 @@ class RowByMatrixMultiply(wiring.Component):
         m = Module()
         m.submodules["weight_mem"] = self.weight_mem
 
-        # can we split into two reads here => two lanes of MACs?
-        # will that trigger multiplier packing automagically (?)
-        rd0 = self.weight_mem.read_port(domain="sync")
-        rd1 = self.weight_mem.read_port(domain="sync")
+        rd = self.weight_mem.read_port(domain="sync")
 
         m.d.comb += [
             self.i.ready.eq(0),
             self.o.valid.eq(0),
-            rd0.en.eq(0),
-            rd0.addr.eq(0),
-            rd1.en.eq(0),
-            rd1.addr.eq(0),
+            rd.en.eq(0),
+            rd.addr.eq(0),
         ]
 
         for j in range(self.OUT_D):
@@ -124,18 +119,11 @@ class RowByMatrixMultiply(wiring.Component):
 
             with m.State("PREFETCH_WEIGHT"):
                 m.d.comb += [
-                    rd0.en.eq(1),
-                    rd0.addr.eq(
+                    rd.en.eq(1),
+                    rd.addr.eq(
                         self.bank_latched * self.NUM_WEIGHTS
                         + self.o_idx * self.IN_D
                         + self.i_idx
-                    ),
-                    rd1.en.eq(1),
-                    rd1.addr.eq(
-                        self.bank_latched * self.NUM_WEIGHTS
-                        + self.o_idx * self.IN_D
-                        + self.i_idx
-                        + 1
                     ),
                 ]
                 m.next = "MAC"
@@ -145,31 +133,20 @@ class RowByMatrixMultiply(wiring.Component):
                     self.running_accum.as_value().as_signed()
                     + (
                         self.input[self.i_idx].as_value().as_signed()
-                        * rd0.data.as_value().as_signed()
-                    )
-                    + (
-                        self.input[self.i_idx + 1].as_value().as_signed()
-                        * rd1.data.as_value().as_signed()
+                        * rd.data.as_value().as_signed()
                     )
                 )
-                with m.If(self.i_idx == self.IN_D - 2):
+                with m.If(self.i_idx == self.IN_D - 1):
                     m.next = "WRITE_OUTPUT"
                 with m.Else():
-                    m.d.sync += self.i_idx.eq(self.i_idx + 2)
+                    m.d.sync += self.i_idx.eq(self.i_idx + 1)
                     m.d.comb += [
-                        rd0.en.eq(1),
-                        rd0.addr.eq(
+                        rd.en.eq(1),
+                        rd.addr.eq(
                             self.bank_latched * self.NUM_WEIGHTS
                             + self.o_idx * self.IN_D
                             + self.i_idx
-                            + 2
-                        ),
-                        rd1.en.eq(1),
-                        rd1.addr.eq(
-                            self.bank_latched * self.NUM_WEIGHTS
-                            + self.o_idx * self.IN_D
-                            + self.i_idx
-                            + 3
+                            + 1
                         ),
                     ]
                     m.next = "MAC"
@@ -185,16 +162,10 @@ class RowByMatrixMultiply(wiring.Component):
                 with m.Else():
                     m.d.sync += self.o_idx.eq(self.o_idx + 1)
                     m.d.comb += [
-                        rd0.en.eq(1),
-                        rd0.addr.eq(
+                        rd.en.eq(1),
+                        rd.addr.eq(
                             self.bank_latched * self.NUM_WEIGHTS
                             + (self.o_idx + 1) * self.IN_D
-                        ),
-                        rd1.en.eq(1),
-                        rd1.addr.eq(
-                            self.bank_latched * self.NUM_WEIGHTS
-                            + (self.o_idx + 1) * self.IN_D
-                            + 1
                         ),
                     ]
                     m.next = "MAC"
