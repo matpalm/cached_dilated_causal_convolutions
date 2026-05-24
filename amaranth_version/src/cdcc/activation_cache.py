@@ -29,6 +29,11 @@ class ActivationCache(wiring.Component):
         self.num_entries = K * self.dilation
         self.use_ebr = use_ebr
 
+        print(
+            f">ActivationCache use_ebr={use_ebr} in_out_d={in_out_d}"
+            f" dilation_level={dilation_level} => dilation={self.dilation} => |entries|={self.num_entries}"
+        )
+
         feature = self.input_layout
         self.buffer = None
         self.ebr_memory = None

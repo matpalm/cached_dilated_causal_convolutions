@@ -29,7 +29,6 @@ class Conv1d(wiring.Component):
             )
 
         num_kernels, self.IN_D, self.OUT_D = np_weights.shape
-
         if num_kernels != K:
             raise Exception(
                 f"Expect Conv1d weights first axis to be {K} but received {np_weights.shape[0]}"
@@ -40,6 +39,10 @@ class Conv1d(wiring.Component):
                 f"Expect Conv1d bias with shape ({self.OUT_D},) "
                 f"but received {np_biases.shape}"
             )
+
+        print(
+            f">Conv1d K={num_kernels} IN_D={self.IN_D} OUT_D={self.OUT_D} apply_relu={apply_relu} ( relu_upper_bound={relu_upper_bound} )"
+        )
 
         super().__init__(
             {
