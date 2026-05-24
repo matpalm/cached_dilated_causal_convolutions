@@ -39,9 +39,9 @@ class RowByMatrixMultiply(wiring.Component):
         # TODO: i think NUM_BANKS is overkill; changing back to just single would be good
 
         self.IN_D, self.OUT_D = np_weights.shape
-        if (self.IN_D % 4 != 0) or (self.OUT_D % 4 != 0):
+        if (self.IN_D % 4 != 0) or ((self.OUT_D != 1) and (self.OUT_D % 4 != 0)):
             raise Exception(
-                f"in_d={self.IN_D} and out_d={self.OUT_D} ; these must be multiples of 4"
+                f"in_d={self.IN_D} and out_d={self.OUT_D} ; these must be multiples of 4; ( out_d can be 1 )"
             )
 
         self.NUM_WEIGHTS = self.IN_D * self.OUT_D
