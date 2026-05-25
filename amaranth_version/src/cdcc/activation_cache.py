@@ -58,7 +58,7 @@ class ActivationCache(wiring.Component):
 
         d = self.dilation
         n = self.num_entries
-        ring_mask = n - 1
+        ring_mask = n - 1  # assumes dilation always pow2 ( which is safe? )
 
         idx = Array(Signal(range(n), name=f"idx_{i}") for i in range(3))
 
@@ -169,8 +169,6 @@ class ActivationCache(wiring.Component):
             ff_idx = Array(Signal(range(n), name=f"ff_idx_{i}") for i in range(3))
 
             m.d.comb += [
-                # Align FF tap view with the accepted sample, matching EBR path
-                # semantics when i.valid/i.ready handshake in this cycle.
                 ff_read_head.eq(
                     Mux(
                         self.i.valid & self.i.ready,

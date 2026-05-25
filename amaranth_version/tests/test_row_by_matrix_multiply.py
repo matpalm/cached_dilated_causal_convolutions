@@ -14,50 +14,34 @@ from cdcc.row_by_matrix_multiply import RowByMatrixMultiply
 
 class TestRowByMatrixMultiply(unittest.TestCase):
 
-    def test_row_by_matrix_multiply_single_vector(self):
+    def _run_row_by_matrix_multiply_single_vector(self, in_d, out_d):
 
-        # weights for a in_d=2 out_d=3 mult
-        IN_D, OUT_D = 4, 8
-        weights = np.array(
-            [
-                [-2, 1, 0, 0, 0, 0, 0, 0],
-                [0.5, -1, 0.25, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-            ]
-        )
-        assert weights.shape == (IN_D, OUT_D)
+        # Seeded random generation keeps tests deterministic.
+        # Use quarter-step values so they are quantization-friendly.
+        rng = np.random.default_rng(1234 + (in_d * 1000) + out_d)
+        weights = rng.integers(-8, 9, size=(in_d, out_d)).astype(float) / 4.0
 
         dut = RowByMatrixMultiply(weights)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)
 
-            # select first column / 2 - second column
-            inp = parse_nnq([0.5, -1.0, 0, 0])
+            inp_float = (rng.integers(-8, 9, size=in_d).astype(float) / 4.0).tolist()
+            inp = parse_nnq(inp_float)
 
             ctx.set(dut.i.payload, inp)
             ctx.set(dut.i.valid, 1)
             await ctx.tick()
             ctx.set(dut.i.valid, 0)
 
-            for _ in range(100):
+            for _ in range(1000):
                 if ctx.get(dut.o.valid):
                     break
                 await ctx.tick()
             self.assertEqual(ctx.get(dut.o.valid), 1)
 
-            expected = parse_nnq(
-                [
-                    -1.5,
-                    1.5,
-                    -0.25,
-                    0,
-                    0,
-                    0,
-                    0,
-                ]
-            )
+            expected_float = np.array(inp_float) @ weights
+            expected = parse_nnq(expected_float.tolist())
             for j, expected_val in enumerate(expected):
                 actual_val = ctx.get(dut.o.payload[j])
                 self.assertAlmostEqual(actual_val.as_float(), expected_val.as_float())
@@ -69,3 +53,12 @@ class TestRowByMatrixMultiply(unittest.TestCase):
         sim.add_clock(1e-6, domain="sync")
         sim.add_testbench(testbench)
         sim.run()
+
+    def test_row_by_matrix_multiply_single_vector_4_8(self):
+        self._run_row_by_matrix_multiply_single_vector(in_d=4, out_d=8)
+
+    def test_row_by_matrix_multiply_single_vector_4_12(self):
+        self._run_row_by_matrix_multiply_single_vector(in_d=4, out_d=12)
+
+    def test_row_by_matrix_multiply_single_vector_4_16(self):
+        self._run_row_by_matrix_multiply_single_vector(in_d=4, out_d=16)

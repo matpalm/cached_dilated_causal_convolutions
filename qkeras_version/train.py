@@ -1,7 +1,14 @@
+import os
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+import pickle
+import json
+import contextlib
+from pathlib import Path
+
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
-import pickle, os, json, contextlib
-from pathlib import Path
 
 # from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
@@ -12,7 +19,18 @@ from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import QKerasModelBuilder
 from .losses import combined_masked_loss_terms
 
+import warnings
+
+# suppress: UserWarning: The `keras.constraints.serialize()` API should only be used for objects of
+#           type `keras.constraints.Constraint`. Found an instance of type
+#           <class 'qkeras.quantizers.quantized_bits'>, which may lead to improper serialization.
+warnings.filterwarnings(
+    "ignore", category=UserWarning, message=r".*API should only be used for objects.*"
+)
+
 if __name__ == "__main__":
+
+    # TODO: pathify run
 
     import argparse
 
@@ -66,25 +84,49 @@ if __name__ == "__main__":
         "--beta-stft",
         type=float,
         default=0.1,
-        help="target STFT-loss weight after ramp",
+        help="target STFT-loss weight after warm up and ramp",
     )
     parser.add_argument(
-        "--beta-stft-ramp-epochs",
-        type=int,
+        "--beta-stft-warmup",
+        type=float,
         default=0,
-        help="linearly ramp beta_stft from 0 to target over this many epochs. 0 denotes no sftf",
+        help="keep beta_stft at 0 for this proportion of epochs at start",
+    )
+    parser.add_argument(
+        "--beta-stft-ramp",
+        type=float,
+        default=0,
+        help="linearly ramp beta_stft from 0 to target over this many proportion of epochs ( post warmup )",
     )
     parser.add_argument(
         "--train-interp",
         action="store_true",
         help="whether to train with interpolated samples",
     )
+    parser.add_argument(
+        "--double-interp",
+        action="store_true",
+        help="if set, and training with --train-interp, we interpolate e0 and e1 across sample",
+    )
     opts = parser.parse_args()
-    print("opts", opts)
 
+    print("opts", opts)
     ensure_dir_exists(f"runs/{opts.run}/")
     for w in ["keras", "qkeras"]:
         ensure_dir_exists(f"runs/{opts.run}/weights/{w}")
+    with open(f"runs/{opts.run}/opts.json", "w") as f:
+        str_opts = {k: str(v) for k, v in vars(opts).items()}
+        json.dump(str_opts, f)
+
+    if (
+        opts.beta_stft_warmup < 0
+        or opts.beta_stft_warmup > 1
+        or opts.beta_stft_ramp < 0
+        or opts.beta_stft_ramp > 1
+    ):
+        raise Exception(
+            "--beta-stft-warmup & --beta-stft-ramp are propotions of --epochs must be (0, 1)"
+        )
 
     data = Embed2DQuadratureData(
         min_note=opts.min_note,
@@ -96,7 +138,6 @@ if __name__ == "__main__":
     )
 
     # we only care about the loss of the _first_ element of the output
-    # TODO: for amaranth version we should include a final OUT_D=1 layer
     filter_column_idx = 0
 
     # all convolutions use K=4
@@ -123,6 +164,8 @@ if __name__ == "__main__":
         relu_upper_bound=opts.relu_upper_bound,
     )
 
+    train_model.summary()
+
     if opts.init_weights and opts.init_weights.is_dir():
         init_weight_fname = sorted(os.listdir(opts.init_weights))[-1]
         init_weights_path = str(opts.init_weights / init_weight_fname)
@@ -138,6 +181,7 @@ if __name__ == "__main__":
         num_samples=opts.num_train_egs,
         emit_endpt_samples=True,
         emit_interpolated_samples=opts.train_interp,
+        emit_double_interpolated_samples=opts.double_interp,
     )
     validate_ds = data.tf_dataset(
         batch_size=opts.batch_size,
@@ -145,6 +189,7 @@ if __name__ == "__main__":
         num_samples=opts.num_validate_egs,
         emit_endpt_samples=True,
         emit_interpolated_samples=opts.train_interp,
+        emit_double_interpolated_samples=opts.double_interp,
     )
 
     # construct some callbacks...
@@ -182,31 +227,49 @@ if __name__ == "__main__":
             os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
     callbacks.append(SaveQuantisedWeights())
 
-    # just set opts.beta_stft from start if beta_stft_ramp_epochs is 0
-    beta_stft_init = opts.beta_stft if opts.beta_stft_ramp_epochs == 0 else 0.0
+    # If warm-up/ramp is requested, start from zero.
+    use_beta_schedule = opts.beta_stft_warmup > 0 or opts.beta_stft_ramp > 0
+    beta_stft_init = opts.beta_stft if not use_beta_schedule else 0.0
     beta_stft = tf.Variable(beta_stft_init, trainable=False, dtype=tf.float32)
-    if opts.beta_stft_ramp_epochs > 0:
+    if use_beta_schedule:
 
         class RampBetaStft(tf.keras.callbacks.Callback):
-            def __init__(self, beta_var: tf.Variable, target: float, ramp_epochs: int):
+
+            def __init__(
+                self,
+                beta_var: tf.Variable,
+                target: float,
+                warmup_epochs: int,
+                ramp_epochs: int,
+            ):
                 self.beta_var = beta_var
                 self.target = float(target)
+                self.warmup_epochs = max(0, int(warmup_epochs))
                 self.ramp_epochs = max(1, int(ramp_epochs))
 
             def on_epoch_begin(self, epoch, logs=None):
-                # epoch is 0-indexed; start at 0 and hit target at the end of ramp.
-                if self.ramp_epochs == 1:
+                # epoch is 0-indexed.
+                if epoch < self.warmup_epochs:
+                    value = 0.0
+                elif self.ramp_epochs == 1:
                     value = self.target
                 else:
-                    value = self.target * min(epoch / (self.ramp_epochs - 1), 1.0)
+                    ramp_epoch = epoch - self.warmup_epochs
+                    value = self.target * min(ramp_epoch / (self.ramp_epochs - 1), 1.0)
                 self.beta_var.assign(value)
                 print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
 
+        warmup_epochs = int(opts.beta_stft_warmup * opts.epochs)
+        ramp_epochs = int(opts.beta_stft_ramp * opts.epochs)
+        print(
+            f"derived warmup_epochs={warmup_epochs} ramp_epochs={ramp_epochs} ( epochs={opts.epochs} )"
+        )
         callbacks.append(
             RampBetaStft(
                 beta_var=beta_stft,
                 target=opts.beta_stft,
-                ramp_epochs=opts.beta_stft_ramp_epochs,
+                warmup_epochs=warmup_epochs,
+                ramp_epochs=ramp_epochs,
             )
         )
 
@@ -234,9 +297,10 @@ if __name__ == "__main__":
     )
     train_model.fit(
         train_ds,
-        validation_data=validate_ds,
+        validation_data=None,  # just use validation for plots
         callbacks=callbacks,
         epochs=opts.epochs,
+        verbose=2,
     )
 
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:

@@ -3,22 +3,41 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export MIN_NOTE=A4
-export MAX_NOTE=A4
+export MIN_NOTE=A3
+export MAX_NOTE=A5
 
-export RUN=157_4_8_8_relu4
-export FILTERS="4 8 8"
+export RUN=180_16_32_16_8_8
+export FILTERS="16 32 16 8 8"
+
+# export WAVE_CONFIG="--train-interp"
+export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
+
+# full config
+export TRAIN_EGS=100000
+export PRETRAIN_EPOCHS=30
+export FINETUNE_EPOCHS=60
+
+# sanity config
+export TRAIN_EGS=100000
+export PRETRAIN_EPOCHS=10
+export FINETUNE_EPOCHS=10
+
+# smoke config
+# export TRAIN_EGS=2
+# export PRETRAIN_EPOCHS=1
+# export FINETUNE_EPOCHS=1
+
 
 # pre train at FP3.15 ( relu4 )
-date
 mkdir -p runs/$RUN/pretrain || true
 time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
  --run $RUN/pretrain \
- --min-note $MIN_NOTE --max-note $MAX_NOTE --train-interp --harsh-waves --soft-clip \
+ --min-note $MIN_NOTE --max-note $MAX_NOTE \
+ $WAVE_CONFIG \
  --fp-int 3 --fp-frac 15 \
  --filter-sizes $FILTERS --relu-upper-bound 4 \
- --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-ramp-epochs 10 \
- --num-train-egs 50000 --epochs 30 --batch-size 128 --learning-rate 1e-3 --l2 0.0001 \
+ --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-warmup-epochs 5 --beta-stft-ramp-epochs 5 \
+ --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size 64 --learning-rate 1e-3 --l2 1e-4 \
  | tee runs/$RUN/pretrain/qkeras_version.train.out
 
 # time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.test \
@@ -30,17 +49,17 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
 #  | tee runs/$RUN/pretrain/qkeras_version.test.out
 
 # fine tune at FP3.6 ( relu4 )
-date
-mkdir -p runs/$RUN/fine_tune || true
+mkdir -p runs/$RUN/finetune || true
 time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
- --run ${RUN}/fine_tune \
- --min-note $MIN_NOTE --max-note $MAX_NOTE --train-interp --harsh-waves --soft-clip \
+ --run ${RUN}/finetune \
+ --min-note $MIN_NOTE --max-note $MAX_NOTE\
+ $WAVE_CONFIG \
  --fp-int 3 --fp-frac 6 \
  --filter-sizes $FILTERS --relu-upper-bound 4 \
  --init-weights runs/$RUN/pretrain/weights/keras/ \
- --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-ramp-epochs 0 \
- --num-train-egs 50000 --epochs 30 --batch-size 128 --learning-rate 1e-5 --l2 0.0001 \
- | tee runs/$RUN/fine_tune/qkeras_version.train.out
+ --alpha-mse 1.0 --beta-stft 0.001 --beta-stft-warmup-epochs 10 --beta-stft-ramp-epochs 10 \
+ --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size 64 --learning-rate 1e-4 --l2 1e-4 \
+ | tee runs/$RUN/finetune/qkeras_version.train.out
 
 # time uv run -m fxpmath_version.test \
 #  --min-note A4 --max-note A4 \
@@ -55,18 +74,30 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
 # rm runs/$RUN/test_x_files/zigzag/test_network.y_pred_fxp.pkl || true
 # uv run python -m unittest discover test_equivalences -k test_network
 
-# build & flash
-date
-export N_INT=3
-export N_FRAC=6
-export SUB_RUN=fine_tune
-export WEIGHTS_PKL=$PWD/runs/$RUN/$SUB_RUN/weights/qkeras/latest.pkl
-pushd /home/mat/dev/tiliqua/gateware
-rm -rf build/neural-waveshaper-r3/
-time pdm neural_waveshaper build --hw r3 --fs-192khz
-openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit || true
-popd
-cp -r /home/mat/dev/tiliqua/gateware/build/neural-waveshaper-r3/ runs/$RUN/$SUB_RUN
-uv run -m amaranth_version.parse_top_tim --top-tim runs/$RUN/$SUB_RUN/neural-waveshaper-r3/top.tim
+# build both versions
+# what a load of hack o_O
+export RUN_DIR=$PWD/runs/$RUN/
+pdm_build() {
+    pushd /home/mat/dev/tiliqua/gateware
+    export N_INT=$1
+    export N_FRAC=$2
+    export SUB_RUN=$3
+    export WEIGHTS_PKL=$RUN_DIR/$SUB_RUN/weights/qkeras/latest.pkl
+    time pdm neural_waveshaper build --hw r3 --fs-192khz --name "nw_${RUN}_${SUB_RUN}"
+    popd
+    cp -r /home/mat/dev/tiliqua/gateware/build/nw_${RUN}_${SUB_RUN}* runs/$RUN/$SUB_RUN/neural-waveshaper-r3
+    uv run -m amaranth_version.parse_top_tim \
+      --top-tim runs/$RUN/$SUB_RUN/neural-waveshaper-r3 \
+      | tee runs/$RUN/$SUB_RUN/parsed_top_tim
+}
+
+#pdm_build 3 15 pretrain &
+pdm_build 3 6 finetune &
+wait
+
+#openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit || true
+#popd
+#cp -r /home/mat/dev/tiliqua/gateware/build/neural-waveshaper-r3/ runs/$RUN/$SUB_RUN
+#uv run -m amaranth_version.parse_top_tim --top-tim runs/$RUN/$SUB_RUN/neural-waveshaper-r3/top.tim
 
 # #pdm flash archive build/neural-waveshaper-r3/neural-waveshaper*.tar.gz --slot 1 --noconfirm

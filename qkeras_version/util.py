@@ -39,12 +39,11 @@ class CheckYPred(tf.keras.callbacks.Callback):
         with io.BytesIO() as img_buffer:
             with warnings.catch_warnings():
                 warnings.simplefilter(action="ignore", category=FutureWarning)
-                plt.figure(figsize=(14, 4))
-                p = sns.lineplot(wide_df, x="n", y="value", hue="variable")
-                p.set_ylim((-2, 2))
-                img_buffer = io.BytesIO()
-                plt.savefig(img_buffer, format="png")
-                plt.clf()
+                fig, ax = plt.subplots(figsize=(40, 4))
+                sns.lineplot(wide_df, x="n", y="value", hue="variable", ax=ax)
+                ax.set_ylim((-2, 2))
+                fig.savefig(img_buffer, format="png")
+                plt.close(fig)
             img_buffer.seek(0)
             pil_img = Image.open(img_buffer).convert("RGB")
         return np.array(pil_img)
