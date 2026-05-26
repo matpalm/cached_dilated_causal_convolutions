@@ -3,30 +3,29 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export MIN_NOTE=A3
-export MAX_NOTE=A5
+export MIN_NOTE=A2
+export MAX_NOTE=A6
 
-export RUN=180_16_32_16_8_8
-export FILTERS="16 32 16 8 8"
-
-# export WAVE_CONFIG="--train-interp"
-export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
-
-# full config
-export TRAIN_EGS=100000
-export PRETRAIN_EPOCHS=30
-export FINETUNE_EPOCHS=60
-
-# sanity config
-export TRAIN_EGS=100000
-export PRETRAIN_EPOCHS=10
-export FINETUNE_EPOCHS=10
+export RUN=182_8_16_16_8_8
+export FILTERS="8 16 16 8 8"
 
 # smoke config
 # export TRAIN_EGS=2
 # export PRETRAIN_EPOCHS=1
 # export FINETUNE_EPOCHS=1
+# export WAVE_CONFIG="--train-interp"
 
+# sanity config
+export TRAIN_EGS=100000
+export PRETRAIN_EPOCHS=10
+export FINETUNE_EPOCHS=10
+export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
+
+# onight config
+# export TRAIN_EGS=100000
+# export PRETRAIN_EPOCHS=30
+# export FINETUNE_EPOCHS=60
+# export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 
 # pre train at FP3.15 ( relu4 )
 mkdir -p runs/$RUN/pretrain || true
@@ -36,7 +35,7 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
  $WAVE_CONFIG \
  --fp-int 3 --fp-frac 15 \
  --filter-sizes $FILTERS --relu-upper-bound 4 \
- --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-warmup-epochs 5 --beta-stft-ramp-epochs 5 \
+ --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
  --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size 64 --learning-rate 1e-3 --l2 1e-4 \
  | tee runs/$RUN/pretrain/qkeras_version.train.out
 
@@ -57,7 +56,7 @@ time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_ve
  --fp-int 3 --fp-frac 6 \
  --filter-sizes $FILTERS --relu-upper-bound 4 \
  --init-weights runs/$RUN/pretrain/weights/keras/ \
- --alpha-mse 1.0 --beta-stft 0.001 --beta-stft-warmup-epochs 10 --beta-stft-ramp-epochs 10 \
+ --alpha-mse 1.0 --beta-stft 0.0 \
  --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size 64 --learning-rate 1e-4 --l2 1e-4 \
  | tee runs/$RUN/finetune/qkeras_version.train.out
 
