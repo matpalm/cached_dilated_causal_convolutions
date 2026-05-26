@@ -1,0 +1,1 @@
+uv run -m amaranth_version.parse_top_tim --top-tim $1
