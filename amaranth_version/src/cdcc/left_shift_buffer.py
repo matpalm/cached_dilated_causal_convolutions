@@ -1,8 +1,7 @@
 from amaranth import Array, Elaboratable, Module, Signal
 from amaranth.lib import data, stream, wiring
 
-from . import NNQ
-
+from . import NNQ, K
 
 class LeftShiftBuffer(wiring.Component):
     """Shift register like buffer For input.
@@ -11,20 +10,22 @@ class LeftShiftBuffer(wiring.Component):
     as input to first 1D convolution.
     """
 
-    IN_D = 4  # input dim; (x, e0, e1, 0)
-    OUT_D = 4  # output dim; (x, e0, e1, 0)
-    K = 4  # kernel size
+    def __init__(self, in_out_d: int):
 
-    i: wiring.In(stream.Signature(data.ArrayLayout(NNQ, IN_D)))
-    o: wiring.Out(stream.Signature(data.ArrayLayout(data.ArrayLayout(NNQ, OUT_D), K)))
-
-    def __init__(self):
-        super().__init__()
-
-        feature = data.ArrayLayout(NNQ, self.OUT_D)
+        feature = data.ArrayLayout(NNQ, in_out_d)
         self.buffer = Array(
-            Signal(feature, name=f"lsb_{k}", init=[0] * self.OUT_D)
-            for k in range(self.K)
+            Signal(feature, name=f"lsb_{k}", init=[0] * in_out_d) for k in range(K)
+        )
+
+        super().__init__(
+            {
+                "i": wiring.In(stream.Signature(data.ArrayLayout(NNQ, in_out_d))),
+                "o": wiring.Out(
+                    stream.Signature(
+                        data.ArrayLayout(data.ArrayLayout(NNQ, in_out_d), K)
+                    )
+                ),
+            }
         )
 
     def elaborate(self, platform):
@@ -36,12 +37,12 @@ class LeftShiftBuffer(wiring.Component):
         ]
 
         with m.If(self.i.valid & self.i.ready):
-            for k in range(self.K - 1):
+            for k in range(K - 1):
                 m.d.sync += self.buffer[k].eq(self.buffer[k + 1])
-            m.d.sync += self.buffer[self.K - 1].eq(self.i.payload)
+            m.d.sync += self.buffer[K - 1].eq(self.i.payload)
 
-        for k in range(self.K - 1):
+        for k in range(K - 1):
             m.d.comb += self.o.payload[k].eq(self.buffer[k + 1])
-        m.d.comb += self.o.payload[self.K - 1].eq(self.i.payload)
+        m.d.comb += self.o.payload[K - 1].eq(self.i.payload)
 
         return m

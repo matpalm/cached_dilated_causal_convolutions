@@ -14,7 +14,7 @@ class TestLeftShiftBuffer(unittest.TestCase):
 
     def test_left_shift_buffer(self):
 
-        dut = LeftShiftBuffer()
+        dut = LeftShiftBuffer(in_out_d=4)
 
         async def testbench(ctx):
             ctx.set(dut.o.ready, 1)

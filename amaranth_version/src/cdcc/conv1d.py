@@ -57,9 +57,14 @@ class Conv1d(wiring.Component):
 
         self.relu_upper_bound = fixed.Const(relu_upper_bound, shape=NNQ_DW)
 
+        # there are always K=4 row by matrix mults do for each conv. have two running
+        # in parallel, each responsible for a pair.
+        # TODO: maybe it just better to go back to x4 row_mults and remove complexity from object?
+        #   the whole PHASE0 and PHASE1 has hardcoded hacky code :/
+
         self.row_mults = [
-            RowByMatrixMultiply(np_weights[0], np_weights_alt=np_weights[2]),
-            RowByMatrixMultiply(np_weights[1], np_weights_alt=np_weights[3]),
+            RowByMatrixMultiply(np_weights[0], np_weights[2]),
+            RowByMatrixMultiply(np_weights[1], np_weights[3]),
         ]
         self.biases = Array(parse_nnq(b, shape=NNQ_DW) for b in np_biases)
         self.apply_relu = apply_relu
@@ -142,6 +147,7 @@ class Conv1d(wiring.Component):
                                 row_sum
                                 + self.row_mults[k].o.payload[i].as_value().as_signed()
                             )
+                        # add biases into first accumulation sum
                         m.d.sync += self.accum[i].eq(
                             self.biases[i].as_value().as_signed() + row_sum
                         )
@@ -211,8 +217,8 @@ class Conv1d(wiring.Component):
                 out_width = NNQ.width
                 for i in range(self.OUT_D):
                     # TODO: had to include this because of a weird diff with narrowing
-                    # to match fxpmath :/ ( specifically difference in truncate toward zero
-                    # behaviour ) i still don't think this is quite right :/
+                    # to match qkeras / fxpmath :/ ( specifically difference in truncate
+                    # toward zero behaviour ) i still don't think this is quite right :/
                     acc = self.accum[i].as_value()
                     acc_clipped = Mux(
                         acc < self.lower_bound,

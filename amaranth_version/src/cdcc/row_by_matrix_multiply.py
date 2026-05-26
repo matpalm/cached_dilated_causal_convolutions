@@ -15,43 +15,41 @@ class RowByMatrixMultiply(wiring.Component):
     computes each output column sequentially.
     """
 
-    def __init__(self, np_weights: NDArray, np_weights_alt: NDArray | None = None):
+    def __init__(self, np_weights_1: NDArray, np_weights_2: NDArray | None = None):
         """
         Args:
-            np_weights  (IN_D, OUT_D)
-            np_weights_alt optional alternate bank (IN_D, OUT_D)
+            np_weights_1  (IN_D, OUT_D)
+            np_weights_2 optional alternate bank (IN_D, OUT_D)
         """
-        if len(np_weights.shape) != 2:
+        if len(np_weights_1.shape) != 2:
             raise Exception(
-                f"Expect RowByMatrixMultiply to be inited with (OUT_D, IN_D) vector but received shape {np_weights.shape}"
+                f"Expect RowByMatrixMultiply to be inited with (OUT_D, IN_D) vector but received shape {np_weights_1.shape}"
             )
-
-        if np_weights_alt is not None:
-            if (
-                len(np_weights_alt.shape) != 2
-                or np_weights_alt.shape != np_weights.shape
-            ):
+        if np_weights_2 is not None:
+            if np_weights_2.shape != np_weights_1.shape:
                 raise Exception(
-                    "Expect np_weights_alt to match np_weights shape "
-                    f"{np_weights.shape}, but received {np_weights_alt.shape}"
+                    "np_weights_2, if provided, needs to match shape of np_weights_1 "
+                    f"{np_weights_1.shape}, but received {np_weights_2.shape}"
                 )
 
-        # TODO: i think NUM_BANKS is overkill; changing back to just single would be good
-
-        self.IN_D, self.OUT_D = np_weights.shape
+        self.IN_D, self.OUT_D = np_weights_1.shape
         if (self.IN_D % 4 != 0) or ((self.OUT_D != 1) and (self.OUT_D % 4 != 0)):
             raise Exception(
                 f"in_d={self.IN_D} and out_d={self.OUT_D} ; these must be multiples of 4; ( out_d can be 1 )"
             )
 
-        self.NUM_WEIGHTS = self.IN_D * self.OUT_D
-        self.NUM_BANKS = 2 if np_weights_alt is not None else 1
-        self.phase = Signal(range(self.NUM_BANKS), init=0)
+        self.num_weights = self.IN_D * self.OUT_D
+
+        self.num_banks = 2 if np_weights_2 is not None else 1
+
+        # TODO: is having to latch the bank here a design problem with respect to how conv1d controls it?
+        self.phase = Signal(range(self.num_banks), init=0)
+        self.bank_latched = Signal(range(self.num_banks), init=0)
 
         # Flattened as [bank][out_d][in_d], row-major within each bank.
-        weight_banks = [np_weights]
-        if np_weights_alt is not None:
-            weight_banks.append(np_weights_alt)
+        weight_banks = [np_weights_1]
+        if np_weights_2 is not None:
+            weight_banks.append(np_weights_2)
 
         weight_init = []
         for bank_weights in weight_banks:
@@ -62,21 +60,22 @@ class RowByMatrixMultiply(wiring.Component):
 
         self.weight_mem = Memory(
             shape=NNQ,
-            depth=self.NUM_WEIGHTS * self.NUM_BANKS,
+            depth=self.num_weights * self.num_banks,
             init=weight_init,
             attrs={"ram_style": "block"},
         )
 
-        self.i_idx = Signal(range(self.IN_D), init=0)
-        self.o_idx = Signal(range(self.OUT_D), init=0)
-        self.running_accum = Signal(NNQ_DW, name="rbmm_running_accum", init=0)
-        self.output = Array(
-            Signal(NNQ_DW, name=f"rbmm_out_{j}", init=0) for j in range(self.OUT_D)
-        )
-        self.bank_latched = Signal(range(self.NUM_BANKS), init=0)
+        self.accumulator = Signal(NNQ_DW, name="rbmm_running_accum", init=0)
+
         self.input = Array(
             Signal(NNQ, name=f"rbmm_in_{i}", init=0) for i in range(self.IN_D)
         )
+        self.i_idx = Signal(range(self.IN_D), init=0)
+
+        self.output = Array(
+            Signal(NNQ_DW, name=f"rbmm_out_{j}", init=0) for j in range(self.OUT_D)
+        )
+        self.o_idx = Signal(range(self.OUT_D), init=0)
 
         super().__init__(
             {
@@ -107,23 +106,27 @@ class RowByMatrixMultiply(wiring.Component):
             with m.State("IDLE"):
                 m.d.comb += self.i.ready.eq(1)
                 with m.If(self.i.valid & self.i.ready):
+                    # ready to process... capture input and zero output
                     for i in range(self.IN_D):
                         m.d.sync += self.input[i].eq(self.i.payload[i])
+                    # TODO; we don't need to zero this (?)
                     for j in range(self.OUT_D):
                         m.d.sync += self.output[j].eq(0)
+                    # reset in and out idxs and set accum=0
                     m.d.sync += [
                         self.i_idx.eq(0),
                         self.o_idx.eq(0),
-                        self.running_accum.eq(0),
+                        self.accumulator.eq(0),
                         self.bank_latched.eq(self.phase),
                     ]
                     m.next = "PREFETCH_WEIGHT"
 
             with m.State("PREFETCH_WEIGHT"):
+                # prep read of first weight ( ready for next cycle )
                 m.d.comb += [
                     rd.en.eq(1),
                     rd.addr.eq(
-                        self.bank_latched * self.NUM_WEIGHTS
+                        self.bank_latched * self.num_weights
                         + self.o_idx * self.IN_D
                         + self.i_idx
                     ),
@@ -131,6 +134,9 @@ class RowByMatrixMultiply(wiring.Component):
                 m.next = "LOAD_MUL_INPUTS"
 
             with m.State("LOAD_MUL_INPUTS"):
+                # TODO: registering mul_a and mul_b ( in a state before the actual MAC )
+                #   made a huge difference to routing speed & COMB ( in a way i don't
+                #   understand ). still want to revisit this re: 9x9 and ALU use
                 m.d.sync += [
                     mul_a.eq(self.input[self.i_idx].as_value().as_signed()),
                     mul_b.eq(rd.data.as_value().as_signed()),
@@ -138,17 +144,20 @@ class RowByMatrixMultiply(wiring.Component):
                 m.next = "MAC"
 
             with m.State("MAC"):
-                m.d.sync += self.running_accum.eq(
-                    self.running_accum.as_value().as_signed() + (mul_a * mul_b)
+                # update accumulator with latest i_idx and weight from memory
+                m.d.sync += self.accumulator.eq(
+                    self.accumulator.as_value().as_signed() + (mul_a * mul_b)
                 )
                 with m.If(self.i_idx == self.IN_D - 1):
+                    # was last i_idx, write output
                     m.next = "WRITE_OUTPUT"
                 with m.Else():
+                    # more to do; i_idx + 1 and prep next weight read
                     m.d.sync += self.i_idx.eq(self.i_idx + 1)
                     m.d.comb += [
                         rd.en.eq(1),
                         rd.addr.eq(
-                            self.bank_latched * self.NUM_WEIGHTS
+                            self.bank_latched * self.num_weights
                             + self.o_idx * self.IN_D
                             + self.i_idx
                             + 1
@@ -157,19 +166,22 @@ class RowByMatrixMultiply(wiring.Component):
                     m.next = "LOAD_MUL_INPUTS"
 
             with m.State("WRITE_OUTPUT"):
-                m.d.sync += self.output[self.o_idx].eq(self.running_accum)
+                # set output and reset input idx and accumulator
+                m.d.sync += self.output[self.o_idx].eq(self.accumulator)
                 m.d.sync += [
                     self.i_idx.eq(0),
-                    self.running_accum.eq(0),
+                    self.accumulator.eq(0),
                 ]
                 with m.If(self.o_idx == self.OUT_D - 1):
+                    # was last o_idx, we are done
                     m.next = "DONE"
                 with m.Else():
+                    # mode to do; o_idx + 1 and prep next weight read
                     m.d.sync += self.o_idx.eq(self.o_idx + 1)
                     m.d.comb += [
                         rd.en.eq(1),
                         rd.addr.eq(
-                            self.bank_latched * self.NUM_WEIGHTS
+                            self.bank_latched * self.num_weights
                             + (self.o_idx + 1) * self.IN_D
                         ),
                     ]

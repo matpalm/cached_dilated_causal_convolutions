@@ -8,6 +8,8 @@ from . import NNQ, K
 class ActivationCache(wiring.Component):
     # note: for dilation=1 this is equivalent to left_shift_buffer
 
+    # TODO: remove the use_ebr=False paths; we _always_ use it now
+
     def __init__(self, in_out_d: int, dilation_level: int, use_ebr: bool = False):
         if dilation_level < 1:
             raise ValueError(f"dilation_level must be >=1, received {dilation_level}")
@@ -28,7 +30,6 @@ class ActivationCache(wiring.Component):
         self.dilation = K**dilation_level
         self.num_entries = K * self.dilation
         self.use_ebr = use_ebr
-
         print(
             f">ActivationCache use_ebr={use_ebr} in_out_d={in_out_d}"
             f" dilation_level={dilation_level} => dilation={self.dilation} => |entries|={self.num_entries}"

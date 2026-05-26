@@ -39,7 +39,7 @@ class QbNetwork(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules["lsb"] = lsb = LeftShiftBuffer()
+        m.submodules["lsb"] = lsb = LeftShiftBuffer(in_out_d=4)
 
         # build convolutions as well as activation caches
         # for all but the last
