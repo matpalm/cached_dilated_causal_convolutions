@@ -4,11 +4,31 @@ neural net running at 192kHz to wave shape quadrature X into 4 different soft cl
 
 ![endpoints](endpts.png)
 
-### model
+### inputs
 
-input; `sinX, cosX, e0, e1`   ( or just `sinX, -, e0, e1` and `cosX` is derived )
+```
+0 core sine wave waveshaping input
+1 core cosine wave waveshaping input ( normalled to phase shfted estimate of in0 )
+2 embedding x
+3 embedding y
+```
 
-output: waveshaped result
+### outputs
+
+```
+0 waveshaped result ( with small amount of low pass filtering )
+1 raw waveshaped result
+2 -
+3 cosine estimated from in0 sine
+```
+
+## modulation
+
+* support audio rate modulation of all inputs
+* trained on core sine wave, but takes any wave as input
+* the in1 derived from phase shifted in0 can be noisy under heavy in0 FM
+
+## model
 
 * inference runs at 192kHz
 * pretrain at FP 3.15, fine tune at FP 3.5
@@ -19,7 +39,6 @@ output: waveshaped result
 * EBR activation caching
 
 ```
-__________________________________________________________
  Layer (type)                Output Shape      Param #
 ==========================================================
  input_1 (InputLayer)        (None, 1024, 4)   0
