@@ -1,6 +1,6 @@
 # cached dilated causal convolutions
 
-neural net running at 192kHz to wave shape quadrature X into 4 different soft clip waves based on 2d embedding
+neural net running at 192kHz to wave shape input quadrature X into 4 different soft clip waves based on additional input 2d embedding
 
 ![endpoints](endpts.png)
 
@@ -8,7 +8,7 @@ neural net running at 192kHz to wave shape quadrature X into 4 different soft cl
 
 ```
 0 core sine wave waveshaping input
-1 core cosine wave waveshaping input ( normalled to phase shfted estimate of in0 )
+1 core cosine wave waveshaping input ( normalled to phase shfted estimate from in0 )
 2 embedding x
 3 embedding y
 ```

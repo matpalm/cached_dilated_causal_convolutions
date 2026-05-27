@@ -17,7 +17,7 @@ from cdcc.cosine_estimator import CosineEstimator
 class TestCosineEstimator(unittest.TestCase):
 
     def test_cosine_estimator(self):
-        dut = CosineEstimator()
+        dut = CosineEstimator(NNQ)
         freq_hz = 440.0
         sample_rate_hz = 192_000.0
         samples_for_two_cycles = int(math.ceil(2.0 * sample_rate_hz / freq_hz))
