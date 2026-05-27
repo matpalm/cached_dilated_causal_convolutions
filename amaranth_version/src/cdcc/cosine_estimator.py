@@ -4,31 +4,29 @@ from amaranth.lib import stream, wiring, data
 from amaranth.lib.memory import Memory
 from amaranth import Module, Signal, Mux
 
-from . import NNQ
-
-
 class CosineEstimator(wiring.Component):
     # given a incoming sine wave estimate the corresponding cosine wave
     # by checking zero crossings to derive frequency and from that look back
     # in a a delay line of the sine values. won't work for sine wave under heavy FM
 
-    # incoming sine wave
-    i: wiring.In(stream.Signature(NNQ))
-
-    # derived cosine
-    o: wiring.Out(stream.Signature(NNQ))
-
-    def __init__(self, decimation=64):
-        super().__init__()
+    def __init__(self, shape):
+        self.shape = shape
+        super().__init__(
+            {
+                "i": wiring.In(stream.Signature(shape)),
+                "o": wiring.Out(stream.Signature(shape)),
+            }
+        )
 
     def elaborate(self, platform):
         m = Module()
 
         # circular buffer for sine values
-        # 256 should be ok for 192kHz sines across ranges (?)
-        N = 256
+        # Keep this power-of-two so address wrap can use a bitmask.
+        N = 4096
+        WRAP_MASK = N - 1
         circular_buffer = Memory(
-            shape=NNQ,
+            shape=self.shape,
             depth=N,
             init=[0] * N,
             attrs={"ram_style": "block"},
@@ -66,10 +64,11 @@ class CosineEstimator(wiring.Component):
             is_negative.eq(self.i.payload.as_value()[-1]),
             crossing_zero.eq(accepted & is_negative_d & ~is_negative),
             samples_since_last_cross.eq(current_sample_idx - last_cross_idx),
-            cosine_offset_estimate.eq(samples_since_last_cross >> 2),
+            # TODO: is +2 the correct offset here?
+            cosine_offset_estimate.eq((samples_since_last_cross + 2) >> 2),
             # sync read returns data one cycle later, so advance address by one
             # sample to compensate that pipeline latency (?)
-            rd.addr.eq((write_head - quarter_period + 1) & 0xFF),
+            rd.addr.eq((write_head - quarter_period + 1) & WRAP_MASK),
             wr.addr.eq(write_head),
             wr.data.eq(self.i.payload),
             wr.en.eq(accepted),
