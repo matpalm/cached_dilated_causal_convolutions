@@ -6,7 +6,7 @@ export TF_USE_LEGACY_KERAS=1
 export MIN_NOTE=A2
 export MAX_NOTE=A6
 
-export RUN=182_8_16_16_8_8
+export RUN=185_8_16_16_8_8
 export FILTERS="8 16 16 8 8"
 
 # smoke config
