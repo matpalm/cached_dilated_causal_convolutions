@@ -59,12 +59,11 @@ class QbNetwork(wiring.Component):
             convs.append(conv)
 
             if not last_layer:
-                print(f"{i} ACT CACHE use_ebr=True")
+                print(f"{i} ACT CACHE")
                 num_filters = len(b)
                 activation_cache = ActivationCache(
                     in_out_d=num_filters,
                     dilation_level=(i + 1),
-                    use_ebr=True,
                 )
                 m.submodules[f"act{i}"] = activation_cache
                 activation_caches.append(activation_cache)
