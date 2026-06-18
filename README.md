@@ -32,6 +32,7 @@ neural net running at 192kHz to wave shape input quadrature X into 4 different s
 
 * inference runs at 192kHz
 * pretrain at FP 3.15, fine tune at FP 3.5
+* receptive field of 4096 samples => ~9 cycles of a 440Hz wave at 192kHz    
 * pretrain with MSE with ramped up STFT losses; finetune with just MSE
 * trained on synthetic sampled data at frequencies between A2 to A6
 * receptive field of 1024 samples ( => ~2.3 cycles of a 440Hz wave at 192kHz )
@@ -41,7 +42,7 @@ neural net running at 192kHz to wave shape input quadrature X into 4 different s
 ```
  Layer (type)                Output Shape      Param #
 ==========================================================
- input_1 (InputLayer)        (None, 1024, 4)   0
+ input_1 (InputLayer)        (None, 4096, 4)   0
  qconv_0_qb (QConv1D)        (None, 1024, 8)   136
  qconv_1_qb (QConv1D)        (None, 256, 16)   528
  qconv_2_qb (QConv1D)        (None, 64, 16)    1040
