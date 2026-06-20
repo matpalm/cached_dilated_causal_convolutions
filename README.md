@@ -2,6 +2,13 @@
 
 neural net running at 192kHz to wave shape input quadrature X into 4 different soft clip waves based on additional input 2d embedding
 
+corners here represent the training data; all data has a soft clip applied
+
+* e0,e1 = -1, -1 => sine wave
+* e0,e1 = -1, 1 => square wave
+* e0,e1 = 1, 1 => zigzag like wave
+* e0,e1 = -1, 1 => saw wave
+
 ![endpoints](endpts.png)
 
 ### inputs
