@@ -305,6 +305,7 @@ if __name__ == "__main__":
     parser.add_argument("--min-note", type=str, default="A4")
     parser.add_argument("--max-note", type=str, default="A4")
     parser.add_argument("--starting-phase", type=float, default=0)
+    parser.add_argument("--grid-size", type=int, default=7)
     parser.add_argument("--seq-len", type=int, default=1000)
     parser.add_argument("--harsh", action="store_true")
     parser.add_argument("--soft-clip", action="store_true")
@@ -332,7 +333,7 @@ if __name__ == "__main__":
     from PIL import Image, ImageDraw
 
     # NxN images, with only border set
-    N = 7
+    N = opts.grid_size
     collage = Image.new(size=(PLOT_W * N, PLOT_H * N), mode="RGB")
     plot_data_source = Embed2DQuadratureData(
         min_note=opts.min_note,
