@@ -274,12 +274,20 @@ class TestEquivalences(unittest.TestCase):
 
         if os.getenv("RUN") is None:
             raise Exception("need to set $RUN for weights for test_network")
+        if os.getenv("SUB_RUN") is None:
+            raise Exception("need to set $SUB_RUN for weights for test_network")
 
-        root_dir = Path(__file__).resolve().parents[1] / "runs" / os.getenv("RUN")
+        # TODO: assume finetune for now
+        root_dir = (
+            Path(__file__).resolve().parents[1]
+            / "runs"
+            / os.getenv("RUN")
+            / os.getenv("SUB_RUN")
+        )
         print(">test_network root_dir", root_dir)
         trained_weights = root_dir / "weights/qkeras/latest.pkl"
         layer_info_fname = root_dir / "qkeras_model.layer_info.json"
-        test_wave = "triangle"
+        test_wave = "sine"
         test_data = root_dir / "test_x_files" / test_wave / "x_yp_yt.pkl"
 
         with open(layer_info_fname, "r") as f:

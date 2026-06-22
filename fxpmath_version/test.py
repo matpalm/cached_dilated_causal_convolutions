@@ -139,7 +139,7 @@ def process(wave):
 
     print(wave, fxp_model.under_and_overflow_counts())
 
-    output_data_pkl_fname = os.path.join(opts.test_x_dir, wave, "x_yp_yt.pkl")
+    output_data_pkl_fname = os.path.join(opts.test_x_dir, wave.value, "x_yp_yt.pkl")
     util.ensure_dir_exists_for_file(output_data_pkl_fname)
     print(
         "writing x",
@@ -179,7 +179,7 @@ def process(wave):
         warnings.simplefilter(action='ignore', category=FutureWarning)
         p = sns.lineplot(wide_df, x='n', y='value', hue='variable')
         p.set(ylim=(-2, 2))
-        plt_fname = f"{opts.plot_dir}/fxp_math.y_pred.{wave}.png"
+        plt_fname = f"{opts.plot_dir}/fxp_math.y_pred.{wave.value}.png"
         util.ensure_dir_exists_for_file(plt_fname)
         print("saving plot to", plt_fname)
         plt.savefig(plt_fname)
@@ -193,5 +193,4 @@ if opts.wave is None:
     p = Pool(len(waves))
     p.map(process, waves)
 else:
-    assert opts.wave in waves
     process(opts.wave)
