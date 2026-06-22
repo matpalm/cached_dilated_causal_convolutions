@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "amaranth==0.5.4",
+    "amaranth-soc @ git+https://github.com/amaranth-lang/amaranth-soc@main",
     "fxpmath==0.4.8",
     "jupyter>=1.1.1",
     "keras==2.11.0",

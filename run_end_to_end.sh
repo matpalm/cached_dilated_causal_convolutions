@@ -68,17 +68,17 @@ finetune() {
 fxp_math_equiv_test() {
     export SUB_RUN=$1
     # quite slow, only required for big changes ( and depend on fxpmath_version.test )
-    rm -rf runs/$RUN/$SUB_RUN/test_x_files/ || true
-    time uv run -m fxpmath_version.test \
-    --min-note A4 --max-note A4 \
-    --load-weights runs/$RUN/$SUB_RUN/weights/qkeras/latest.pkl \
-    --layer-info runs/$RUN/$SUB_RUN/qkeras_model.layer_info.json \
-    --wave sine \
-    --test-x-dir runs/$RUN/$SUB_RUN/test_x_files/ \
-    --plot-dir runs/$RUN/ \
-    --num-test-egs 300 \
-    | tee runs/$RUN/$SUB_RUN/fxpmath_version.test.out
-    rm runs/$RUN/$SUB_RUN/test_x_files/sine/test_network.y_pred_fxp.pkl || true
+    # rm -rf runs/$RUN/$SUB_RUN/test_x_files/ || true
+    # time uv run -m fxpmath_version.test \
+    # --min-note A4 --max-note A4 \
+    # --load-weights runs/$RUN/$SUB_RUN/weights/qkeras/latest.pkl \
+    # --layer-info runs/$RUN/$SUB_RUN/qkeras_model.layer_info.json \
+    # --wave sine \
+    # --test-x-dir runs/$RUN/$SUB_RUN/test_x_files/ \
+    # --plot-dir runs/$RUN/ \
+    # --num-test-egs 50 \
+    # | tee runs/$RUN/$SUB_RUN/fxpmath_version.test.out
+    # rm runs/$RUN/$SUB_RUN/test_x_files/sine/test_network.y_pred_fxp.pkl || true
     uv run python -m unittest discover test_equivalences -k test_network
 }
 

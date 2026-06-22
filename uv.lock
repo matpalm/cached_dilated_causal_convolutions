@@ -35,6 +35,14 @@ wheels = [
 ]
 
 [[package]]
+name = "amaranth-soc"
+version = "0.1a1.dev32+g3e3d8b7"
+source = { git = "https://github.com/amaranth-lang/amaranth-soc?rev=main#3e3d8b7241c1c7e80e0cd12937d288d0ad4a6cba" }
+dependencies = [
+    { name = "amaranth" },
+]
+
+[[package]]
 name = "anyio"
 version = "4.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -206,6 +214,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "amaranth" },
+    { name = "amaranth-soc" },
     { name = "fxpmath" },
     { name = "jupyter" },
     { name = "keras" },
@@ -221,6 +230,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "amaranth", specifier = "==0.5.4" },
+    { name = "amaranth-soc", git = "https://github.com/amaranth-lang/amaranth-soc?rev=main" },
     { name = "fxpmath", specifier = "==0.4.8" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "keras", specifier = "==2.11.0" },
