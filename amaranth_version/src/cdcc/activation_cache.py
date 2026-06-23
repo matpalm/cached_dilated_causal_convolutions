@@ -26,7 +26,11 @@ class ActivationCache(wiring.Component):
         )
 
         self.dilation = K**dilation_level
-        self.num_entries = K * self.dilation
+
+        # note: only need caching back to the furthest tap (3*dilation) plus the
+        # current entry => 3*dilation + 1. we _dont_ need K*dilation = 4*dilation entries
+        self.num_entries = 3 * self.dilation + 1
+
         print(
             f">ActivationCache in_out_d={in_out_d}"
             f" dilation_level={dilation_level} => dilation={self.dilation} => |entries|={self.num_entries}"
@@ -50,17 +54,10 @@ class ActivationCache(wiring.Component):
 
         d = self.dilation
         n = self.num_entries
-        ring_mask = n - 1  # assumes dilation always pow2 ( which is safe? )
 
-        idx = Array(Signal(range(n), name=f"idx_{i}") for i in range(3))
-
-        m.d.comb += [
-            # n is always a power-of-two (K=4 and dilation is K**level),
-            # so modulo-n wrap is just masking the low bits.
-            idx[0].eq((self.write_head - d) & ring_mask),
-            idx[1].eq((self.write_head - (2 * d)) & ring_mask),
-            idx[2].eq((self.write_head - (3 * d)) & ring_mask),
-        ]
+        # helper for ring based indexing
+        def sub_mod(a, b):
+            return Mux(a >= b, a - b, a - b + n)
 
         m.submodules["ac_mem"] = self.ebr_memory
 
@@ -79,9 +76,9 @@ class ActivationCache(wiring.Component):
         )
 
         m.d.comb += [
-            idx_accepted[0].eq((accepted_head - d) & ring_mask),
-            idx_accepted[1].eq((accepted_head - (2 * d)) & ring_mask),
-            idx_accepted[2].eq((accepted_head - (3 * d)) & ring_mask),
+            idx_accepted[0].eq(sub_mod(accepted_head, d)),
+            idx_accepted[1].eq(sub_mod(accepted_head, 2 * d)),
+            idx_accepted[2].eq(sub_mod(accepted_head, 3 * d)),
             self.o.payload[0].eq(tap[2]),
             self.o.payload[1].eq(tap[1]),
             self.o.payload[2].eq(tap[0]),
@@ -156,6 +153,8 @@ class ActivationCache(wiring.Component):
             m.d.comb += rd.addr.eq(idx_accepted[0])
 
         with m.If(self.i.valid & self.i.ready):
-            m.d.sync += self.write_head.eq((self.write_head + 1) & ring_mask)
+            m.d.sync += self.write_head.eq(
+                Mux(self.write_head == n - 1, 0, self.write_head + 1)
+            )
 
         return m
