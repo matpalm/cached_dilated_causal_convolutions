@@ -7,7 +7,8 @@ export MIN_NOTE=A4
 export MAX_NOTE=A4
 
 export RUN=202_8_8_48k_psram2
-export FILTERS="8 8"
+export RUN=204_8_8_8_8_48k_psram2
+export FILTERS="8 8 8 8"
 
 # smoke config
 # export TRAIN_EGS=2
@@ -84,7 +85,7 @@ fxp_math_equiv_test() {
 
 #pretrain
 #finetune
-fxp_math_equiv_test finetune
+#fxp_math_equiv_test finetune
 
 # build both versions
 # what a load of hack o_O
@@ -96,17 +97,19 @@ pdm_build() {
     export N_FRAC=$2
     export SUB_RUN=$3
     export WEIGHTS_PKL=$RUN_DIR/$SUB_RUN/weights/qkeras/latest.pkl
-    #time pdm neural_waveshaper build --hw $HW --fs-192khz --name "nw_${RUN}_${SUB_RUN}"
-    time pdm neural_waveshaper build --hw $HW --name "nw_${RUN}_${SUB_RUN}"
+    export RUN_ID=`echo $RUN | cut -d'_' -f1`
+    export BUILD=nw_${RUN_ID}
+    time pdm neural_waveshaper build --hw $HW --name $BUILD
+    #time pdm neural_waveshaper build --hw $HW --fs-192khz --name $BUILD
     popd
-    cp -r /home/mat/dev/tiliqua/gateware/build/nw_${RUN}_${SUB_RUN}*${HW} runs/$RUN/$SUB_RUN/neural-waveshaper-${HW}
+    cp -r /home/mat/dev/tiliqua/gateware/build/$BUILD-${HW} runs/$RUN/$SUB_RUN/
     uv run -m amaranth_version.parse_top_tim \
-      --top-tim runs/$RUN/$SUB_RUN/neural-waveshaper-${HW} \
+      --top-tim runs/$RUN/$SUB_RUN/$BUILD-${HW} \
       | tee runs/$RUN/$SUB_RUN/parsed_top_tim
 }
 
 #pdm_build 3 15 pretrain &
-#pdm_build 3 6 finetune &
+pdm_build 3 6 finetune &
 wait
 
 #openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit || true

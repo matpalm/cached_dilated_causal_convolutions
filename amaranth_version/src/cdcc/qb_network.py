@@ -8,9 +8,11 @@ from numpy.typing import NDArray
 from . import K, NNQ
 from .conv1d import Conv1d
 from .left_shift_buffer import LeftShiftBuffer
-# from .activation_cache import ActivationCache
+from .activation_cache import ActivationCache
 from .activation_cache_ps import ActivationCachePS
 from .stream_cut import StreamCut
+
+LAST_ACTIVATION_CACHE_PSRAM = True
 
 
 class QbNetwork(wiring.Component):
@@ -30,15 +32,31 @@ class QbNetwork(wiring.Component):
         # 1) tests can get .bus ports before creating FakePSRAM and
         # 2) qb_network can expose each bus as out ports for "real" psram
         # TODO: 1) feels clunky :/
+        #
+        # note: the last cache may be PSRAM backed ( wishbone ) while every
+        # shallower cache stays in EBR. psram_cache_indices records which
+        # caches expose a wishbone bus so qb_network / CoreTop can wire them.
         self.activation_caches = []
-        for i in range(self.num_layers - 1):
+        self.psram_cache_indices = []
+        num_caches = self.num_layers - 1
+        for i in range(num_caches):
             _, b = self.conv_weights_biases_for(f"qconv_{i}_qb")
             num_filters = len(b)
-            print(f"{i} ACT CACHE in_out_d={num_filters} dilation_level={i+1}")
-            cache = ActivationCachePS(
-                in_out_d=num_filters,
-                dilation_level=(i + 1),
-            )
+            is_last_cache = i == num_caches - 1
+            use_psram = LAST_ACTIVATION_CACHE_PSRAM and is_last_cache
+            kind = "PSRAM" if use_psram else "EBR"
+            print(f"{i} ACT CACHE ({kind}) in_out_d={num_filters} dilation_level={i+1}")
+            if use_psram:
+                cache = ActivationCachePS(
+                    in_out_d=num_filters,
+                    dilation_level=(i + 1),
+                )
+                self.psram_cache_indices.append(i)
+            else:
+                cache = ActivationCache(
+                    in_out_d=num_filters,
+                    dilation_level=(i + 1),
+                )
             self.activation_caches.append(cache)
 
         # in / out ports are fixed...
@@ -46,11 +64,11 @@ class QbNetwork(wiring.Component):
             "i": wiring.In(stream.Signature(data.ArrayLayout(NNQ, self.IN_D))),
             "o": wiring.Out(stream.Signature(NNQ)),
         }
-        # ... but ports for caching must be made dynamically.
+        # ... but a wishbone port per PSRAM backed cache must be made dynamically.
         # TODO: forcing fixed size layers would make this _much_ simpler ( and
         #       is going to be required anyway for hot swapping layers? )
-        for i, cache in enumerate(self.activation_caches):
-            ports[f"bus_act{i}"] = wiring.Out(cache.bus_signature)
+        for i in self.psram_cache_indices:
+            ports[f"bus_act{i}"] = wiring.Out(self.activation_caches[i].bus_signature)
 
         super().__init__(ports)
 
@@ -76,11 +94,17 @@ class QbNetwork(wiring.Component):
             m.submodules[f"conv{i}"] = conv
             convs.append(conv)
 
-        # connect use activation caches to ports from qb_network.
+        # register activation caches and connect the PSRAM backed ones to the
+        # wishbone ports exposed by qb_network.
         activation_caches = self.activation_caches
         for i, cache in enumerate(activation_caches):
             m.submodules[f"act{i}"] = cache
-            wiring.connect(m, cache.bus, wiring.flipped(getattr(self, f"bus_act{i}")))
+        for i in self.psram_cache_indices:
+            wiring.connect(
+                m,
+                activation_caches[i].bus,
+                wiring.flipped(getattr(self, f"bus_act{i}")),
+            )
 
         # inject cuts after each activation cache
         # to break long handshake paths.
