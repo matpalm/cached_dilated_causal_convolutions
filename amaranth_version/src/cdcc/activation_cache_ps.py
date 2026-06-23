@@ -304,7 +304,6 @@ class ActivationCachePS(wiring.Component):
      2) reads back the delays d, 2d, 3d (one dimension per transaction in sequence)
      3) write output as four entries (delays 3d, 2d, d, current_activation)
 
-    - dim k has addr  [k * num_entries, (k+1) * num_entries)
     - pack 16b NNQ to 32d wishbone we x2 samples per word
     - use WishboneL2Cache for bursts
 
@@ -334,8 +333,15 @@ class ActivationCachePS(wiring.Component):
         self.num_entries = K * self.dilation  # = K^(level+1), always pow2
         self.address_width = exact_log2(self.num_entries)
 
+        # entry-major layout: dims of a ring entry sit contiguously. pad the
+        # per-entry dim stride up to a power of two so the entry index is just
+        # the high bits of the address ( addr = ptr << dim_bits | dim_idx )
+        # ( is this safe? )
+        self.dim_bits = (in_out_d - 1).bit_length()  # ceil(log2(in_out_d))
+        self.dim_stride = 1 << self.dim_bits
+
         # address space for cache.
-        total_words = in_out_d * self.num_entries
+        total_words = self.num_entries * self.dim_stride
         self.internal_addr_width = (
             int(math.ceil(math.log2(total_words))) if total_words > 1 else 1
         )
@@ -412,10 +418,10 @@ class ActivationCachePS(wiring.Component):
 
         # TODO: this all kinda now fixes use for 16 bits :/
         NNQ_BITS = NNQ.width
-        assert NNQ_BITS == 16, "huge assumption re: psram that NNW is 16bits :/"
+        assert NNQ_BITS <= 16, "huge assumption re: psram that NNW is 16bits :/"
         n = self.num_entries
         ring_mask = n - 1
-        aw = self.address_width
+        dim_bits = self.dim_bits
 
         write_ptr = Signal(range(n), init=0)
         accepted_ptr = Signal(range(n), init=0)  # write_ptr at input acceptance
@@ -456,7 +462,7 @@ class ActivationCachePS(wiring.Component):
                     bus.cyc.eq(1),
                     bus.we.eq(1),
                     bus.sel.eq(-1),
-                    bus.adr.eq((dim_idx << aw) | write_ptr),
+                    bus.adr.eq((write_ptr << dim_bits) | dim_idx),
                     bus.dat_w.eq(input_latch.as_value().word_select(dim_idx, NNQ_BITS)),
                 ]
                 with m.If(bus.ack):
@@ -476,7 +482,8 @@ class ActivationCachePS(wiring.Component):
                     bus.we.eq(0),
                     bus.sel.eq(-1),
                     bus.adr.eq(
-                        (dim_idx << aw) | ((accepted_ptr + self._off_k3) & ring_mask)
+                        (((accepted_ptr + self._off_k3) & ring_mask) << dim_bits)
+                        | dim_idx
                     ),
                 ]
                 with m.If(bus.ack):
@@ -499,7 +506,8 @@ class ActivationCachePS(wiring.Component):
                     bus.we.eq(0),
                     bus.sel.eq(-1),
                     bus.adr.eq(
-                        (dim_idx << aw) | ((accepted_ptr + self._off_k2) & ring_mask)
+                        (((accepted_ptr + self._off_k2) & ring_mask) << dim_bits)
+                        | dim_idx
                     ),
                 ]
                 with m.If(bus.ack):
@@ -522,7 +530,8 @@ class ActivationCachePS(wiring.Component):
                     bus.we.eq(0),
                     bus.sel.eq(-1),
                     bus.adr.eq(
-                        (dim_idx << aw) | ((accepted_ptr + self._off_k1) & ring_mask)
+                        (((accepted_ptr + self._off_k1) & ring_mask) << dim_bits)
+                        | dim_idx
                     ),
                 ]
                 with m.If(bus.ack):
