@@ -3,11 +3,14 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export MIN_NOTE=A4
-export MAX_NOTE=A4
+export MIN_NOTE=A3
+export MAX_NOTE=A5
 
-export RUN=202_8_8_48k_psram2
-export FILTERS="8 8"
+#export RUN=202_8_8_48k_psram2
+#export RUN=203_8_8_8_48k_psram2
+export RUN=204_8_8_8_8_48k_psram2/
+#export RUN=206_8_16_16_8_8_48k_psram2
+export FILTERS="8 8 8 8"
 
 # smoke config
 # export TRAIN_EGS=2
@@ -16,9 +19,9 @@ export FILTERS="8 8"
 # export WAVE_CONFIG="--train-interp"
 
 # sanity config
-export TRAIN_EGS=1000
-export PRETRAIN_EPOCHS=5
-export FINETUNE_EPOCHS=5
+export TRAIN_EGS=10000
+export PRETRAIN_EPOCHS=10
+export FINETUNE_EPOCHS=10
 export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 
 # onight config
@@ -26,6 +29,9 @@ export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 # export PRETRAIN_EPOCHS=30
 # export FINETUNE_EPOCHS=60
 # export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
+
+export RUN_ID=`echo $RUN | cut -d'_' -f1`
+echo $RUN_ID
 
 pretrain() {
     # pre train at FP3.15 ( relu4 )
@@ -84,7 +90,7 @@ fxp_math_equiv_test() {
 
 #pretrain
 #finetune
-fxp_math_equiv_test finetune
+#fxp_math_equiv_test finetune
 
 # build both versions
 # what a load of hack o_O
@@ -97,16 +103,17 @@ pdm_build() {
     export SUB_RUN=$3
     export WEIGHTS_PKL=$RUN_DIR/$SUB_RUN/weights/qkeras/latest.pkl
     #time pdm neural_waveshaper build --hw $HW --fs-192khz --name "nw_${RUN}_${SUB_RUN}"
-    time pdm neural_waveshaper build --hw $HW --name "nw_${RUN}_${SUB_RUN}"
+    export BUILD_NAME="neural_waveshaper_${RUN_ID}"  # since RUN and SUBRUN might be too long
+    time pdm neural_waveshaper build --hw $HW --name $BUILD_NAME
     popd
-    cp -r /home/mat/dev/tiliqua/gateware/build/nw_${RUN}_${SUB_RUN}*${HW} runs/$RUN/$SUB_RUN/neural-waveshaper-${HW}
+    cp -r /home/mat/dev/tiliqua/gateware/build/${BUILD_NAME}-${HW} runs/$RUN/$SUB_RUN/neural-waveshaper-${HW}
     uv run -m amaranth_version.parse_top_tim \
       --top-tim runs/$RUN/$SUB_RUN/neural-waveshaper-${HW} \
       | tee runs/$RUN/$SUB_RUN/parsed_top_tim
 }
 
 #pdm_build 3 15 pretrain &
-#pdm_build 3 6 finetune &
+pdm_build 3 6 finetune &
 wait
 
 #openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit || true
