@@ -1,4 +1,6 @@
+import os
 import pickle
+from ast import literal_eval
 
 from amaranth import Module
 from amaranth.lib import data, stream, wiring
@@ -12,7 +14,16 @@ from .activation_cache import ActivationCache
 from .activation_cache_ps import ActivationCachePS
 from .stream_cut import StreamCut
 
-LAST_ACTIVATION_CACHE_PSRAM = True
+# indexes of activation caches to use PSRAM ( the rest stay in EBR ).
+# supports negative indexing ( -1 => deepest cache ).
+PSRAM_ACTIVATION_CACHE_INDICES = literal_eval(
+    os.getenv("PSRAM_ACTIVATION_CACHE_INDICES", "[]")
+)
+print("PSRAM_ACTIVATION_CACHE_INDICES", PSRAM_ACTIVATION_CACHE_INDICES)
+
+# amount to align for when we have more than one PSRAM cache
+# TODO: can't wishbone do this for us?
+PSRAM_REGION_ALIGN = 4096
 
 
 class QbNetwork(wiring.Component):
@@ -39,19 +50,33 @@ class QbNetwork(wiring.Component):
         self.activation_caches = []
         self.psram_cache_indices = []
         num_caches = self.num_layers - 1
+
+        # normalise (potentially -ve) idxs; e.g. -1 => last
+        psram_indices = sorted({i % num_caches for i in PSRAM_ACTIVATION_CACHE_INDICES})
+
+        # running byte offset for laying out PSRAM backed caches.
+        psram_base = 0
+
         for i in range(num_caches):
             _, b = self.conv_weights_biases_for(f"qconv_{i}_qb")
             num_filters = len(b)
-            is_last_cache = i == num_caches - 1
-            use_psram = LAST_ACTIVATION_CACHE_PSRAM and is_last_cache
+            use_psram = i in psram_indices
             kind = "PSRAM" if use_psram else "EBR"
             print(f"{i} ACT CACHE ({kind}) in_out_d={num_filters} dilation_level={i+1}")
             if use_psram:
                 cache = ActivationCachePS(
                     in_out_d=num_filters,
                     dilation_level=(i + 1),
+                    base=psram_base,
                 )
                 self.psram_cache_indices.append(i)
+                # advance the base past this cache's region. each entry-major
+                # 16bit word pairs into a 32bit PSRAM word ( x2 ), so the byte
+                # span is ceil(total_words / 2) * 4, aligned upwards.
+                # TODO: PSRAM_REGION_ALIGN isn't overly wasteful?
+                total_words = cache.num_entries * cache.dim_stride
+                byte_span = ((total_words + 1) // 2) * 4
+                psram_base += -(-byte_span // PSRAM_REGION_ALIGN) * PSRAM_REGION_ALIGN
             else:
                 cache = ActivationCache(
                     in_out_d=num_filters,
@@ -89,7 +114,6 @@ class QbNetwork(wiring.Component):
             print(f"{i} CONV apply_relu={not last_layer} w {w.shape} b {b.shape}")
             # TODO: hardcoded upper bound here!
             # see https://github.com/matpalm/cached_dilated_causal_convolutions/issues/24
-            print("!" * 100, "ASSUMING RELU4")
             conv = Conv1d(w, b, apply_relu=(not last_layer), relu_upper_bound=4.0)
             m.submodules[f"conv{i}"] = conv
             convs.append(conv)
@@ -108,10 +132,9 @@ class QbNetwork(wiring.Component):
 
         # inject cuts after each activation cache
         # to break long handshake paths.
-        # TODO: do we need cuts when act cache is psram backed?
+        # TODO: do we need cuts when act cache is psram backed? very low cost i guess...
         cut_act_convs = []
         for i in range(self.num_layers - 1):  # ie. NOT last layer
-            print(f"{i} cut_act_convs")
             cut_act_conv = StreamCut(activation_caches[i].output_layout)
             m.submodules[f"cut_act_conv{i}"] = cut_act_conv
             cut_act_convs.append(cut_act_conv)

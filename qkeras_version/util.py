@@ -39,7 +39,7 @@ class CheckYPred(tf.keras.callbacks.Callback):
         with io.BytesIO() as img_buffer:
             with warnings.catch_warnings():
                 warnings.simplefilter(action="ignore", category=FutureWarning)
-                fig, ax = plt.subplots(figsize=(40, 4))
+                fig, ax = plt.subplots(figsize=(200, 4))
                 sns.lineplot(wide_df, x="n", y="value", hue="variable", ax=ax)
                 ax.set_ylim((-2, 2))
                 fig.savefig(img_buffer, format="png")

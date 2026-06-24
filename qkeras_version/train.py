@@ -12,7 +12,6 @@ from tensorflow.keras.optimizers import Adam
 
 # from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
 from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
-
 from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
@@ -48,6 +47,12 @@ if __name__ == "__main__":
         help="override RFS. if not set, use K^len(filter_sizes)",
     )
     parser.add_argument("--l2", type=float, default=0.0)
+    parser.add_argument(
+        "--train-seq-len-multiplier",
+        type=int,
+        default=5,
+        help="multiplier for receptive field to decide training sequence length."
+    )
     parser.add_argument("--in-d", type=int, default=4)
     parser.add_argument("--out-d", type=int, default=1)
     parser.add_argument(
@@ -148,7 +153,7 @@ if __name__ == "__main__":
     # receptive field should be _at least_ 128, even for 2 layer models otherwise we get no useful debug result
     RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**num_layers
     RECEPTIVE_FIELD_SIZE = max(128, RECEPTIVE_FIELD_SIZE)
-    TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
+    TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * opts.train_seq_len_multiplier
     print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
 

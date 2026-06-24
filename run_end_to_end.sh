@@ -3,40 +3,45 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export MIN_NOTE=A3
-export MAX_NOTE=A5
+#export RUN=208_8_8_8_8_48k_psram3
+#export RUN=209_8x5_48k_psram3
+#export RUN=210_8x6_48k_psram3
+#export RUN=211_8x7_48k_psram3
+#export RUN=212_8x5_16
+#export RUN=213_8x4_16x2
+#export RUN=214_8x3_16x3
+export RUN=215_8x3_16x3_192
+export FILTERS="8 8 8 16 16 16"
 
-<<<<<<< HEAD
-export RUN=202_8_8_48k_psram2
-export RUN=204_8_8_8_8_48k_psram2
-=======
-#export RUN=202_8_8_48k_psram2
-#export RUN=203_8_8_8_48k_psram2
-export RUN=204_8_8_8_8_48k_psram2/
-#export RUN=206_8_16_16_8_8_48k_psram2
->>>>>>> master
-export FILTERS="8 8 8 8"
+export RUN_ID=`echo $RUN | cut -d'_' -f1`
+export PSRAM_ACTIVATION_CACHE_INDICES="[-2, -1]"
+export BUILD=nw_${RUN_ID}_psram-2-1
 
 # smoke config
+# export MIN_NOTE=A4
+# export MAX_NOTE=A4
 # export TRAIN_EGS=2
 # export PRETRAIN_EPOCHS=1
 # export FINETUNE_EPOCHS=1
 # export WAVE_CONFIG="--train-interp"
 
 # sanity config
+export MIN_NOTE=A3
+export MAX_NOTE=A5
 export TRAIN_EGS=10000
-export PRETRAIN_EPOCHS=10
+export PRETRAIN_EPOCHS=20
 export FINETUNE_EPOCHS=10
 export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 
 # onight config
+# export MIN_NOTE=A2
+# export MAX_NOTE=A6
 # export TRAIN_EGS=100000
 # export PRETRAIN_EPOCHS=30
 # export FINETUNE_EPOCHS=60
 # export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 
-export RUN_ID=`echo $RUN | cut -d'_' -f1`
-echo $RUN_ID
+export SAMPLE_RATE=192
 
 pretrain() {
     # pre train at FP3.15 ( relu4 )
@@ -45,7 +50,8 @@ pretrain() {
     --run $RUN/pretrain \
     --min-note $MIN_NOTE --max-note $MAX_NOTE \
     $WAVE_CONFIG \
-    --sample-rate-khz 48 \
+    --sample-rate-khz $SAMPLE_RATE \
+    --train-seq-len-multiplier 2 \
     --fp-int 3 --fp-frac 15 \
     --filter-sizes $FILTERS --relu-upper-bound 4 \
     --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
@@ -67,7 +73,8 @@ finetune() {
     --run ${RUN}/finetune \
     --min-note $MIN_NOTE --max-note $MAX_NOTE\
     $WAVE_CONFIG \
-    --sample-rate-khz 48 \
+    --sample-rate-khz $SAMPLE_RATE \
+    --train-seq-len-multiplier 2 \
     --fp-int 3 --fp-frac 6 \
     --filter-sizes $FILTERS --relu-upper-bound 4 \
     --init-weights runs/$RUN/pretrain/weights/keras/ \
@@ -93,8 +100,8 @@ fxp_math_equiv_test() {
     uv run python -m unittest discover test_equivalences -k test_network
 }
 
-#pretrain
-#finetune
+pretrain
+finetune
 #fxp_math_equiv_test finetune
 
 # build both versions
@@ -107,10 +114,8 @@ pdm_build() {
     export N_FRAC=$2
     export SUB_RUN=$3
     export WEIGHTS_PKL=$RUN_DIR/$SUB_RUN/weights/qkeras/latest.pkl
-    export RUN_ID=`echo $RUN | cut -d'_' -f1`
-    export BUILD=nw_${RUN_ID}
-    time pdm neural_waveshaper build --hw $HW --name $BUILD
-    #time pdm neural_waveshaper build --hw $HW --fs-192khz --name $BUILD
+    #time pdm neural_waveshaper build --hw $HW --name $BUILD
+    time pdm neural_waveshaper build --hw $HW --name $BUILD --fs-192khz
     popd
     cp -r /home/mat/dev/tiliqua/gateware/build/$BUILD-${HW} runs/$RUN/$SUB_RUN/
     uv run -m amaranth_version.parse_top_tim \
