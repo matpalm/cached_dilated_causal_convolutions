@@ -100,6 +100,10 @@ class Conv1d(wiring.Component):
         for i in range(self.OUT_D):
             m.d.comb += self.o.payload[i].eq(self.result[i])
 
+        # index for the serialized post-processing tail ( clamp/relu/narrow ).
+        # sized to safely hold 0..OUT_D-1 ( and stay >=1 bit when OUT_D==1 ).
+        pp_idx = Signal(range(self.OUT_D + 1), name="conv_pp_idx", init=0)
+
         with m.FSM() as fsm:
 
             all_rows_ready = 1
@@ -169,72 +173,59 @@ class Conv1d(wiring.Component):
                         m.d.sync += self.accum[i].eq(
                             self.accum[i].as_value().as_signed() + row_sum
                         )
-                    m.next = "CLIP_LOWER"
+                    m.next = "POST_PROCESS"
 
-            with m.State("CLIP_LOWER"):
-                # TODO: combine CLIP_LOWER and _UPPER?
-                for i in range(self.OUT_D):
-                    m.d.sync += self.accum[i].eq(
-                        Mux(
-                            self.accum[i] < self.lower_bound,
-                            self.lower_bound,
-                            self.accum[i],
-                        )
-                    )
-                m.next = "CLIP_UPPER"
+            with m.State("POST_PROCESS"):
+                # serialised per-channel clamp -> relu -> narrow.
+                # do one output channel per cycle through a single shared
+                # path instead of OUT_D parallel comparator chains
 
-            with m.State("CLIP_UPPER"):
-                for i in range(self.OUT_D):
-                    m.d.sync += self.accum[i].eq(
-                        Mux(
-                            self.accum[i] > self.upper_bound,
-                            self.upper_bound,
-                            self.accum[i],
-                        )
-                    )
-                if self.apply_relu:
-                    m.next = "APPLY_RELU"
-                else:
-                    m.next = "SINGLE_W"
-
-            with m.State("APPLY_RELU"):
-                for i in range(self.OUT_D):
-                    m.d.sync += self.accum[i].eq(
-                        Mux(  # if negative, return 0
-                            self.accum[i].as_value()[-1],
-                            0,
-                            Mux(  # if > upper bound, return upper bound
-                                self.accum[i] > self.relu_upper_bound,
-                                self.relu_upper_bound,
-                                self.accum[i],
-                            ),
-                        )
-                    )
-                m.next = "SINGLE_W"
-
-            with m.State("SINGLE_W"):
                 frac_drop = NNQ_DW.f_bits - NNQ.f_bits
                 out_width = NNQ.width
-                for i in range(self.OUT_D):
-                    # TODO: had to include this because of a weird diff with narrowing
-                    # to match qkeras / fxpmath :/ ( specifically difference in truncate
-                    # toward zero behaviour ) i still don't think this is quite right :/
-                    acc = self.accum[i].as_value()
-                    acc_clipped = Mux(
-                        acc < self.lower_bound,
-                        self.lower_bound,
-                        Mux(acc > self.upper_bound, self.upper_bound, acc),
+                lower = self.lower_bound
+                upper = self.upper_bound
+                acc = self.accum[pp_idx].as_value()
+
+                # old states; CLIP_LOWER + CLIP_UPPER -> clamp to [lower, upper]
+                clipped = Mux(
+                    acc < lower,
+                    lower,
+                    Mux(acc > upper, upper, acc),
+                )
+
+                # old state; APPLY_RELU ( optional ): negatives -> 0, cap at relu_upper_bound
+                if self.apply_relu:
+                    relu_ub = self.relu_upper_bound.as_value()
+                    post = Mux(
+                        clipped < 0,
+                        0,
+                        Mux(clipped > relu_ub, relu_ub, clipped),
                     )
-                    frac_nonzero = acc_clipped[:frac_drop].any()
-                    trunc_toward_zero = Mux(
-                        acc_clipped[-1] & frac_nonzero,
-                        acc_clipped + (1 << frac_drop),
-                        acc_clipped,
-                    )
-                    m.d.sync += self.result[i].eq(
-                        trunc_toward_zero[frac_drop : frac_drop + out_width].as_signed()
-                    )
-                m.next = "OUTPUT"
+                else:
+                    post = clipped
+
+                # # old state; SINGLE_W: re-clip ( matches fxpmath/qkeras ) then truncate
+                # toward zero while narrowing NNQ_DW -> NNQ.
+                acc_clipped = Mux(
+                    post < lower,
+                    lower,
+                    Mux(post > upper, upper, post),
+                )
+                frac_nonzero = acc_clipped[:frac_drop].any()
+                trunc_toward_zero = Mux(
+                    acc_clipped[-1] & frac_nonzero,
+                    acc_clipped + (1 << frac_drop),
+                    acc_clipped,
+                )
+                m.d.sync += self.result[pp_idx].eq(
+                    trunc_toward_zero[frac_drop : frac_drop + out_width].as_signed()
+                )
+
+                with m.If(pp_idx == self.OUT_D - 1):
+                    m.d.sync += pp_idx.eq(0)
+                    m.next = "OUTPUT"
+                with m.Else():
+                    m.d.sync += pp_idx.eq(pp_idx + 1)
 
             with m.State("OUTPUT"):
                 m.d.comb += self.o.valid.eq(1)

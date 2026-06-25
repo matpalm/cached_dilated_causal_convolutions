@@ -154,7 +154,10 @@ if __name__ == "__main__":
     RECEPTIVE_FIELD_SIZE = opts.receptive_field_size or K**num_layers
     RECEPTIVE_FIELD_SIZE = max(128, RECEPTIVE_FIELD_SIZE)
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * opts.train_seq_len_multiplier
-    print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
+    print(
+        f"RECEPTIVE_FIELD_SIZE {RECEPTIVE_FIELD_SIZE}"
+        f" ( {opts.sample_rate_khz / RECEPTIVE_FIELD_SIZE} sec )",
+    )
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
 
     # construct model
