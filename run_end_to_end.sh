@@ -3,6 +3,7 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
+<<<<<<< Updated upstream
 #export RUN=208_8_8_8_8_48k_psram3
 #export RUN=209_8x5_48k_psram3
 #export RUN=210_8x6_48k_psram3
@@ -12,26 +13,39 @@ export TF_USE_LEGACY_KERAS=1
 #export RUN=214_8x3_16x3
 export RUN=215_8x3_16x3_192
 export FILTERS="8 8 8 16 16 16"
+=======
+export RUN=218_4x16
+export FILTERS="16 16 16 16"
+>>>>>>> Stashed changes
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-2, -1]"
 export BUILD=nw_${RUN_ID}_psram-2-1
 
 # smoke config
-# export MIN_NOTE=A4
-# export MAX_NOTE=A4
-# export TRAIN_EGS=2
-# export PRETRAIN_EPOCHS=1
-# export FINETUNE_EPOCHS=1
-# export WAVE_CONFIG="--train-interp"
+export MIN_NOTE=A4
+export MAX_NOTE=A4
+export TRAIN_EGS=2
+export PRETRAIN_EPOCHS=1
+export FINETUNE_EPOCHS=1
+export WAVE_CONFIG="--train-interp"
 
 # sanity config
+<<<<<<< Updated upstream
 export MIN_NOTE=A3
 export MAX_NOTE=A5
 export TRAIN_EGS=10000
 export PRETRAIN_EPOCHS=20
 export FINETUNE_EPOCHS=10
 export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
+=======
+# export MIN_NOTE=A2
+# export MAX_NOTE=A6
+# export TRAIN_EGS=10000
+# export PRETRAIN_EPOCHS=20
+# export FINETUNE_EPOCHS=10
+# export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
+>>>>>>> Stashed changes
 
 # onight config
 # export MIN_NOTE=A2
@@ -100,8 +114,8 @@ fxp_math_equiv_test() {
     uv run python -m unittest discover test_equivalences -k test_network
 }
 
-pretrain
-finetune
+#pretrain
+#finetune
 #fxp_math_equiv_test finetune
 
 # build both versions
