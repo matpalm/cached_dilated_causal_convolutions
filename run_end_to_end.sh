@@ -3,8 +3,8 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export RUN=218_4x16
-export FILTERS="16 16 16 16"
+export RUN=221_32x4_opt
+export FILTERS="32 32 32 32"
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
@@ -96,8 +96,8 @@ fxp_math_equiv_test() {
     uv run python -m unittest discover test_equivalences -k test_network
 }
 
-#pretrain
-#finetune
+pretrain
+finetune
 #fxp_math_equiv_test finetune
 
 # build both versions
