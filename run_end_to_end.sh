@@ -3,19 +3,12 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-#export RUN=208_8_8_8_8_48k_psram3
-#export RUN=209_8x5_48k_psram3
-#export RUN=210_8x6_48k_psram3
-#export RUN=211_8x7_48k_psram3
-#export RUN=212_8x5_16
-#export RUN=213_8x4_16x2
-#export RUN=214_8x3_16x3
-export RUN=215_8x3_16x3_192
-export FILTERS="8 8 8 16 16 16"
+export RUN=219_4x24
+export FILTERS="24 24 24 24"
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
-export PSRAM_ACTIVATION_CACHE_INDICES="[-2, -1]"
-export BUILD=nw_${RUN_ID}_psram-2-1
+export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
+export BUILD=nw_${RUN_ID}_psram-1
 
 # smoke config
 # export MIN_NOTE=A4
@@ -26,8 +19,8 @@ export BUILD=nw_${RUN_ID}_psram-2-1
 # export WAVE_CONFIG="--train-interp"
 
 # sanity config
-export MIN_NOTE=A3
-export MAX_NOTE=A5
+export MIN_NOTE=A2
+export MAX_NOTE=A6
 export TRAIN_EGS=10000
 export PRETRAIN_EPOCHS=20
 export FINETUNE_EPOCHS=10
@@ -41,7 +34,8 @@ export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 # export FINETUNE_EPOCHS=60
 # export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 
-export SAMPLE_RATE=192
+export SAMPLE_RATE_KHZ=192
+export BATCH_SIZE=32
 
 pretrain() {
     # pre train at FP3.15 ( relu4 )
@@ -50,12 +44,13 @@ pretrain() {
     --run $RUN/pretrain \
     --min-note $MIN_NOTE --max-note $MAX_NOTE \
     $WAVE_CONFIG \
-    --sample-rate-khz $SAMPLE_RATE \
+    --sample-rate-khz $SAMPLE_RATE_KHZ \
     --train-seq-len-multiplier 2 \
     --fp-int 3 --fp-frac 15 \
     --filter-sizes $FILTERS --relu-upper-bound 4 \
     --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
-    --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size 64 --learning-rate 1e-3 --l2 1e-4 \
+    --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
+    --learning-rate 1e-3 --l2 1e-4 \
     | tee runs/$RUN/pretrain/qkeras_version.train.out
     # time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.test \
     #  --fp-int 4 --fp-frac 12 \
@@ -73,13 +68,14 @@ finetune() {
     --run ${RUN}/finetune \
     --min-note $MIN_NOTE --max-note $MAX_NOTE\
     $WAVE_CONFIG \
-    --sample-rate-khz $SAMPLE_RATE \
+    --sample-rate-khz $SAMPLE_RATE_KHZ \
     --train-seq-len-multiplier 2 \
     --fp-int 3 --fp-frac 6 \
     --filter-sizes $FILTERS --relu-upper-bound 4 \
     --init-weights runs/$RUN/pretrain/weights/keras/ \
     --alpha-mse 1.0 --beta-stft 0.0 \
-    --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size 64 --learning-rate 1e-4 --l2 1e-4 \
+    --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size $BATCH_SIZE \
+    --learning-rate 1e-4 --l2 1e-4 \
     | tee runs/$RUN/finetune/qkeras_version.train.out
 }
 
@@ -114,7 +110,6 @@ pdm_build() {
     export N_FRAC=$2
     export SUB_RUN=$3
     export WEIGHTS_PKL=$RUN_DIR/$SUB_RUN/weights/qkeras/latest.pkl
-    #time pdm neural_waveshaper build --hw $HW --name $BUILD
     time pdm neural_waveshaper build --hw $HW --name $BUILD --fs-192khz
     popd
     cp -r /home/mat/dev/tiliqua/gateware/build/$BUILD-${HW} runs/$RUN/$SUB_RUN/
