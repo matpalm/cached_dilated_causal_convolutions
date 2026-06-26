@@ -2,7 +2,8 @@ import numpy as np
 import random
 import datetime
 
-def fade_in_out(buffer, fade_num_samples: int):
+
+def fade_in_out(buffer, fade_in_out_samples: int):
     num_samples, num_channels = buffer.shape
 
     # generate ( constant power ) quarter cycle cosine ramp

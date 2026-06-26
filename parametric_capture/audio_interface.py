@@ -22,8 +22,8 @@ class AudioInterface(object):
 
         self.sample_rate_hz = sample_rate_hz
 
-    def send(self, buffer):
-        buffer = fade_in_out(buffer, fade_num_samples=500)
+    def send(self, buffer, fade_in_out_samples=500):
+        buffer = fade_in_out(buffer, fade_in_out_samples=500)
         recorded_audio = sd.playrec(
             buffer.astype(np.float32),
             samplerate=self.sample_rate_hz,
