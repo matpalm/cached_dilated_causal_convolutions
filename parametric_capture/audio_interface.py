@@ -1,5 +1,6 @@
 import sounddevice as sd
 import numpy as np
+from util import fade_in_out
 
 class AudioInterface(object):
 
@@ -11,6 +12,7 @@ class AudioInterface(object):
 
         def scan_for_tiliqua():
             for i, device in enumerate(sd.query_devices()):
+                print(i, device)
                 if "tiliqua" in device["name"].lower():
                     return i
             raise Exception("not found")
@@ -21,8 +23,9 @@ class AudioInterface(object):
         self.sample_rate_hz = sample_rate_hz
 
     def send(self, buffer):
+        buffer = fade_in_out(buffer, fade_num_samples=500)
         recorded_audio = sd.playrec(
-            buffer,
+            buffer.astype(np.float32),
             samplerate=self.sample_rate_hz,
             channels=self.NUM_IN_OUT_CHANNELS,
             dtype="float32",

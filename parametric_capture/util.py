@@ -1,6 +1,6 @@
 import numpy as np
 import random
-
+import datetime
 
 def fade_in_out(buffer, fade_num_samples: int):
     num_samples, num_channels = buffer.shape
@@ -18,3 +18,7 @@ def fade_in_out(buffer, fade_num_samples: int):
     buffer[:fade_num_samples] *= fade_in_ramp
     buffer[-fade_num_samples:] *= fade_out_ramp
     return buffer
+
+
+def DTS():
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

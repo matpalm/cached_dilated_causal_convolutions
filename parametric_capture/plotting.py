@@ -2,9 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot(array, fname):
+def plot(array, fname, plot_offset: int = None, plot_len: int = None):
     if len(array.shape) == 1:
         array = array.reshape((-1, 1))
+
+    if plot_offset is not None:
+        array = array[plot_offset : plot_offset + plot_len]
+
     _, c = array.shape
     fig, axes = plt.subplots(c, 1, figsize=(12, 3 * c), sharex=True)
     axes = np.atleast_1d(axes)
