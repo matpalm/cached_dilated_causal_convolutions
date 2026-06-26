@@ -23,12 +23,13 @@ run_dir.mkdir(parents=True, exist_ok=True)
 
 # get initial sobol samples for 3 CV values and A
 # note: cv values bounded by (-1, 1) => (-10V, +10V)
+#       we use 0.75 instead of 1.0 to avoid very low amp multisines at edges
 bounds = []
-bounds.append((-1, 1))  # A cv ; set to noon, (-10, 10)
-bounds.append((-1, 1))  # zero point; full CW,  (-10, 10)
+bounds.append((-0.75, 0.75))  # A cv ; set to noon, (-10, 10)
+bounds.append((-0.75, 0.75))  # zero point; full CW,  (-10, 10)
 bounds.append((-0.5, 0.5))  # PVM; set to noon,  (-10, 10)
 # bounds.append((-1.0, 1.0))  # lin FM  (-10, 10)   ignore for now, not seeming to do anything?
-bounds.append((0.1, 1))  # ampltiude
+bounds.append((0.2, 1))  # ampltiude
 sobol_sampler = SobolSampler(bounds=bounds)
 samples = sobol_sampler.samples(num_samples_po2=opts.num_sobol_samples_po2)
 print("samples", samples)

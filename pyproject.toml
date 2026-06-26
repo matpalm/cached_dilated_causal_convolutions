@@ -17,4 +17,5 @@ dependencies = [
     "seaborn==0.12.2",
     "sounddevice>=0.5.5",
     "tensorflow[and-cuda]==2.11.0",
+    "zarr>=2.18.3",
 ]
