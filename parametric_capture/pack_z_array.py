@@ -3,24 +3,28 @@ from pathlib import Path
 import zarr
 import numpy as np
 from tqdm import tqdm
+import argparse
 
-# root_dir = Path("runs/006/capture_buffers/")
-root_dir = Path("runs/006/cv_buffers/")
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("--root-npy-dir", type=Path, required=True)
+parser.add_argument("--output-zarr", type=Path, required=True)
+opts = parser.parse_args()
 
-N = 20
-SAMPLE_LEN = 96_000
-C = 4
+# count the files and use first to decide shape for all
+fnames = list(sorted(opts.root_npy_dir.iterdir()))
+num_files = len(fnames)
+sample_len, num_channels = np.load(fnames[0]).shape
+print("num_files", num_files, "sample_len", sample_len, "num_channels", num_channels)
 
+# pack into z array
 z = zarr.open(
-    "combined_dataset.zarr",
+    opts.output_zarr,
     mode="w",
-    shape=(N * SAMPLE_LEN, C),
-    chunks=(SAMPLE_LEN, C),
+    shape=(num_files * sample_len, num_channels),
+    chunks=(sample_len, num_channels),
     dtype=np.float32,
 )
-
-fnames = sorted(os.listdir(root_dir))[:N]
 for i, fname in enumerate(tqdm(fnames)):
-    buffer = np.load(root_dir / fname)
-    assert buffer.shape == (SAMPLE_LEN, C), buffer.shape
-    z[i * SAMPLE_LEN : (i + 1) * SAMPLE_LEN] = buffer
+    buffer = np.load(fname)
+    assert buffer.shape == (sample_len, num_channels), buffer.shape
+    z.blocks[i] = buffer
