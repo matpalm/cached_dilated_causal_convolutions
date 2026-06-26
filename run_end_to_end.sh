@@ -3,8 +3,8 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export RUN=221_32x4_opt
-export FILTERS="32 32 32 32"
+export RUN=225_8_3x24
+export FILTERS="8 24 24 24"
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
