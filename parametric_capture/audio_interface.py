@@ -12,7 +12,6 @@ class AudioInterface(object):
 
         def scan_for_tiliqua():
             for i, device in enumerate(sd.query_devices()):
-                print(i, device)
                 if "tiliqua" in device["name"].lower():
                     return i
             raise Exception("not found")

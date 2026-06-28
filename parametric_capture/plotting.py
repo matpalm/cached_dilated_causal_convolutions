@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot(array, fname, plot_offset: int = None, plot_len: int = None):
+def plot(array, fname=None, plot_offset: int = None, plot_len: int = None):
     if len(array.shape) == 1:
         array = array.reshape((-1, 1))
 
@@ -22,11 +22,17 @@ def plot(array, fname, plot_offset: int = None, plot_len: int = None):
 
     axes[-1].set_xlabel("sample")
     fig.tight_layout()
+    if fname is None:
+        plt.close(fig)  # otherwise notebook shows _two_ plots inline :/
+        return fig
+
     fig.savefig(fname, dpi=500)
     plt.close(fig)
 
 
-def plot_spectrogram(series, fname, sample_rate_hz, max_freq_hz: float = 6000):
+def plot_spectrogram(
+    series, fname, sample_rate_hz: int = 48_000, max_freq_hz: float = 6_000
+):
     # NFFT=4096 gives ~2.9 Hz bins at 12 kHz, resolving 5 Hz spacing
     nfft = 4096
     noverlap = nfft * 3 // 4
@@ -40,3 +46,18 @@ def plot_spectrogram(series, fname, sample_rate_hz, max_freq_hz: float = 6000):
     fig.tight_layout()
     fig.savefig(fname, dpi=150)
     plt.close(fig)
+
+
+def play_sample(
+    series,
+    sample_rate_hz: int = 48_000,
+    play_offset: int = None,
+    play_len: int = None,
+    autoplay: bool = True,
+):
+    from IPython.display import Audio
+
+    series = np.asarray(series)
+    if play_offset is not None:
+        series = series[play_offset : play_offset + play_len]
+    return Audio(series.astype(np.float32), rate=sample_rate_hz, autoplay=autoplay)

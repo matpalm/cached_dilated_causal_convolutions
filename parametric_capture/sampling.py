@@ -69,7 +69,7 @@ class SobolSampler(object):
     def __init__(
         self,
         bounds,  # list of 2 tuples
-        seed: int = 124,
+        seed: int,
     ):
         for b in bounds:
             if len(b) != 2:

@@ -11,7 +11,7 @@ for _ in range(4):
     samples.append(sample)
 
 samples = np.stack(samples).T
-plot(samples, "test_send_return.to_tiliqua.jpg")
+plot(samples, "test_send_return.to_tiliqua.jpg", plot_offset=10_000, plot_len=2_000)
 
 audio = AudioInterface(sample_rate_hz=SR)
 
@@ -25,4 +25,9 @@ print(sd.query_devices(audio.tiliqua_idx))
 print(">sending")
 recorded_audio = audio.send(samples)
 print("<received")
-plot(recorded_audio, "test_send_return.from_tiliqua.jpg")
+plot(
+    recorded_audio,
+    "test_send_return.from_tiliqua.jpg",
+    plot_offset=10_000,
+    plot_len=2_000,
+)
