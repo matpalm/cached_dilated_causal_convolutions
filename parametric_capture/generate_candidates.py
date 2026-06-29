@@ -163,6 +163,8 @@ edge_scores_df = pd.DataFrame(records)
 
 # write some stats to a file ( then stdout )
 with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "w") as f:
+    print("opts", opts, file=f)
+    print("src_runs", list(map(str, src_runs)), file=f)
     for col in ["local_grad", "local_density", "score"]:
         print("top by", col, file=f)
         print(edge_scores_df.sort_values(col, ascending=False).head(), file=f)

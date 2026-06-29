@@ -78,7 +78,9 @@ class SobolSampler(object):
         num_d = len(self.lower_bounds)
         self.sampler = qmc.Sobol(d=num_d, scramble=True, seed=seed)
 
-    def samples(self, num_samples_po2: int):
+    def samples(self, num_samples_po2: int, fast_forward: int = None):
         # note: doesnt have to be po2
+        if fast_forward:
+            self.sampler.fast_forward(fast_forward)
         samples = self.sampler.random(n=num_samples_po2)  # (num_samples, num_d) (0, 1)
         return qmc.scale(samples, self.lower_bounds, self.upper_bounds)

@@ -26,14 +26,18 @@ run_dir.mkdir(parents=True, exist_ok=True)
 samples_npy = opts.samples_npy
 if samples_npy is None:
     samples_npy = Path("runs") / opts.run / "cv_samples.npy"
+
 samples = np.load(samples_npy)
 amplitudes = samples[:, -1]  # (nb)
 cv_values = samples[:, :-1]  # (nb, |cv|)
 
 num_cv_values = cv_values.shape[-1]
-if num_cv_values > 4:
+
+if num_cv_values != 3:
     raise Exception(
-        "num_cv_values", num_cv_values, "but there only 4 input channels on device"
+        "num_cv_values",
+        num_cv_values,
+        ", can only use 3 ( last reserved for v/oct sweep )",
     )
 
 multisines = generate_cv_schroeder_multisine(
@@ -50,8 +54,12 @@ def cv_a_to_audio_buffer(cv_values, amp):
     # ensure sampled DC + multisine AC bounded
     headroom = np.min(1.0 - np.abs(cv_values))
     effective_amp = min(float(amp), max(0.0, float(headroom)))
+    # adjust AC offset of DC cv_values with multisine
     for c_idx, cv_value in enumerate(cv_values):
         audio_buffer[:, c_idx] = cv_value + multisines[c_idx] * effective_amp
+    # last output is always voct sweep; 0.0 -> 0.4  ( ~4octaves, uncalibrated still )
+    audio_buffer[:, 3] = np.linspace(0.0, 0.4, num_samples)
+    # ensure in bounds
     np.clip(audio_buffer, -1.0, 1.0, out=audio_buffer)
     return audio_buffer
 

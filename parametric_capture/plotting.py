@@ -1,3 +1,8 @@
+# seaborn just wont shut up
+import warnings
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
+
 import matplotlib.pyplot as plt
 import numpy as np
 

@@ -70,17 +70,35 @@ def plot(array, fname=None, plot_offset: int = None, plot_len: int = None):
 
 SR = 48_000
 
-samples = np.zeros((SR * 4, 4))
-up_down = np.hstack(
-    [
-        np.linspace(-1, 1, SR),
-        np.linspace(1, -1, SR),
-        np.linspace(-1, 1, SR),
-        np.linspace(0, 0, SR),
-    ]
-)
-for i in range(4):
-    samples[:, i] = up_down
+# mode = "up_down_up_zero"
+# mode = "stepped_v_oct_on_ch3"
+mode = "ramped_v_oct_on_ch3"
+
+if mode == "up_down_up_zero":
+    samples = np.zeros((4 * SR, 4))
+    up_down = np.hstack(
+        [
+            np.linspace(-1, 1, SR),
+            np.linspace(1, -1, SR),
+            np.linspace(-1, 1, SR),
+            np.linspace(0, 0, SR),
+        ]
+    )
+    for i in range(C):
+        samples[:, i] = up_down
+elif mode == "stepped_v_oct_on_ch3":
+    samples = np.zeros((5 * 2 * SR, 4))
+    for i in range(3):
+        samples[:, i] = 0.5
+    specific_voltages = [4, 3, 2, 1, 0]  # one per second
+    sample = [[v / 10] * 2 * SR for v in specific_voltages]  # scale back to (-1,1)
+    samples[:, 3] = np.concatenate(sample)
+elif mode == "ramped_v_oct_on_ch3":
+    samples = np.zeros((2 * SR, 4))
+    for i in range(3):
+        samples[:, i] = 0.5
+    samples[:, 3] = np.linspace(0.0, 0.4, 2 * SR)
+
 print("> to_tiliqua")
 plot(samples, "test_send_return.to_tiliqua.jpg")
 

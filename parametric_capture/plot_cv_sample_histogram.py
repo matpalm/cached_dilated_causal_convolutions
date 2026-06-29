@@ -1,3 +1,8 @@
+# seaborn just wont shut up
+import warnings
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
+
 import pandas as pd
 import numpy as np
 import argparse
@@ -9,8 +14,8 @@ parser.add_argument("--cv-samples-npy", type=Path, required=True)
 parser.add_argument("--plot", type=Path, required=True)
 opts = parser.parse_args()
 
-cv_samples = np.load(opts.cv_samples_npy)
-df_wide = pd.DataFrame(cv_samples, columns=["a_cv", "zero_p", "pwm", "amp"])
+cv_samples = np.load(opts.cv_samples_npy)[:, :4]
+df_wide = pd.DataFrame(cv_samples, columns=["a_cv", "b_cv", "morph", "amp"])
 df_long = df_wide.melt(var_name="axis", value_name="value")
 g = sns.displot(
     data=df_long,
