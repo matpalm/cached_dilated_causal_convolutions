@@ -63,17 +63,15 @@ class ParametricCaptureData(object):
                 # yield
                 yield xs, ys
 
-        return sample_generator()
-
-        # ds = tf.data.Dataset.from_generator(
-        #     sample_generator,
-        #     output_signature=(
-        #         tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float32),
-        #         tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float32),
-        #     ),
-        # )
-        # ds = ds.batch(batch_size)
-        # return ds.prefetch(tf.data.AUTOTUNE)
+        ds = tf.data.Dataset.from_generator(
+            sample_generator,
+            output_signature=(
+                tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float32),
+                tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float32),
+            ),
+        )
+        ds = ds.batch(batch_size)
+        return ds.prefetch(tf.data.AUTOTUNE)
 
 
 if __name__ == "__main__":
