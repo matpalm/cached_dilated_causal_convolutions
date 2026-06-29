@@ -1,6 +1,45 @@
 import tensorflow as tf
 
 
+def masked_huber(receptive_field_size, filter_column_idx=None, alpha=0.1):
+    """
+    Calculates masked version of the Huber loss
+
+    Parameters:
+        receptive_field_size: number of initial time steps to ignore
+        filter_column_idx: only calculate loss w.r.t this column in output. done since
+                           the output has 4 outs, but we might only care about one
+        alpha: Huber delta; threshold when the loss transitions from quadratic to linear
+    Returns:
+        keras loss function
+    """
+
+    # TODO: generalise with MSE
+
+    def loss_fn(y_true, y_pred):
+        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
+        if filter_column_idx is not None:
+            # consider only a single column from output for loss
+            y_true = y_true[:, :, filter_column_idx : filter_column_idx + 1]
+            y_pred = y_pred[:, :, filter_column_idx : filter_column_idx + 1]
+        assert y_true.shape == y_pred.shape
+        # huber loss per element
+        error = y_true - y_pred
+        abs_error = tf.abs(error)
+        quadratic = tf.minimum(abs_error, alpha)
+        linear = abs_error - quadratic
+        huber = 0.5 * tf.square(quadratic) + alpha * linear
+        # average over elements of y
+        huber = tf.reduce_mean(huber, axis=-1)
+        # we want to ignore the first elements of the loss since they
+        # have been fed with left padded data
+        huber = huber[:, receptive_field_size:]
+        # return average over batch and sequence
+        return tf.reduce_mean(huber)
+
+    return loss_fn
+
+
 def masked_mse(receptive_field_size, filter_column_idx=None):
     """
     Calculates masked version of mean square error
@@ -32,7 +71,7 @@ def masked_mse(receptive_field_size, filter_column_idx=None):
 
 
 def masked_multires_stft_loss(
-    receptive_field_size,
+    receptive_field_size: int = 0,
     filter_column_idx=None,
     fft_sizes=(512, 1024, 2048),
     hop_sizes=(128, 256, 512),
@@ -79,8 +118,9 @@ def masked_multires_stft_loss(
             y_pred_ = y_pred
 
         # mask left-padded receptive field
-        y_true_ = y_true_[:, receptive_field_size:, :]
-        y_pred_ = y_pred_[:, receptive_field_size:, :]
+        if receptive_field_size > 0:
+            y_true_ = y_true_[:, receptive_field_size:, :]
+            y_pred_ = y_pred_[:, receptive_field_size:, :]
 
         # collapse channel dim for STFT (assuming 1 selected channel)
         y_true_1d = tf.squeeze(y_true_, axis=-1)
@@ -133,11 +173,15 @@ def combined_masked_loss(
 
 def combined_masked_loss_terms(
     receptive_field_size,
+    use_huber_loss: bool = False,
     filter_column_idx=0,
     alpha_mse=1.0,
     beta_stft=0.2,
 ):
-    mse_fn = masked_mse(receptive_field_size, filter_column_idx)
+    if use_huber_loss:
+        core_loss_fn = masked_huber(receptive_field_size, filter_column_idx)
+    else:
+        core_loss_fn = masked_mse(receptive_field_size, filter_column_idx)
 
     # actually, STFT term can be spectral-only to avoid counting time MSE twice ?
     # so can remove w_time completely (?)
@@ -150,17 +194,23 @@ def combined_masked_loss_terms(
     )
 
     def loss_fn(y_true, y_pred):
-        return alpha_mse * mse_fn(y_true, y_pred) + beta_stft * stft_fn(y_true, y_pred)
+        return alpha_mse * core_loss_fn(y_true, y_pred) + beta_stft * stft_fn(
+            y_true, y_pred
+        )
 
-    def mse_component(y_true, y_pred):
-        return mse_fn(y_true, y_pred)
+    def core_component(y_true, y_pred):
+        return core_loss_fn(y_true, y_pred)
 
     def stft_component(y_true, y_pred):
         return stft_fn(y_true, y_pred)
 
-    # Stable metric names for TensorBoard/Keras logs.
+    # fix named metric names for tb / keras etc
     loss_fn.__name__ = "combined_masked_loss"
-    mse_component.__name__ = "masked_mse"
+    core_component.__name__ = "masked_huber" if use_huber_loss else "masked_mse"
     stft_component.__name__ = "masked_stft"
 
-    return loss_fn, mse_component, stft_component
+    return (
+        loss_fn,
+        core_component,
+        stft_component,
+    )
