@@ -15,21 +15,20 @@ class ParametricCaptureData(object):
 
     def __init__(
         self,
-        root_zarr_dir: Path,
+        model_data_z: Path,
         seed: int = 123,
     ):
-        root_zarr_dir = Path(root_zarr_dir)
         try:
-            self.model_data_z = zarr.open(root_zarr_dir / "model_data.z", mode="r")
+            self.model_data_z = zarr.open(str(model_data_z), mode="r")
         except zarr.errors.PathNotFoundError as e:
-            print("files not found in", root_zarr_dir)
+            print("files not found in", root_zarr_dir, str(e))
             raise e
         self.n_chunks = self.model_data_z.nchunks
         self.chunk_len = self.model_data_z.blocks[0].shape[0]
-        print("self.n_chunks", self.n_chunks, "self.chunk_len", self.chunk_len)
+        # print("self.n_chunks", self.n_chunks, "self.chunk_len", self.chunk_len)
         self.rng = np.random.default_rng(seed=seed)
 
-    def tf_dataset(
+    def tf_training_dataset(
         self, seq_len: int, num_batches: int, batch_size: int, cache_fname: str = None
     ):
         """
@@ -78,6 +77,48 @@ class ParametricCaptureData(object):
         ds = ds.batch(batch_size)
         return ds.prefetch(tf.data.AUTOTUNE)
 
+    def tf_inference_dataset(self, batch_size: int = 1):
+        """
+        Generate all samples returned shape
+        x - (1, SAMPLE_LEN, 4)
+        y - (1, SAMPLE_LEN, 1)
+
+        Args:
+            seq_len: second axis for batch
+            num_batches: total number of batches generated
+            batch_size: batch size
+        """
+
+        seq_len = self.model_data_z.blocks[0][0]
+
+        def sample_generator():
+            for c in range(self.n_chunks):
+                data = self.model_data_z.blocks[c]
+                # build x
+                #  - triangle / core wave ( from capture )
+                #  - cv value a_cv
+                #  - cv_value b_cv
+                #  - cv_value morph
+                xs = np.empty((self.chunk_len, IN_D), dtype=np.float32)
+                for c in range(4):
+                    xs[:, c] = data[:, c]
+                # build y
+                #  - just morph output ( from capture )
+                ys = np.empty((self.chunk_len, OUT_D), dtype=np.float32)
+                ys[:, 0] = data[:, 4]
+                # yield
+                yield xs, ys
+
+        ds = tf.data.Dataset.from_generator(
+            sample_generator,
+            output_signature=(
+                tf.TensorSpec(shape=(self.chunk_len, IN_D), dtype=tf.float32),
+                tf.TensorSpec(shape=(self.chunk_len, OUT_D), dtype=tf.float32),
+            ),
+        )
+        ds = ds.batch(batch_size)
+        return ds.prefetch(tf.data.AUTOTUNE)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -92,7 +133,7 @@ if __name__ == "__main__":
     print("opts", opts)
 
     pc_data = ParametricCaptureData(opts.root_zarr_dir)  # ="/dev/shm/r001")
-    ds = pc_data.tf_dataset(
+    ds = pc_data.tf_training_dataset(
         seq_len=opts.seq_len,
         num_batches=opts.num_batches,
         batch_size=opts.batch_size,

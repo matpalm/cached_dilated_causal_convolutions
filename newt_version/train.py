@@ -20,7 +20,7 @@ print("opts", opts)
 data = ParametricCaptureData(root_zarr_dir="/dev/shm/r001/")
 
 TRAIN_SEQ_LEN = 512
-train_ds = data.tf_dataset(
+train_ds = data.tf_training_dataset(
     batch_size=opts.batch_size,
     seq_len=TRAIN_SEQ_LEN,
     num_batches=opts.num_train_egs,
@@ -39,7 +39,7 @@ train_model.compile(
 
 check_ypred = CheckYPred(
     tb_dir="tb/newt",
-    dataset=data.tf_dataset(
+    dataset=data.tf_training_dataset(
         batch_size=opts.batch_size,
         seq_len=TRAIN_SEQ_LEN * 5,
         num_batches=1,

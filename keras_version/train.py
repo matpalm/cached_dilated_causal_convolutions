@@ -5,6 +5,7 @@ import tensorflow as tf
 import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
+import json
 
 from tensorflow.keras.optimizers import Adam
 
@@ -26,11 +27,17 @@ if __name__ == "__main__":
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--training-data-z", type=Path, required=True)
     parser.add_argument("--num-train-batches", type=int, default=1_000)
     parser.add_argument("--num-validate-batches", type=int, default=10)
     parser.add_argument("--cache-fname", type=str, default=None)
     opts = parser.parse_args()
     print("opts", opts)
+
+    tensorboard_dir = "runs" / opts.run / "tb"
+    tensorboard_dir.mkdir(parents=True, exist_ok=True)
+    weights_dir = "runs" / opts.run / "weights" / "keras"
+    weights_dir.mkdir(parents=True, exist_ok=True)
 
     IN_D = 4  # triangle, 3 cvs
     OUT_D = 1  # output wave
@@ -43,34 +50,33 @@ if __name__ == "__main__":
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-    data = ParametricCaptureData(root_zarr_dir="/dev/shm/r001/")
-    train_ds = data.tf_dataset(
+    data = ParametricCaptureData(root_zarr_dir=opts.training_data_z)
+    train_ds = data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
         num_batches=opts.num_train_batches,
         batch_size=opts.batch_size,
         cache_fname=opts.cache_fname,
     )
-    validate_ds = data.tf_dataset(
+    validate_ds = data.tf_training_dataset(
         seq_len=TEST_SEQ_LEN,
         num_batches=opts.num_validate_batches,
         batch_size=opts.batch_size,
     )
 
     # make model
-    train_model = create_dilated_model(
-        in_d=IN_D,
-        filter_sizes=FILTER_SIZES,
-        kernel_size=K,
-        out_d=OUT_D,
-        all_outputs=False,
-    )
+    model_config = {
+        "in_d": IN_D,
+        "filter_sizes": FILTER_SIZES,
+        "kernel_size": K,
+        "out_d": OUT_D,
+        "all_outputs": False,
+    }
+    with open("runs" / opts.run / "model_config.json", "w") as f:
+        json.dump(model_config, f)
+    train_model = create_dilated_model(**model_config)
     train_model.compile(Adam(opts.learning_rate), loss=masked_mse(RECEPTIVE_FIELD_SIZE))
 
     callbacks = []
-    tensorboard_dir = "runs" / opts.run / "tb"
-    tensorboard_dir.mkdir(parents=True, exist_ok=True)
-    weights_dir = "runs" / opts.run / "weights" / "keras"
-    weights_dir.mkdir(parents=True, exist_ok=True)
     callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=str(tensorboard_dir)))
     callbacks.append(
         tf.keras.callbacks.ModelCheckpoint(
