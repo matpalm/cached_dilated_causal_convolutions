@@ -21,6 +21,21 @@ def build_newt(num_waveshapers=64, ctrl_hidden=128, shaper_hidden=32, shaper_dep
     # control CVs (B, S, 3)
     ctrl = x[..., 1:4]
 
+    # slope sign breaks up/down ambiguity (same value rising vs falling)
+    slope = tf.sign(exciter - tf.pad(exciter, [[0, 0], [1, 0], [0, 0]])[:, :-1, :])
+    exc_in = tf.concat([exciter, slope], axis=-1)  # (B, S, 2)
+
+    # short causal conv front-end gives a small temporal RF for time-shaping
+    e0 = layers.Conv1D(filters=16, kernel_size=16, padding="causal", activation="tanh")(
+        exc_in
+    )
+    e0 = layers.Conv1D(filters=16, kernel_size=16, padding="causal", activation="tanh")(
+        e0
+    )
+    exciter = layers.Conv1D(filters=1, kernel_size=1, activation="tanh")(
+        e0
+    )  # (B, S, 1)
+
     # control -> FiLM params:
     # pre (scale,shift) + post (scale,shift) per shaper
     h = layers.Dense(ctrl_hidden, activation="relu")(ctrl)

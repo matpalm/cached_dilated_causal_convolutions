@@ -16,17 +16,19 @@ def masked_mse(receptive_field_size):
         return tf.reduce_mean(mse)
     return loss_fn
 
-def create_dilated_model(seq_len: int,
-                         in_d: int,
-                         filter_sizes: List[int],
-                         kernel_size: int,
-                         out_d: int,
-                         all_outputs: bool=False):
+
+def create_dilated_model(
+    in_d: int,
+    filter_sizes: List[int],
+    kernel_size: int,
+    out_d: int,
+    all_outputs: bool = False,
+):
 
     # creates a keras model that can trained to generate weights
     # for a CachedBlockModel
 
-    inp = Input((seq_len, in_d))
+    inp = Input((None, in_d))
     last_layer = inp
 
     collected_outputs = []

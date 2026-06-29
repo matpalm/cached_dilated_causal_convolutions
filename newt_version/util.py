@@ -27,10 +27,6 @@ class CheckYPred(tf.keras.callbacks.Callback):
 
     def _plot_as_numpy(self, x, y_true, y_pred):
         df = pd.DataFrame()
-        # df["tri"] = x[:, 0]
-        # df["a_cv"] = x[:, 1]
-        # df["b_cv"] = x[:, 2]
-        # df["morph"] = x[:, 3]
         df["y_true"] = y_true[:, 0]
         df["y_pred"] = y_pred[:, 0]
         df["n"] = range(len(x))

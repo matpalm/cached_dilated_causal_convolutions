@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from scipy.signal import lfilter
+from tqdm import tqdm
 
 IN_D = 4
 OUT_D = 1
@@ -28,7 +29,9 @@ class ParametricCaptureData(object):
         print("self.n_chunks", self.n_chunks, "self.chunk_len", self.chunk_len)
         self.rng = np.random.default_rng(seed=seed)
 
-    def tf_dataset(self, seq_len: int, num_batches: int, batch_size: int):
+    def tf_dataset(
+        self, seq_len: int, num_batches: int, batch_size: int, cache_fname: str = None
+    ):
         """
         Generate num_samples samples of shape (batch_size, seq_len, 4)
 
@@ -70,33 +73,30 @@ class ParametricCaptureData(object):
                 tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float32),
             ),
         )
+        if cache_fname is not None:
+            ds = ds.cache(cache_fname)
         ds = ds.batch(batch_size)
         return ds.prefetch(tf.data.AUTOTUNE)
 
 
 if __name__ == "__main__":
-    pc_data = ParametricCaptureData(
-        root_zarr_dir="/home/mat/dev/cached_dilated_causal_convolutions/parametric_capture/runs/001"
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
+    parser.add_argument("--root-zarr-dir", type=str)
+    parser.add_argument("--seq-len", type=int, default=5_120)
+    parser.add_argument("--num-batches", type=int, default=100_000)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--cache", type=str)
+    opts = parser.parse_args()
+    print("opts", opts)
 
-    ds = pc_data.tf_dataset(seq_len=1_000, num_batches=16, batch_size=1)
-    for n, (xs, ys) in enumerate(ds):
-
-        combined = np.concatenate([xs, ys], axis=1)  # (1000, 5)
-        labels = ["tri", "a_cv", "b_cv", "morph_cv", "morph_out"]
-        steps = np.arange(combined.shape[0])
-
-        plt.figure(figsize=(12, 6))
-        for i, label in enumerate(labels):
-            plt.plot(steps, combined[:, i], label=label, linewidth=1.2)
-
-        plt.xlim(0, 999)
-        plt.ylim(-1.0, 1.0)
-        plt.xlabel("step")
-        plt.ylabel("value")
-        plt.title("Parametric Capture: xs + ys")
-        plt.grid(True, alpha=0.3)
-        plt.legend(loc="upper right")
-        plt.tight_layout()
-        plt.savefig(f"pcapture_xs_ys_plot.{n:02d}.jpg", dpi=300, format="jpg")
-        plt.close()
+    pc_data = ParametricCaptureData(opts.root_zarr_dir)  # ="/dev/shm/r001")
+    ds = pc_data.tf_dataset(
+        seq_len=opts.seq_len,
+        num_batches=opts.num_batches,
+        batch_size=opts.batch_size,
+        cache=opts.cache,
+    )
+    for _ in tqdm(ds, total=opts.num_batches):
+        pass
