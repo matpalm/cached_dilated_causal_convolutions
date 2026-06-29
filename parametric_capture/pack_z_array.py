@@ -11,9 +11,6 @@ def pack_z_array(root_npy_dir, output_zarr):
     fnames = list(sorted(root_npy_dir.iterdir()))
     num_files = len(fnames)
     sample_len, num_channels = np.load(fnames[0]).shape
-    print(
-        "num_files", num_files, "sample_len", sample_len, "num_channels", num_channels
-    )
 
     # pack into z array
     z = zarr.open(
@@ -23,7 +20,7 @@ def pack_z_array(root_npy_dir, output_zarr):
         chunks=(sample_len, num_channels),
         dtype=np.float32,
     )
-    for i, fname in enumerate(tqdm(fnames)):
+    for i, fname in enumerate(tqdm(fnames, desc="pack zarr")):
         buffer = np.load(fname)
         assert buffer.shape == (sample_len, num_channels), buffer.shape
         z.blocks[i] = buffer

@@ -5,9 +5,10 @@ import pandas as pd
 import seaborn as sns
 from pathlib import Path
 from sklearn.neighbors import NearestNeighbors
-
+from tqdm import tqdm
 from util import *
 from plotting import *
+import pickle
 
 # seaborn just wont shut up
 import warnings
@@ -49,16 +50,28 @@ if opts.src_run_file and opts.src_run_file.exists():
         for line in f.readlines():
             src_runs.append(Path(line.strip()))
 
+# calculate audio stats for ch0 of capture ( which is the primary target )
 records = []
 for src_run in src_runs:
-    capture_buffers_zarr = zarr.open("runs" / src_run / "capture_buffers.z", mode="r")
-    # print("capture_buffers_zarr nchunks", capture_buffers_zarr.nchunks)
-    for b in range(capture_buffers_zarr.nchunks):
-        sample = capture_buffers_zarr.blocks[b]
-        ch0_of_sample = sample[:, 0]
-        stats = calculate_audio_stats(ch0_of_sample, ignore_in_out=500)
-        records.append(stats)
-# print("capture_buffers_zarr ch0")
+    cache_pkl_path = "runs" / src_run / "audio_stats.pkl"
+    if cache_pkl_path.exists():
+        with open(cache_pkl_path, "rb") as f:
+            run_records = pickle.load(f)
+    else:
+        capture_buffers_zarr = zarr.open(
+            "runs" / src_run / "capture_buffers.z", mode="r"
+        )
+        run_records = []
+        for b in tqdm(
+            range(capture_buffers_zarr.nchunks), desc=f"calculating stats for {src_run}"
+        ):
+            sample = capture_buffers_zarr.blocks[b]
+            ch0_of_sample = sample[:, 0]
+            stats = calculate_audio_stats(ch0_of_sample, ignore_in_out=500)
+            run_records.append(stats)
+        with open(cache_pkl_path, "wb") as f:
+            pickle.dump(run_records, f)
+    records += run_records
 capture_buffers_df = pd.DataFrame(records)
 print(capture_buffers_df.describe())
 del records

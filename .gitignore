@@ -18,3 +18,5 @@ sverilog_version/src/network.sv
 runs/
 *~
 runs
+parametric_capture/old_runs
+old_runs

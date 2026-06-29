@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot(array, fname=None, plot_offset: int = None, plot_len: int = None):
+def plot(
+    array, title: str = "", fname=None, plot_offset: int = None, plot_len: int = None
+):
     if len(array.shape) == 1:
         array = array.reshape((-1, 1))
 
@@ -21,7 +23,7 @@ def plot(array, fname=None, plot_offset: int = None, plot_len: int = None):
     for i in range(c):
         data = array[:, i]
         axes[i].plot(data)
-        axes[i].set_title(f"ch{i}")
+        axes[i].set_title(f"ch{i} {title}")
         axes[i].set_ylabel("Amplitude")
         axes[i].set_ylim(-1.0, 1.0)
 

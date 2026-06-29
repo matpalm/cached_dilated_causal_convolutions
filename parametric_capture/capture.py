@@ -57,8 +57,13 @@ def cv_a_to_audio_buffer(cv_values, amp):
     # adjust AC offset of DC cv_values with multisine
     for c_idx, cv_value in enumerate(cv_values):
         audio_buffer[:, c_idx] = cv_value + multisines[c_idx] * effective_amp
-    # last output is always voct sweep; 0.0 -> 0.4  ( ~4octaves, uncalibrated still )
-    audio_buffer[:, 3] = np.linspace(0.0, 0.4, num_samples)
+    # last output is always voct sweep; 0.0 -> 0.4 -> 0.0 ( ~4octaves, uncalibrated still )
+    audio_buffer[:, 3] = np.hstack(
+        [
+            np.linspace(0.0, 0.4, num_samples // 2),
+            np.linspace(0.4, 0.0, num_samples // 2),
+        ]
+    )
     # ensure in bounds
     np.clip(audio_buffer, -1.0, 1.0, out=audio_buffer)
     return audio_buffer
@@ -66,7 +71,7 @@ def cv_a_to_audio_buffer(cv_values, amp):
 
 audio = AudioInterface()
 
-for s in tqdm(list(range(len(samples)))):
+for s in tqdm(list(range(len(samples))), desc="capture"):
 
     capture_dts = DTS()
 

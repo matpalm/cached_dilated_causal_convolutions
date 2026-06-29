@@ -222,6 +222,8 @@ class Embed2DQuadratureData(object):
 
         Args:
             batch_size: dim 0 of output
+            seq_len: second axis for batch
+            num_samples: total number of batches generated
             emit_endpt_samples: if true there's a chance of sampling ( uninterpolated ) endpts
             emit_interpolated_samples: if true there's a cchange of sampling an interpolate wave ( on edge )
             emit_double_interpolated_samples: if true then vary interpolation over seq_len for interp samples
