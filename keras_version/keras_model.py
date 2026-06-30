@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Conv1D
+from tensorflow.keras.layers import Input, Conv1D, Add, Activation
 from tensorflow.keras.models import Model
 from typing import List
 
@@ -21,9 +21,11 @@ def create_dilated_model(
     in_d: int,
     filter_sizes: List[int],
     kernel_size: int,
+    skip_dim: int,
     out_d: int,
     all_outputs: bool = False,
 ):
+    assert not all_outputs, "all_outputs is deprecated"
 
     # creates a keras model that can trained to generate weights
     # for a CachedBlockModel
@@ -31,7 +33,7 @@ def create_dilated_model(
     inp = Input((None, in_d))
     last_layer = inp
 
-    collected_outputs = []
+    skip_connections = []
     for i, filter_size in enumerate(filter_sizes):
 
         conv_a_output = Conv1D(name=f"c{i}a", filters=filter_size,
@@ -40,21 +42,39 @@ def create_dilated_model(
         conv_b_output = Conv1D(name=f"c{i}b", filters=filter_size,
                                kernel_size=1, strides=1,
                                activation='relu')(conv_a_output)
-        collected_outputs.append(conv_b_output)
+
+        # residual connection; project input to match channels when they differ
+        residual = last_layer
+        if last_layer.shape[-1] != filter_size:
+            residual = Conv1D(
+                name=f"c{i}res",
+                filters=filter_size,
+                kernel_size=1,
+                strides=1,
+                activation=None,
+            )(last_layer)
+
+        conv_b_output = Add(name=f"c{i}add")([conv_b_output, residual])
+
+        skip = Conv1D(
+            name=f"c{i}skip",
+            filters=skip_dim,
+            kernel_size=1,
+            strides=1,
+            activation=None,
+        )(conv_b_output)
+        skip_connections.append(skip)
+
+        # collected_outputs.append(conv_b_output)
         last_layer = conv_b_output
 
-    y_pred = Conv1D(name='y_pred', filters=out_d,
-                    kernel_size=1, strides=1,
-                    activation=None)(last_layer)
-    collected_outputs.append(y_pred)
+    added_skips = Add()(skip_connections)
+    added_skips = Activation("relu")(added_skips)
+    y_pred = Conv1D(
+        name="y_pred", filters=out_d, kernel_size=1, strides=1, activation=None
+    )(added_skips)
 
-    if all_outputs:
-        model = Model(inp, collected_outputs)
-    else:
-        model = Model(inp, y_pred)
-
-    print("dilated", model.summary())
-    return model
+    return Model(inp, y_pred)
 
 
 # TODO: suspect this doesn't work with an even kernel size?
