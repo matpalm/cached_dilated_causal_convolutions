@@ -50,7 +50,7 @@ if __name__ == "__main__":
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-    data = ParametricCaptureData(root_zarr_dir=opts.training_data_z)
+    data = ParametricCaptureData(model_data_z=opts.training_data_z)
     train_ds = data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
         num_batches=opts.num_train_batches,
@@ -68,6 +68,7 @@ if __name__ == "__main__":
         "in_d": IN_D,
         "filter_sizes": FILTER_SIZES,
         "kernel_size": K,
+        "skip_dim": 32,
         "out_d": OUT_D,
         "all_outputs": False,
     }

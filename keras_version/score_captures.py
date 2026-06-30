@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 from pathlib import Path
 import zarr
 import numpy as np
@@ -34,19 +35,19 @@ print("mse\thuber\tstft", file=tsv_out)
 huber_loss = Huber(delta=0.1)
 stft_loss = masked_multires_stft_loss()
 pcapture_data = ParametricCaptureData(model_data_z=opts.model_data_z)
-ds = pcapture_data.tf_inference_dataset(batch_size=1)
-for x, y_true in tqdm(ds, total=pcapture_data.n_chunks):
-    # TODO: support batching
-    y_pred = inference_model(x)
-    # print("y_true", y_true.shape, y_true[0][:10])
-    # print("y_pred", y_pred.shape, y_pred[0][:10])
-    mean_mse = np.mean(MSE(y_true, y_pred))
-    # print("mean_mse", float(mean_mse))
-    mean_huber = huber_loss(y_true, y_pred)
-    # print("mean_huber", float(mean_huber))
-    stft = stft_loss(y_true, y_pred)
-    # print("stft_loss", float(stft_loss))
-    losses_f = map(float, [mean_mse, mean_huber, stft])
-    losses_s = map(str, losses_f)
-    print("\t".join(losses_s), file=tsv_out)
+batch_size = 32
+ds = pcapture_data.tf_inference_dataset(batch_size=batch_size)
+num_batches = math.ceil(pcapture_data.n_chunks / batch_size)
+for x_batch, y_true_batch in tqdm(ds, total=num_batches):
+    y_pred_batch = inference_model(x_batch)
+    batch_n = y_true_batch.shape[0]
+    for i in range(batch_n):
+        y_true = y_true_batch[i : i + 1]
+        y_pred = y_pred_batch[i : i + 1]
+        mean_mse = np.mean(MSE(y_true, y_pred))
+        mean_huber = huber_loss(y_true, y_pred)
+        stft = stft_loss(y_true, y_pred)
+        losses_f = map(float, [mean_mse, mean_huber, stft])
+        losses_s = map(str, losses_f)
+        print("\t".join(losses_s), file=tsv_out)
 tsv_out.close()
