@@ -20,12 +20,15 @@ parser.add_argument("--losses-tsv", type=Path, required=True)
 opts = parser.parse_args()
 print("opts", opts)
 
+if opts.losses_tsv.exists():
+    print(f"SKIPPING score_captures: --losses-tsv {opts.losses_tsv} already exists")
+    exit(0)
+
 with open("runs" / opts.run / "model_config.json", "r") as f:
     model_config = json.load(f)
 
 inference_model = create_dilated_model(**model_config)
 inference_model.load_weights(str(opts.model_ckpt))
-
 print(inference_model.summary())
 
 tsv_out = open(opts.losses_tsv, "w")
@@ -35,7 +38,7 @@ print("mse\thuber\tstft", file=tsv_out)
 huber_loss = Huber(delta=0.1)
 stft_loss = masked_multires_stft_loss()
 pcapture_data = ParametricCaptureData(model_data_z=opts.model_data_z)
-batch_size = 32
+batch_size = 8
 ds = pcapture_data.tf_inference_dataset(batch_size=batch_size)
 num_batches = math.ceil(pcapture_data.n_chunks / batch_size)
 for x_batch, y_true_batch in tqdm(ds, total=num_batches):

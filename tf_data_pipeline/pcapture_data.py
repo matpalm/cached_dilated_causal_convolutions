@@ -11,6 +11,19 @@ OUT_D = 1
 IGNORE_FADE_LEN = 500
 
 
+def model_data_block_to_xs_ys(data):
+    # build x
+    #  - triangle / core wave ( from capture )
+    #  - cv value a_cv
+    #  - cv_value b_cv
+    #  - cv_value morph
+    xs = data[:, :4]
+    # build y
+    #  - just morph output ( from capture )
+    ys = data[:, 4:5]
+    return xs, ys
+
+
 class ParametricCaptureData(object):
 
     def __init__(
@@ -21,7 +34,7 @@ class ParametricCaptureData(object):
         try:
             self.model_data_z = zarr.open(str(model_data_z), mode="r")
         except zarr.errors.PathNotFoundError as e:
-            print("files not found in", root_zarr_dir, str(e))
+            print("files not found in", str(model_data_z), str(e))
             raise e
         self.n_chunks = self.model_data_z.nchunks
         self.chunk_len = self.model_data_z.blocks[0].shape[0]
@@ -50,17 +63,7 @@ class ParametricCaptureData(object):
                 r_seq_to = r_seq_from + seq_len
                 # grab relevant pieces
                 data = self.model_data_z.blocks[r_chunk][r_seq_from:r_seq_to]
-                # build x
-                #  - triangle / core wave ( from capture )
-                #  - cv value a_cv
-                #  - cv_value b_cv
-                #  - cv_value morph
-                xs = data[:, 4]
-                # build y
-                #  - just morph output ( from capture )
-                ys = data[:, 4:5]
-                # yield
-                yield xs, ys
+                yield model_data_block_to_xs_ys(data)
 
         ds = tf.data.Dataset.from_generator(
             sample_generator,
@@ -91,16 +94,7 @@ class ParametricCaptureData(object):
         def sample_generator():
             for c in range(self.n_chunks):
                 data = self.model_data_z.blocks[c]
-                # build x
-                #  - triangle / core wave ( from capture )
-                #  - cv value a_cv
-                #  - cv_value b_cv
-                #  - cv_value morph
-                xs = data[:, :4]
-                # build y
-                #  - just morph output ( from capture )
-                ys = data[:, 4:5]
-                yield xs, ys
+                yield model_data_block_to_xs_ys(data)
 
         ds = tf.data.Dataset.from_generator(
             sample_generator,

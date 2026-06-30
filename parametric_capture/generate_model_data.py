@@ -21,6 +21,9 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument("--run", type=Path, required=True)
 opts = parser.parse_args()
 
+if ("runs" / opts.run / "model_data.z").exists():
+    raise Exception(str("runs" / opts.run / "model_data.z"), "already exists")
+
 capture_buffer_z = zarr.open("runs" / opts.run / "capture_buffers.z", mode="r")
 cv_buffer_z = zarr.open("runs" / opts.run / "cv_buffers.z", mode="r")
 assert capture_buffer_z.nchunks == cv_buffer_z.nchunks

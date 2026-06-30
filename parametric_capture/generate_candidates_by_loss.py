@@ -28,6 +28,7 @@ parser.add_argument(
     default=[],
 )
 parser.add_argument("--src-run-file", type=Path, help="if set, add runs from this list")
+parser.add_argument("--losses-tsv", type=Path)
 parser.add_argument("--num-candidates", type=int, default=256)
 parser.add_argument(
     "--density-weight",
@@ -54,8 +55,8 @@ if opts.src_run_file and opts.src_run_file.exists():
 # load loss values for each run
 records = []
 for src_run in src_runs:
-    with open("runs" / src_run / "losses.tsv") as f:
-        for line in f.readlines():
+    with open("runs" / src_run / opts.losses_tsv) as f:
+        for line_num, line in enumerate(f.readlines()):
             if line.startswith("mse"):
                 continue
             mse, huber, sftf = map(float, line.split("\t"))
@@ -85,23 +86,6 @@ for simplex in tri.simplices:
             edges.add(edge)
 unique_edges = list(edges)
 print("|unique_edges|", len(unique_edges))
-
-
-# def calculate_local_grads(audio_stat):
-#     local_grads = []
-#     for edge in unique_edges:
-#         pi, pj = edge
-#         cv_i, cv_j = cv_samples[pi], cv_samples[pj]
-#         cv_distance = np.linalg.norm(cv_i - cv_j)
-#         # print('cv_i cv_j', cv_i, cv_j, 'dist', cv_distance)
-#         stat_i, stat_j = audio_stat[pi], audio_stat[pj]
-#         stat_distance = np.abs(stat_i - stat_j)
-#         # print('stat_i, stat_j', stat_i, stat_j, 'dist', stat_distance)
-#         local_grad = stat_distance / cv_distance
-#         local_grads.append((local_grad, stat_distance, cv_distance, pi, pj))
-#     return pd.DataFrame(
-#         local_grads, columns="local_grad stat_distance cv_distance pi pj".split(" ")
-#     )
 
 
 # calculate all edge midpoints and lengths
@@ -167,7 +151,7 @@ with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "w") as f:
     print("src_runs", list(map(str, src_runs)), file=f)
     for col in ["loss_sum", "local_density", "score"]:
         print("top by", col, file=f)
-        print(edge_scores_df.sort_values(col, ascending=False).head(20), file=f)
+        print(edge_scores_df.sort_values(col, ascending=False).head(10), file=f)
 with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "r") as f:
     print(f.read())
 
