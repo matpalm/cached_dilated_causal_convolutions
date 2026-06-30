@@ -55,13 +55,10 @@ class ParametricCaptureData(object):
                 #  - cv value a_cv
                 #  - cv_value b_cv
                 #  - cv_value morph
-                xs = np.empty((seq_len, IN_D), dtype=np.float32)
-                for c in range(4):
-                    xs[:, c] = data[:, c]
+                xs = data[:, 4]
                 # build y
                 #  - just morph output ( from capture )
-                ys = np.empty((seq_len, OUT_D), dtype=np.float32)
-                ys[:, 0] = data[:, 4]
+                ys = data[:, 4:5]
                 # yield
                 yield xs, ys
 
@@ -74,10 +71,12 @@ class ParametricCaptureData(object):
         )
         if cache_fname is not None:
             ds = ds.cache(cache_fname)
-        ds = ds.batch(batch_size)
-        return ds.prefetch(tf.data.AUTOTUNE)
+        if num_batches is not None:
+            ds = ds.batch(batch_size)
+            ds = ds.prefetch(tf.data.AUTOTUNE)
+        return ds
 
-    def tf_inference_dataset(self, batch_size: int = 1):
+    def tf_inference_dataset(self, batch_size: int = 1, cache_fname: str = None):
         """
         Generate all samples returned shape
         x - (1, SAMPLE_LEN, 4)
@@ -89,8 +88,6 @@ class ParametricCaptureData(object):
             batch_size: batch size
         """
 
-        seq_len = self.model_data_z.blocks[0][0]
-
         def sample_generator():
             for c in range(self.n_chunks):
                 data = self.model_data_z.blocks[c]
@@ -99,14 +96,10 @@ class ParametricCaptureData(object):
                 #  - cv value a_cv
                 #  - cv_value b_cv
                 #  - cv_value morph
-                xs = np.empty((self.chunk_len, IN_D), dtype=np.float32)
-                for c in range(4):
-                    xs[:, c] = data[:, c]
+                xs = data[:, :4]
                 # build y
                 #  - just morph output ( from capture )
-                ys = np.empty((self.chunk_len, OUT_D), dtype=np.float32)
-                ys[:, 0] = data[:, 4]
-                # yield
+                ys = data[:, 4:5]
                 yield xs, ys
 
         ds = tf.data.Dataset.from_generator(
@@ -116,8 +109,12 @@ class ParametricCaptureData(object):
                 tf.TensorSpec(shape=(self.chunk_len, OUT_D), dtype=tf.float32),
             ),
         )
-        ds = ds.batch(batch_size)
-        return ds.prefetch(tf.data.AUTOTUNE)
+        if cache_fname is not None:
+            ds = ds.cache(cache_fname)
+        if batch_size is not None:
+            ds = ds.batch(batch_size)
+            ds = ds.prefetch(tf.data.AUTOTUNE)
+        return ds
 
 
 if __name__ == "__main__":
@@ -132,7 +129,7 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     print("opts", opts)
 
-    pc_data = ParametricCaptureData(opts.root_zarr_dir)  # ="/dev/shm/r001")
+    pc_data = ParametricCaptureData(opts.root_zarr_dir)
     ds = pc_data.tf_training_dataset(
         seq_len=opts.seq_len,
         num_batches=opts.num_batches,
