@@ -45,7 +45,8 @@ set -ex
 # loss based search
 #echo 001 > src_run.txt
 #echo 002 >> src_run.txt
-for D in `seq 130 150`; do
+#for D in `seq 120 199`; do
+for D in `seq 151 199`; do
   printf -v FD "%03d" $D
   uv run generate_candidates_by_loss.py \
     --src-run-file src_run.txt \

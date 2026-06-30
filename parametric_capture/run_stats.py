@@ -44,7 +44,8 @@ def _section(title: str) -> None:
     print(f"\n-- {title} --")
 
 
-STATS = ("min", "max", "mean", "std")
+STATS = ("mean", "std")
+PCT_STATS = tuple(f"p{p}" for p in range(0, 101, 10))
 
 
 @dataclass
@@ -56,24 +57,32 @@ class Section:
     stats: list = field(default_factory=list)  # stat column names
     rows: list = field(default_factory=list)  # [(label, {stat: float})]
     text: list = field(default_factory=list)  # extra freeform lines (e.g. corr)
+    pct_stats: list = field(default_factory=list)  # p0..p100 column names
+    pct_rows: list = field(default_factory=list)  # [(label, {pct: float})]
 
 
 def _col_stats(arr: np.ndarray, labels, stats=STATS):
-    """Return (stats, rows) where rows is [(label, {stat: value})]."""
+    """Return (stats, rows, pct_stats, pct_rows) where rows is [(label, {stat: value})]."""
+
     arr = np.asarray(arr)
     if arr.ndim == 1:
         arr = arr[:, None]
     rows = []
+    pct_rows = []
+    pct_percentiles = list(range(0, 101, 10))
+    pct_keys = list(PCT_STATS)
     for c, label in enumerate(labels):
         col = arr[:, c]
         vals = {
-            "min": float(np.min(col)),
-            "max": float(np.max(col)),
             "mean": float(np.mean(col)),
             "std": float(np.std(col)),
         }
         rows.append((str(label), {s: vals[s] for s in stats if s in vals}))
-    return list(stats), rows
+        pct_vals_arr = np.percentile(col, pct_percentiles)
+        pct_rows.append(
+            (str(label), {k: float(v) for k, v in zip(pct_keys, pct_vals_arr)})
+        )
+    return list(stats), rows, pct_keys, pct_rows
 
 
 def resolve_run_dir(run: Path) -> Path:
@@ -115,12 +124,14 @@ def extract_cv_samples(run_dir: Path):
         labels = [
             f"col_{i}" for i in range(samples.shape[1] if samples.ndim == 2 else 1)
         ]
-    stats, rows = _col_stats(samples, labels)
+    stats, rows, pct_stats, pct_rows = _col_stats(samples, labels)
     header = (
         f"shape {samples.shape}  dtype {samples.dtype}  "
         f"({_fmt_bytes(path.stat().st_size)})"
     )
-    return Section("cv_samples.npy", header, stats, rows)
+    return Section(
+        "cv_samples.npy", header, stats, rows, pct_stats=pct_stats, pct_rows=pct_rows
+    )
 
 
 def extract_losses(run_dir: Path):
@@ -144,7 +155,7 @@ def extract_losses(run_dir: Path):
     data = np.array(rows_raw)
     if header is None or len(header) != data.shape[1]:
         header = [f"col_{i}" for i in range(data.shape[1])]
-    stats, rows = _col_stats(data, header)
+    stats, rows, pct_stats, pct_rows = _col_stats(data, header)
     text = []
     if data.shape[1] > 1:
         corr = np.corrcoef(data, rowvar=False)
@@ -157,7 +168,13 @@ def extract_losses(run_dir: Path):
                 + " ".join(f"{corr[i, j]:>10.3f}" for j in range(len(header)))
             )
     return Section(
-        "losses.tsv", f"{len(data)} rows (one per capture)", stats, rows, text
+        "losses.tsv",
+        f"{len(data)} rows (one per capture)",
+        stats,
+        rows,
+        text,
+        pct_stats=pct_stats,
+        pct_rows=pct_rows,
     )
 
 
@@ -171,9 +188,14 @@ def extract_audio_stats(run_dir: Path):
         return Section("audio_stats.pkl", "(empty)")
     keys = list(records[0].keys())
     data = np.array([[r[k] for k in keys] for r in records], dtype=float)
-    stats, rows = _col_stats(data, keys)
+    stats, rows, pct_stats, pct_rows = _col_stats(data, keys)
     return Section(
-        "audio_stats.pkl", f"{len(records)} records (ch0 of each capture)", stats, rows
+        "audio_stats.pkl",
+        f"{len(records)} records (ch0 of each capture)",
+        stats,
+        rows,
+        pct_stats=pct_stats,
+        pct_rows=pct_rows,
     )
 
 
@@ -197,7 +219,7 @@ def extract_buffer(run_dir: Path, name: str, labels, max_captures: int):
         np.linspace(0, n_captures - 1, min(max_captures, n_captures)).astype(int)
     )
     sampled = np.concatenate([np.asarray(z.blocks[b]) for b in sample_idx], axis=0)
-    stats, rows = _col_stats(sampled, labels)
+    stats, rows, pct_stats, pct_rows = _col_stats(sampled, labels)
 
     # clipping is meaningful for audio: percentage of samples at +/-1.0
     clip = np.mean(np.abs(sampled) >= 0.999, axis=0) * 100.0
@@ -210,7 +232,7 @@ def extract_buffer(run_dir: Path, name: str, labels, max_captures: int):
         f"samples/capture {per_capture}  ({_fmt_bytes(_dir_size(path))})  "
         f"[{len(sample_idx)} sampled]"
     )
-    return Section(name, header, stats, rows)
+    return Section(name, header, stats, rows, pct_stats=pct_stats, pct_rows=pct_rows)
 
 
 def extract_sections(run_dir: Path, max_captures: int) -> dict:
@@ -271,6 +293,9 @@ def render_single_section(sec) -> None:
         print(f"  {sec.header}")
     if sec.rows:
         _print_grid(sec.stats, sec.rows)
+    if sec.pct_rows:
+        print("  percentiles:")
+        _print_grid(sec.pct_stats, sec.pct_rows)
     for line in sec.text:
         print(f"  {line}")
 
@@ -288,6 +313,9 @@ def render_compare_section(a, b, name_a: str, name_b: str) -> None:
         present = a or b
         if present and present.rows:
             _print_grid(present.stats, present.rows)
+        if present and present.pct_rows:
+            print("  percentiles:")
+            _print_grid(present.pct_stats, present.pct_rows)
         for line in present.text if present else []:
             print(f"  {line}")
         return
@@ -318,6 +346,40 @@ def render_compare_section(a, b, name_a: str, name_b: str) -> None:
             else:
                 sd = f"{'-':>{col_w}}"
             print(f"  {lbl + '.' + s:<{metric_w}}  {sa} {sb} {sd}")
+
+    # percentile comparison
+    pct_labels = (
+        [lbl for lbl, _ in a.pct_rows]
+        if a and a.pct_rows
+        else ([lbl for lbl, _ in b.pct_rows] if b and b.pct_rows else [])
+    )
+    if pct_labels:
+        pct_stats = (a or b).pct_stats
+        a_pct_map = dict(a.pct_rows) if a and a.pct_rows else {}
+        b_pct_map = dict(b.pct_rows) if b and b.pct_rows else {}
+        for lbl, _ in (b.pct_rows if b and b.pct_rows else []):
+            if lbl not in pct_labels:
+                pct_labels.append(lbl)
+        metric_w_pct = max(
+            [len(f"{lbl}.{s}") for lbl in pct_labels for s in pct_stats] + [6]
+        )
+        print(f"\n  percentiles:")
+        print(
+            f"  {'metric':<{metric_w_pct}}  "
+            f"{name_a:>{col_w}} {name_b:>{col_w}} {'delta':>{col_w}}"
+        )
+        for lbl in pct_labels:
+            for s in pct_stats:
+                va = a_pct_map.get(lbl, {}).get(s)
+                vb = b_pct_map.get(lbl, {}).get(s)
+                sa = f"{va:>{col_w}.4f}" if va is not None else f"{'-':>{col_w}}"
+                sb = f"{vb:>{col_w}.4f}" if vb is not None else f"{'-':>{col_w}}"
+                sd = (
+                    f"{vb - va:>+{col_w}.4f}"
+                    if va is not None and vb is not None
+                    else f"{'-':>{col_w}}"
+                )
+                print(f"  {lbl + '.' + s:<{metric_w_pct}}  {sa} {sb} {sd}")
 
     # correlation (and any other freeform text) is shown per run, labeled
     for run_name, sec in ((name_a, a), (name_b, b)):

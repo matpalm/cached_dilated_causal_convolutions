@@ -32,7 +32,7 @@ run_dir.mkdir(parents=True, exist_ok=True)
 # note: cv values bounded by (-1, 1) => (-10V, +10V)
 #       we use 0.75 instead of 1.0 to avoid very low amp multisines at edges
 bounds = []
-bounds.append((-1, 1))
+bounds.append((-1, 1))  # note: module only responds to (-0.6, 0.6 ) for a_cv and b_cv
 bounds.append((-1, 1))
 bounds.append((-1, 1))
 bounds.append((0.2, 0.8))  # ampltiude
