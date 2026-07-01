@@ -9,13 +9,14 @@ from tqdm import tqdm
 from util import *
 from plotting import *
 import pickle
+import argparse
 
 # seaborn just wont shut up
 import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
-import argparse
+from sample_db import SampleDB
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument(
@@ -35,12 +36,14 @@ parser.add_argument(
     help="increase to penalise near cvs. 0 => no penalty",
 )
 parser.add_argument(
-    "--dest-run", type=Path, required=True, help="where to write cv_samples.npy"
+    "--dest-run", type=Path, required=True, help="where to write stats on candidates"
 )
 opts = parser.parse_args()
 print(opts)
 
 ("runs" / opts.dest_run).mkdir(parents=True, exist_ok=True)
+
+db = SampleDB()
 
 src_runs = []
 for src_run in opts.src_run:
@@ -78,7 +81,7 @@ del records
 
 cv_samples = []
 for src_run in src_runs:
-    cv_samples.append(np.load("runs" / src_run / "cv_samples.npy"))
+    cv_samples.append(db.cv_values_for(src_run))
 cv_samples = np.vstack(cv_samples)
 print("cv_samples", cv_samples.shape)
 
@@ -195,7 +198,4 @@ for pi, pj in zip(topN_pi, topN_pj):
     cv_i, cv_j = cv_samples[pi], cv_samples[pj]
     candidate_cvs.append((cv_i + cv_j) / 2)
 candidate_cvs = np.stack(candidate_cvs)
-
-fname = "runs" / opts.dest_run / "cv_samples.npy"
-print("wrote", fname, candidate_cvs.shape)
-np.save(fname, candidate_cvs)
+db.set_cv_values_from_npy(opts.dest_run, candidate_cvs)

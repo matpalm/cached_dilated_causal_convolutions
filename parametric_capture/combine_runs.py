@@ -9,6 +9,8 @@ parser.add_argument("--srcs", type=str, required=True, nargs="+")
 parser.add_argument("--dest", type=str, required=True)
 opts = parser.parse_args()
 
+raise Exception("add support in sample_db")
+
 srcs = [Path("runs") / s for s in opts.srcs]
 
 dest = Path("runs") / opts.dest
@@ -65,8 +67,3 @@ combine(
     srcs=[r / "capture_buffers.z" for r in srcs],
     dest=dest / "capture_buffers.z",
 )
-
-cv_sample_npys = [np.load(r / "cv_samples.npy") for r in srcs]
-cv_sample_npys = np.vstack(cv_sample_npys)
-print("cv_sample_npys", cv_sample_npys.shape)
-np.save(dest / "cv_samples.npy", cv_sample_npys)

@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-for run in Path("old_runs/zpo.a_cv.b_cv.morpth.pre_voct/").iterdir():
+for run in Path("runs").iterdir():
     has_capture_z = has_cv_z = False
     for subdir in run.iterdir():
         if subdir.parts[-1] == "cv_buffers.z":

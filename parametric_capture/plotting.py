@@ -6,6 +6,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 import matplotlib.pyplot as plt
 import numpy as np
 
+from audio_interface import SAMPLE_RATE_HZ
 
 def plot(
     array, title: str = "", fname=None, plot_offset: int = None, plot_len: int = None
@@ -37,14 +38,12 @@ def plot(
     plt.close(fig)
 
 
-def plot_spectrogram(
-    series, fname, sample_rate_hz: int = 48_000, max_freq_hz: float = 6_000
-):
+def plot_spectrogram(series, fname, max_freq_hz: float = 6_000):
     # NFFT=4096 gives ~2.9 Hz bins at 12 kHz, resolving 5 Hz spacing
     nfft = 4096
     noverlap = nfft * 3 // 4
     fig, ax = plt.subplots(figsize=(12, 4))
-    ax.specgram(series, Fs=sample_rate_hz, NFFT=nfft, noverlap=noverlap, cmap="inferno")
+    ax.specgram(series, Fs=SAMPLE_RATE_HZ, NFFT=nfft, noverlap=noverlap, cmap="inferno")
     ax.set_ylim(0, max_freq_hz)
     ax.set_yticks(np.arange(0, max_freq_hz + 1, 5))
     ax.set_xlabel("Time (s)")
@@ -57,7 +56,6 @@ def plot_spectrogram(
 
 def play_sample(
     series,
-    sample_rate_hz: int = 48_000,
     play_offset: int = None,
     play_len: int = None,
     autoplay: bool = True,
@@ -67,4 +65,4 @@ def play_sample(
     series = np.asarray(series)
     if play_offset is not None:
         series = series[play_offset : play_offset + play_len]
-    return Audio(series.astype(np.float32), rate=sample_rate_hz, autoplay=autoplay)
+    return Audio(series.astype(np.float32), rate=SAMPLE_RATE_HZ, autoplay=autoplay)

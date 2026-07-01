@@ -46,21 +46,20 @@ set -ex
 #echo 001 > src_run.txt
 #echo 002 >> src_run.txt
 #for D in `seq 120 199`; do
-for D in `seq 151 199`; do
-  printf -v FD "%03d" $D
-  uv run generate_candidates_by_loss.py \
-    --src-run-file src_run.txt \
-    --losses-tsv losses.228_keras.018.tsv \
-    --dest-run $FD \
-    --num-candidates 32 --density-weight 20
-  uv run capture.py --run $FD
-  uv run generate_model_data.py --run $FD
-  pushd ..
-  uv run -m keras_version.score_captures \
-   --run 228_keras \
-   --model-ckpt runs/228_keras/weights/keras/018.weights.h5 \
-   --model-data-z parametric_capture/runs/$FD/model_data.z \
-   --losses-tsv parametric_capture/runs/$FD/losses.228_keras.018.tsv
-  popd
-  echo $FD >> src_run.txt
-done
+#   printf -v FD "%03d" $D
+#   uv run generate_candidates_by_loss.py \
+#     --src-run-file src_run.txt \
+#     --losses-tsv losses.228_keras.018.tsv \
+#     --dest-run $FD \
+#     --num-candidates 32 --density-weight 20
+#   uv run capture.py --run $FD
+#   uv run generate_model_data.py --run $FD
+#   pushd ..
+#   uv run -m keras_version.score_captures \
+#    --run 228_keras \
+#    --model-ckpt runs/228_keras/weights/keras/018.weights.h5 \
+#    --model-data-z parametric_capture/runs/$FD/model_data.z \
+#    --losses-tsv parametric_capture/runs/$FD/losses.228_keras.018.tsv
+#   popd
+#   echo $FD >> src_run.txt
+# done

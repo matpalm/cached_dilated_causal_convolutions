@@ -2,17 +2,19 @@ import random
 import argparse
 from pathlib import Path
 from tqdm import tqdm
+import zarr
 
-from audio_interface import AudioInterface
+from audio_interface import AudioInterface, SAMPLE_RATE_HZ
 from sampling import *
 from util import *
 from pack_z_array import pack_z_array
+from sample_db import SampleDB
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--run", type=Path, required=True)
-parser.add_argument(
-    "--samples-npy", type=Path, default=None, help="if none, use run cv_samples.npy"
-)
+# parser.add_argument(
+#     "--samples-npy", type=Path, default=None, help="if none, use sampled_db run"
+# )
 parser.add_argument(
     "--explicitly-use-channels",
     action="store_true",
@@ -21,17 +23,62 @@ parser.add_argument(
 parser.add_argument("--sample-len-sec", type=float, default=2.0)
 opts = parser.parse_args()
 
+if opts.explicitly_use_channels:
+    raise Exception("broke support for this sample_db changes. needs updating!")
+
 run_dir = Path("runs") / opts.run
+
+# fetch from sample_db the count of captures done and pending for this run
+db = SampleDB()
+captured_stats = db.captured_stats_for(run=opts.run)
+print("captured_stats", captured_stats)
+
+# if none are pending, we can exist
+if captured_stats[False] == 0:
+    print("nothing to do")
+    exit()
+
+# if none are done, we need to set things up
+if captured_stats[True] == 0:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    num_todo = captured_stats[False]
+    assert num_todo > 0
+    print("first time running", run_dir, "setup zarrays to hold", num_todo, "samples")
+    sample_len = opts.sample_len_sec * SAMPLE_RATE_HZ
+    num_channels = 4
+    cv_buffers_z = zarr.open(
+        run_dir / "cv_buffers.z",
+        mode="w",
+        shape=(num_todo * sample_len, num_channels),
+        chunks=(sample_len, num_channels),
+        dtype=np.float32,
+    )
+    capture_buffers_z = zarr.open(
+        run_dir / "capture_buffers.z",
+        mode="w",
+        shape=(num_todo * sample_len, num_channels),
+        chunks=(sample_len, num_channels),
+        dtype=np.float32,
+    )
+else:
+    # we have done some, so just open the existing arrays for append
+    cv_buffers_z = zarr.open(run_dir / "cv_buffers.z", mode="a")
+    capture_buffers_z = zarr.open(run_dir / "capture_buffers.z", mode="a")
+
+# first check to see if run has been setup; i.e.
 run_dir.mkdir(parents=True, exist_ok=True)
-(run_dir / "plots").mkdir(parents=True, exist_ok=False)
-(run_dir / "cv_buffers").mkdir(parents=True, exist_ok=False)
-(run_dir / "capture_buffers").mkdir(parents=True, exist_ok=False)
+# (run_dir / "cv_buffers").mkdir(parents=True, exist_ok=False)
+# (run_dir / "capture_buffers").mkdir(parents=True, exist_ok=False)
 
-samples_npy = opts.samples_npy
-if samples_npy is None:
-    samples_npy = Path("runs") / opts.run / "cv_samples.npy"
+sample_ids = db.idxs_to_capture(opts.run)
+print("pending sample_ids", sample_ids)
 
-samples = np.load(samples_npy)
+samples = []
+for idx in sample_ids:
+    samples.append(db.cv_values_for(opts.run, idx))
+samples = np.vstack(samples)
+print("samples", samples.shape)
+
 amplitudes = samples[:, -1]  # (nb)
 cv_values = samples[:, :-1]  # (nb, |cv|)
 
@@ -86,17 +133,14 @@ def cv_a_to_audio_buffer(cv_values, amp):
 
 audio = AudioInterface()
 
-for s in tqdm(list(range(len(samples))), desc="capture"):
-    capture_dts = DTS()
+for s, idx in enumerate(tqdm(sample_ids, desc="capture")):
+    #  capture_dts = DTS()
     cv_buffer = cv_a_to_audio_buffer(cv_values[s], amplitudes[s])
-    np.save(run_dir / "cv_buffers" / f"{capture_dts}.npy", cv_buffer)
+    cv_buffers_z.blocks[idx] = cv_buffer
+    #    np.save(run_dir / "cv_buffers" / f"{capture_dts}.npy", cv_buffer)
     capture_buffer = audio.send(cv_buffer)
-    np.save(run_dir / "capture_buffers" / f"{capture_dts}.npy", capture_buffer)
-
-pack_z_array(run_dir / "capture_buffers", run_dir / "capture_buffers.z")
-pack_z_array(run_dir / "cv_buffers", run_dir / "cv_buffers.z")
-
-if str(opts.samples_npy) != str(run_dir / "cv_samples.npy"):
-    # we weren't running from the run_dir cv_samples.npy,
-    # so save these samples as the definite set now
-    np.save(run_dir / "cv_samples.npy", samples)
+    capture_buffers_z.blocks[idx] = capture_buffer
+    #    np.save(run_dir / "capture_buffers" / f"{capture_dts}.npy", capture_buffer)
+    db.set_captured(run=opts.run, idx=idx)
+# pack_z_array(run_dir / "capture_buffers", run_dir / "capture_buffers.z")
+# pack_z_array(run_dir / "cv_buffers", run_dir / "cv_buffers.z")

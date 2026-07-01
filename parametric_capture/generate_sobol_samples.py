@@ -7,6 +7,7 @@ from audio_interface import AudioInterface
 from sampling import SobolSampler
 from plotting import *
 from util import *
+from sample_db import SampleDB
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--run", type=str, required=True)
@@ -40,6 +41,4 @@ sobol_sampler = SobolSampler(bounds=bounds, seed=seed)
 samples = sobol_sampler.samples(
     num_samples_po2=opts.num_sobol_samples_po2, fast_forward=opts.fast_forward
 )
-fname = run_dir / "cv_samples.npy"
-np.save(fname, samples)
-print("wrote", fname, samples.shape)
+SampleDB().set_cv_values_from_npy(opts.run, samples)
