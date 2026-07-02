@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-def masked_huber(receptive_field_size, alpha=0.1):
+def masked_huber(receptive_field_size: int = None, alpha=0.1):
     """
     Calculates masked version of the Huber loss
 
@@ -18,9 +18,10 @@ def masked_huber(receptive_field_size, alpha=0.1):
         assert y_true.shape == y_pred.shape
         assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
         assert y_true.shape[-1] == 1, "expected (batch, sequence_length, output_dim=1)"
-        assert (
-            y_true.shape[-2] > receptive_field_size
-        ), "sequence is shorter than receptive_field_size!"
+        if receptive_field_size:
+            assert (
+                y_true.shape[-2] > receptive_field_size
+            ), "sequence is shorter than receptive_field_size!"
         # huber loss per element
         error = y_true - y_pred
         abs_error = tf.abs(error)
@@ -29,16 +30,17 @@ def masked_huber(receptive_field_size, alpha=0.1):
         huber = 0.5 * tf.square(quadratic) + alpha * linear
         # average over elements of y
         huber = tf.reduce_mean(huber, axis=-1)
-        # we want to ignore the first elements of the loss since they
-        # have been fed with left padded data
-        huber = huber[:, receptive_field_size:]
+        if receptive_field_size:
+            # we want to ignore the first elements of the loss since they
+            # have been fed with left padded data
+            huber = huber[:, receptive_field_size:]
         # return average over batch and sequence
         return tf.reduce_mean(huber)
 
     return loss_fn
 
 
-def masked_mse(receptive_field_size):
+def masked_mse(receptive_field_size: int = None):
     """
     Calculates masked version of mean square error
 
@@ -52,14 +54,16 @@ def masked_mse(receptive_field_size):
         assert y_true.shape == y_pred.shape
         assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
         assert y_true.shape[-1] == 1, "expected (batch, sequence_length, output_dim=1)"
-        assert (
-            y_true.shape[-2] > receptive_field_size
-        ), "sequence is shorter than receptive_field_size!"
+        if receptive_field_size:
+            assert (
+                y_true.shape[-2] > receptive_field_size
+            ), "sequence is shorter than receptive_field_size!"
         # average over elements of y
         mse = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
         # we want to ignore the first elements of the loss since they
         # have been fed with left padded data
-        mse = mse[:, receptive_field_size:]
+        if receptive_field_size:
+            mse = mse[:, receptive_field_size:]
         # return average over batch and sequence
         return tf.reduce_mean(mse)
 
@@ -67,7 +71,7 @@ def masked_mse(receptive_field_size):
 
 
 def masked_multires_stft_loss(
-    receptive_field_size: int,
+    receptive_field_size: int = None,
     fft_sizes=(512, 1024, 2048),
     hop_sizes=(128, 256, 512),
     win_lengths=(512, 1024, 2048),
@@ -106,16 +110,17 @@ def masked_multires_stft_loss(
         assert y_true.shape == y_pred.shape
         assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
         assert y_true.shape[-1] == 1, "expected (batch, sequence_length, output_dim=1)"
-        assert (
-            y_true.shape[-2] > receptive_field_size
-        ), "sequence is shorter than receptive_field_size!"
+        if receptive_field_size:
+            assert (
+                y_true.shape[-2] > receptive_field_size
+            ), "sequence is shorter than receptive_field_size!"
 
         # y: (batch, seq, channels=1)
         y_true_ = y_true
         y_pred_ = y_pred
 
         # mask left-padded receptive field
-        if receptive_field_size > 0:
+        if receptive_field_size and receptive_field_size > 0:
             y_true_ = y_true_[:, receptive_field_size:, :]
             y_pred_ = y_pred_[:, receptive_field_size:, :]
 
@@ -154,7 +159,7 @@ def masked_multires_stft_loss(
 
 
 def combined_masked_loss(
-    receptive_field_size: int,
+    receptive_field_size: int = None,
     alpha_mse: float = 1.0,
     beta_stft: float = 0.2,
 ):
@@ -167,7 +172,7 @@ def combined_masked_loss(
 
 
 def combined_masked_loss_terms(
-    receptive_field_size: int,
+    receptive_field_size: int = None,
     use_huber_loss: bool = False,
     alpha_mse: float = 1.0,
     beta_stft: float = 0.2,
