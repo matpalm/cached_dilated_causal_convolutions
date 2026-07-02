@@ -28,7 +28,7 @@ parser.add_argument(
     default=[],
 )
 parser.add_argument("--src-run-file", type=Path, help="if set, add runs from this list")
-parser.add_argument("--losses-tsv", type=Path)
+parser.add_argument("--keras-run", type=str, help="for losses in db", required=True)
 parser.add_argument("--num-candidates", type=int, default=256)
 parser.add_argument(
     "--density-weight",
@@ -55,26 +55,24 @@ if opts.src_run_file and opts.src_run_file.exists():
             src_runs.append(Path(line.strip()))
 
 # load loss values for each run
-records = []
+loss_rows = []
 for src_run in src_runs:
-    with open("runs" / src_run / opts.losses_tsv) as f:
-        for line_num, line in enumerate(f.readlines()):
-            if line.startswith("mse"):
-                continue
-            mse, huber, sftf = map(float, line.split("\t"))
-            records.append({"mse": mse, "huber": huber, "sftf": sftf})
-losses_df = pd.DataFrame(records)
+    losses = db.losses_for(src_run, model=opts.keras_run)
+    print("src_run", src_run, "model", opts.keras_run, "|losses|", len(losses))
+    loss_rows.extend(losses)
+losses_df = pd.DataFrame(loss_rows)
+del loss_rows
 print(losses_df.describe())
-del records
 print("|losses|", len(losses_df))
+assert len(losses_df) > 0
 
 cv_samples = []
 for src_run in src_runs:
     cv_samples.append(db.cv_values_for(src_run))
 cv_samples = np.vstack(cv_samples)
 print("cv_samples", cv_samples.shape)
-
-assert len(losses_df) == len(cv_samples)
+if len(losses_df) != len(cv_samples):
+    raise Exception(f"|losses_df| {len(losses_df)} != |cv_samples| {len(cv_samples)}")
 
 tri = Delaunay(cv_samples)
 num_simplex_vertices = tri.simplices.shape[-1]
@@ -115,11 +113,11 @@ densities = np.array([len(neighbors) for neighbors in density_counts], dtype=flo
 
 # scaling scoring pieces
 scaler = MinMaxScaler()
-for col in ["mse", "huber", "sftf"]:
+for col in ["huber", "stft"]:
     losses_df[col] = scaler.fit_transform(losses_df[[col]])
 
 hubers = np.array(losses_df["huber"])
-sftfs = np.array(losses_df["sftf"])
+stft = np.array(losses_df["stft"])
 
 records = []
 for e, edge in enumerate(unique_edges):
@@ -132,8 +130,8 @@ for e, edge in enumerate(unique_edges):
 
     # losses
     record["mean_huber"] = (hubers[pi] + hubers[pj]) / 2
-    record["mean_sftf"] = (sftfs[pi] + sftfs[pj]) / 2
-    record["loss_sum"] = record["mean_huber"] + record["mean_sftf"]
+    record["mean_stft"] = (stft[pi] + stft[pj]) / 2
+    record["loss_sum"] = record["mean_huber"] + record["mean_stft"]
 
     # local density
     local_density = densities[e]

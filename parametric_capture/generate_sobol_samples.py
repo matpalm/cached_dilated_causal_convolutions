@@ -34,7 +34,7 @@ bounds = []
 bounds.append((-1, 1))  # note: module only responds to (-0.6, 0.6 ) for a_cv and b_cv
 bounds.append((-1, 1))
 bounds.append((-1, 1))
-bounds.append((0.2, 0.8))  # ampltiude
+bounds.append((0.2, 0.8))  # ampltiude of multisine
 sobol_sampler = SobolSampler(bounds=bounds, seed=seed)
 samples = sobol_sampler.samples(
     num_samples_po2=opts.num_sobol_samples_po2, fast_forward=opts.fast_forward

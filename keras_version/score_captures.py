@@ -25,8 +25,7 @@ def run_id_from(model_data_z_path):
     p = model_data_z_path.split("/")
     assert p[-1] == "model_data.z"
     assert p[-3] == "runs"
-    return int(p[-2])
-
+    return f"{int(p[-2]):03d}"
 
 db = SampleDB()
 

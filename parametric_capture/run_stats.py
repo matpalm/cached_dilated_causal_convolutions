@@ -7,7 +7,6 @@ contain any subset of the following artifacts:
     cv_buffers.z                  zarr (N*L, 4) sent buffers; nchunks == N captures
     capture_buffers.z             zarr (N*L, 4) received buffers (ch0 morph_out, ch3 triangle)
     model_data.z                  zarr (N*L, 5) x0..x3, y_true (training join)
-    losses.tsv                    per-capture mse / huber / sftf
     audio_stats.pkl               list[dict] rms, spectral_centroid, thd, flatness, odd_even
     candidate_generation_stats.txt  text report from candidate generation
     cv_buffers/ capture_buffers/   pre-packed per-capture .npy (older format)
