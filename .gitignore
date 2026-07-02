@@ -18,3 +18,4 @@ sverilog_version/src/network.sv
 runs/
 *~
 runs
+sample.db

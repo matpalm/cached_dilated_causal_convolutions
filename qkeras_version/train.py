@@ -142,9 +142,6 @@ if __name__ == "__main__":
         seed=456,
     )
 
-    # we only care about the loss of the _first_ element of the output
-    filter_column_idx = 0
-
     # all convolutions use K=4
     K = 4
     num_layers = len(opts.filter_sizes) + 1
@@ -293,7 +290,6 @@ if __name__ == "__main__":
     # compile and train
     combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
         RECEPTIVE_FIELD_SIZE,
-        filter_column_idx=filter_column_idx,
         alpha_mse=opts.alpha_mse,
         beta_stft=beta_stft,
     )
