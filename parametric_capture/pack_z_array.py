@@ -7,6 +7,9 @@ import argparse
 
 
 def pack_z_array(root_npy_dir, output_zarr):
+
+    raise Exception("shouldn't have to do this anymore? ")
+
     # count the files and use first to decide shape for all
     fnames = list(sorted(root_npy_dir.iterdir()))
     num_files = len(fnames)

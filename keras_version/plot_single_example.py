@@ -14,8 +14,7 @@ from .keras_model import create_dilated_model
 from tf_data_pipeline.pcapture_data import model_data_block_to_xs_ys
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--run", type=Path, required=True)
-parser.add_argument("--model-ckpt", type=Path, required=True)
+parser.add_argument("--keras-run", type=Path, required=True)
 parser.add_argument("--model-data-z", type=Path, required=True)
 parser.add_argument("--sample-id", type=int, required=True)
 parser.add_argument("--plot-offset", type=int, default=20_000)
@@ -24,11 +23,15 @@ parser.add_argument("--plot-fname", type=str, required=True)
 opts = parser.parse_args()
 print("opts", opts)
 
-with open("runs" / opts.run / "model_config.json", "r") as f:
+with open("runs" / opts.keras_run / "model_config.json", "r") as f:
     model_config = json.load(f)
+    print("model_config", model_config)
 
 inference_model = create_dilated_model(**model_config)
-inference_model.load_weights(str(opts.model_ckpt))
+
+ckpts = (Path("runs") / opts.keras_run / "weights" / "keras").iterdir()
+latest_ckpt = list(sorted(ckpts))[-1]
+inference_model.load_weights(str(latest_ckpt))
 
 model_data_z = zarr.open(str(opts.model_data_z), mode="r")
 try:

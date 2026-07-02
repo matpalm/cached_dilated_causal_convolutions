@@ -8,6 +8,7 @@ import zarr
 import numpy as np
 from scipy.signal import lfilter, lfilter_zi
 import argparse
+from tqdm import tqdm
 
 # def two_stage_one_pole_lowpass(x: np.ndarray, alpha: float = 0.6) -> np.ndarray:
 #     b = np.array([alpha])
@@ -27,6 +28,7 @@ if ("runs" / opts.run / "model_data.z").exists():
 capture_buffer_z = zarr.open("runs" / opts.run / "capture_buffers.z", mode="r")
 cv_buffer_z = zarr.open("runs" / opts.run / "cv_buffers.z", mode="r")
 assert capture_buffer_z.nchunks == cv_buffer_z.nchunks
+print("capture_buffer_z.nchunks", capture_buffer_z.nchunks)
 assert capture_buffer_z.shape == cv_buffer_z.shape
 print("capture_buffer_z.shape", capture_buffer_z.shape)
 total_entries = capture_buffer_z.shape[0]
@@ -50,7 +52,7 @@ a = np.array([1.0, -(1.0 - alpha)])
 zi1 = lfilter_zi(b, a)[:1] * 0.0
 zi2 = lfilter_zi(b, a)[:1] * 0.0
 
-for start in range(0, total_entries, chunk_rows):
+for start in tqdm(list(range(0, total_entries, chunk_rows))):
     # read both inputs once per chunk
     end = min(start + chunk_rows, total_entries)
     cap = capture_buffer_z[start:end]

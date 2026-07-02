@@ -8,7 +8,6 @@ from pathlib import Path
 from sklearn.neighbors import NearestNeighbors
 from tqdm import tqdm
 from util import *
-from plotting import *
 import pickle
 from sklearn.preprocessing import MinMaxScaler
 

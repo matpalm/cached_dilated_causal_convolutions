@@ -1,6 +1,14 @@
 import sqlite3
 import numpy as np
 from typing import List
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class LossRow:
+    idx: int
+    huber: float
+    stft: float
 
 
 class SampleDB(object):
@@ -19,12 +27,24 @@ class SampleDB(object):
                             cv1 real,
                             cv2 real,
                             cv3 real,
-                            captured bool
+                            captured bool,
+                            primary key (run, idx)
                         )""")
-            c.execute("create index idx_cv_values_run on cv_values(run)")
             c.execute("create index idx_cv_values_run_idx on cv_values(run, idx)")
-            c.execute("create index idx_cv_values_captured on cv_values(captured)")
         except sqlite3.OperationalError:
+            # assume table already exists? clumsy...
+            pass
+        try:
+            c.execute("""create table losses (
+                            run text,
+                            idx int,
+                            model text,
+                            huber real,
+                            stft real,
+                            primary key (run, idx, model)
+                        )""")
+            c.execute("create index idx_losses_run_model_idx on losses(run, model)")
+        except sqlite3.OperationalError as e:
             # assume table already exists? clumsy...
             pass
 
@@ -61,8 +81,7 @@ class SampleDB(object):
         run = str(run)
         c = self.conn.cursor()
         if idx is None:
-            # all idxs
-            cvss = []
+            # all idxs; idx aligns with np row_id
             c.execute(
                 """
                 select cv0, cv1, cv2, cv3
@@ -72,9 +91,27 @@ class SampleDB(object):
                 """,
                 (run,),
             )
+            cvss = []
             for cvs in c.fetchall():
                 cvss.append(cvs)
             return np.array(cvss)
+        elif isinstance(idx, list):
+            idxs = [int(i) for i in idx]
+            placeholders = ",".join(["?"] * len(idxs))
+            c.execute(
+                f"""
+                select idx, cv0, cv1, cv2, cv3
+                from cv_values
+                where run=? and idx in ({placeholders})
+                """,
+                (run, *idxs),
+            )
+            idx_to_row = {}
+            result = []
+            for i, (idx, cv0, cv1, cv2, cv3) in enumerate(c.fetchall()):
+                idx_to_row[idx] = i
+                result.append(np.array([cv0, cv1, cv2, cv3]))
+            return idx_to_row, np.stack(result)
         else:
             c.execute(
                 """
@@ -133,3 +170,64 @@ class SampleDB(object):
             (run, idx),
         )
         self.conn.commit()
+
+    def set_losses(self, run: str, idx: int, model: str, huber: float, stft: float):
+        run = str(run)
+        c = self.conn.cursor()
+        c.execute(
+            """
+            insert into losses
+            (run, idx, model, huber, stft)
+            values (?, ?, ?, ?, ?)
+            on conflict(run, idx, model)
+            do update set huber=excluded.huber,
+                          stft=excluded.stft
+            """,
+            (run, idx, str(model), huber, stft),
+        )
+        self.conn.commit()
+
+    def losses_for(self, run: str, model: str):
+        run = str(run)
+        c = self.conn.cursor()
+        c.execute(
+            """
+            select idx, huber, stft
+            from losses
+            where run=? and model=?
+            order by idx;
+            """,
+            (run, model),
+        )
+        return [
+            LossRow(idx=idx, huber=huber, stft=stft)
+            for idx, huber, stft in c.fetchall()
+        ]
+
+    def duplicate_run_with_idx_offset(
+        self, src_run: str, dest_run: str, idx_offset: int
+    ):
+        """
+        duplicate entries from src_run as dest_run but with dest_run.idx values
+        offset by +idx_offset
+        """
+        assert idx_offset >= 0
+        src_run = str(src_run)
+        dest_run = str(dest_run)
+        c = self.conn.cursor()
+        c.execute(
+            """
+            insert into cv_values
+            (run, idx, cv0, cv1, cv2, cv3, captured)
+                select ?, idx + ?, cv0, cv1, cv2, cv3, captured
+                from cv_values
+                where run=?
+            """,
+            (dest_run, idx_offset, src_run),
+        )
+        self.conn.commit()
+
+
+# if __name__ == "__main__":
+#     db = SampleDB()
+#     print(db.losses_for(run=4, model="parametric_capture/runs/004/model_data.z"))

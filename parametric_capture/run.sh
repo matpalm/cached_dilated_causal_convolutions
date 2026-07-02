@@ -8,6 +8,7 @@ set -ex
 # core sobol sampleset
 # uv run generate_sobol_samples.py --run 001 --num-sobol-samples-po2 2048
 # uv run capture.py --run 001
+# uv run generate_model_data.py --run 001
 # uv run generate_plots.py --run 001 --num 16
 
 # extend sobol set
@@ -15,6 +16,21 @@ set -ex
 #  --run 002 --num-sobol-samples-po2 2048 \
 #  --seed 001 --fast-forward 2048
 # uv run capture.py --run 002
+# uv run generate_model_data.py --run 002
+# uv run generate_plots.py --run 002 --num 16
+
+# extend sobol set again
+# uv run generate_sobol_samples.py \
+#  --run 003 --num-sobol-samples-po2 4096 \
+#  --seed 001 --fast-forward 4096
+# uv run capture.py --run 003
+# uv run generate_model_data.py --run 003
+# uv run generate_plots.py --run 003 --num 16
+
+# combine sobol sets into one
+uv run combine_runs.py --src 001 002 003 --dest 004
+uv run generate_model_data.py --run 004
+uv run generate_plots.py --run 004 --num 16
 
 # local_grad guided search
 # no density weighting ( to demonstrate fixation )

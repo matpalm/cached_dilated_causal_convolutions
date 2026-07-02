@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 from tqdm import tqdm
 import zarr
+import signal
 
 from audio_interface import AudioInterface, SAMPLE_RATE_HZ
 from sampling import *
@@ -71,7 +72,8 @@ run_dir.mkdir(parents=True, exist_ok=True)
 # (run_dir / "capture_buffers").mkdir(parents=True, exist_ok=False)
 
 sample_ids = db.idxs_to_capture(opts.run)
-print("pending sample_ids", sample_ids)
+print("pending sample_ids (first 10)", sample_ids[:10])
+print("pending sample_ids (last 10)", sample_ids[-10:])
 
 samples = []
 for idx in sample_ids:
@@ -142,5 +144,7 @@ for s, idx in enumerate(tqdm(sample_ids, desc="capture")):
     capture_buffers_z.blocks[idx] = capture_buffer
     #    np.save(run_dir / "capture_buffers" / f"{capture_dts}.npy", capture_buffer)
     db.set_captured(run=opts.run, idx=idx)
+
+
 # pack_z_array(run_dir / "capture_buffers", run_dir / "capture_buffers.z")
 # pack_z_array(run_dir / "cv_buffers", run_dir / "cv_buffers.z")

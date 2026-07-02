@@ -13,7 +13,7 @@ from .keras_model import create_dilated_model, masked_mse
 # from cmsisdsp_py_version.cached_block_model import create_cached_block_model_from_keras_model
 
 # from tf_data_pipeline.data import Embed2DWaveFormData
-from tf_data_pipeline.pcapture_data import ParametricCaptureData
+from tf_data_pipeline.pcapture_data import ParametricCaptureData, interleaved_datasets
 from .util import CheckYPred
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--training-data-z", type=Path, required=True)
+    parser.add_argument("--training-data-z", type=Path, required=True, nargs="+")
     parser.add_argument("--num-train-batches", type=int, default=1_000)
     parser.add_argument("--num-validate-batches", type=int, default=10)
     parser.add_argument("--cache-fname", type=str, default=None)
@@ -50,18 +50,42 @@ if __name__ == "__main__":
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-    data = ParametricCaptureData(model_data_z=opts.training_data_z)
-    train_ds = data.tf_training_dataset(
-        seq_len=TRAIN_SEQ_LEN,
-        num_batches=opts.num_train_batches,
-        batch_size=opts.batch_size,
-        cache_fname=opts.cache_fname,
-    )
-    validate_ds = data.tf_training_dataset(
-        seq_len=TEST_SEQ_LEN,
-        num_batches=opts.num_validate_batches,
-        batch_size=opts.batch_size,
-    )
+    if len(opts.training_data_z) == 1:
+        data = ParametricCaptureData(model_data_z=opts.training_data_z[0])
+        train_ds = data.tf_training_dataset(
+            seq_len=TRAIN_SEQ_LEN,
+            num_batches=opts.num_train_batches,
+            batch_size=opts.batch_size,
+            cache_fname=opts.cache_fname,
+        )
+        validate_ds = data.tf_training_dataset(
+            seq_len=TEST_SEQ_LEN,
+            num_batches=opts.num_validate_batches,
+            batch_size=opts.batch_size,
+        )
+    else:
+        train_ds_s = []
+        weights = []
+        for mdz in opts.training_data_z:
+            data = ParametricCaptureData(model_data_z=mdz)
+            train_ds_s.append(
+                data.tf_training_dataset(
+                    seq_len=TRAIN_SEQ_LEN,
+                    num_batches=opts.num_train_batches,
+                    batch_size=opts.batch_size,
+                    cache_fname=opts.cache_fname,
+                )
+            )
+            weights.append(data.num_examples())
+        print("weights", weights)
+        train_ds = interleaved_datasets(
+            train_ds_s, repeats=[False] * len(train_ds_s), weights=weights
+        )
+        validate_ds = data.tf_training_dataset(
+            seq_len=TEST_SEQ_LEN,
+            num_batches=opts.num_validate_batches,
+            batch_size=opts.batch_size,
+        )
 
     # make model
     model_config = {

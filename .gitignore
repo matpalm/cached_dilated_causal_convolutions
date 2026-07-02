@@ -21,3 +21,5 @@ runs
 parametric_capture/old_runs
 old_runs
 datalogger_firmware/data
+parametric_capture/src_run.txt
+sample.db
