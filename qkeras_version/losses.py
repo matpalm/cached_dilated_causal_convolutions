@@ -1,14 +1,12 @@
 import tensorflow as tf
 
 
-def masked_huber(receptive_field_size, filter_column_idx=None, alpha=0.1):
+def masked_huber(receptive_field_size, alpha=0.1):
     """
     Calculates masked version of the Huber loss
 
     Parameters:
         receptive_field_size: number of initial time steps to ignore
-        filter_column_idx: only calculate loss w.r.t this column in output. done since
-                           the output has 4 outs, but we might only care about one
         alpha: Huber delta; threshold when the loss transitions from quadratic to linear
     Returns:
         keras loss function
@@ -17,12 +15,12 @@ def masked_huber(receptive_field_size, filter_column_idx=None, alpha=0.1):
     # TODO: generalise with MSE
 
     def loss_fn(y_true, y_pred):
-        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
-        if filter_column_idx is not None:
-            # consider only a single column from output for loss
-            y_true = y_true[:, :, filter_column_idx : filter_column_idx + 1]
-            y_pred = y_pred[:, :, filter_column_idx : filter_column_idx + 1]
         assert y_true.shape == y_pred.shape
+        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
+        assert y_true.shape[-1] == 1, "expected (batch, sequence_length, output_dim=1)"
+        assert (
+            y_true.shape[-2] > receptive_field_size
+        ), "sequence is shorter than receptive_field_size!"
         # huber loss per element
         error = y_true - y_pred
         abs_error = tf.abs(error)
@@ -40,25 +38,23 @@ def masked_huber(receptive_field_size, filter_column_idx=None, alpha=0.1):
     return loss_fn
 
 
-def masked_mse(receptive_field_size, filter_column_idx=None):
+def masked_mse(receptive_field_size):
     """
     Calculates masked version of mean square error
 
     Parameters:
         receptive_field_size: number of initial time steps to ignore
-        filter_column_idx: only calculate loss w.r.t this column in output. done since
-                           the output has 4 outs, but we might only care about one
     Returns:
         keras loss function
     """
 
     def loss_fn(y_true, y_pred):
-        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
-        if filter_column_idx is not None:
-            # consider only a single column from output for loss
-            y_true = y_true[:, :, filter_column_idx : filter_column_idx + 1]
-            y_pred = y_pred[:, :, filter_column_idx : filter_column_idx + 1]
         assert y_true.shape == y_pred.shape
+        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
+        assert y_true.shape[-1] == 1, "expected (batch, sequence_length, output_dim=1)"
+        assert (
+            y_true.shape[-2] > receptive_field_size
+        ), "sequence is shorter than receptive_field_size!"
         # average over elements of y
         mse = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
         # we want to ignore the first elements of the loss since they
@@ -71,8 +67,7 @@ def masked_mse(receptive_field_size, filter_column_idx=None):
 
 
 def masked_multires_stft_loss(
-    receptive_field_size: int = 0,
-    filter_column_idx=None,
+    receptive_field_size: int,
     fft_sizes=(512, 1024, 2048),
     hop_sizes=(128, 256, 512),
     win_lengths=(512, 1024, 2048),
@@ -85,7 +80,6 @@ def masked_multires_stft_loss(
 
     Args:
         receptive_field_size: number of initial time steps to ignore
-        filter_column_idx: output channel index to train against
         fft_sizes: FFT sizes used at each STFT res
         hop_sizes: STFT hop sizes for each res
         win_lengths: STFT window lengths for each res
@@ -109,13 +103,16 @@ def masked_multires_stft_loss(
         return tf.abs(s)
 
     def loss_fn(y_true, y_pred):
-        # y: (batch, seq, channels)
-        if filter_column_idx is not None:
-            y_true_ = y_true[:, :, filter_column_idx : filter_column_idx + 1]
-            y_pred_ = y_pred[:, :, filter_column_idx : filter_column_idx + 1]
-        else:
-            y_true_ = y_true
-            y_pred_ = y_pred
+        assert y_true.shape == y_pred.shape
+        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
+        assert y_true.shape[-1] == 1, "expected (batch, sequence_length, output_dim=1)"
+        assert (
+            y_true.shape[-2] > receptive_field_size
+        ), "sequence is shorter than receptive_field_size!"
+
+        # y: (batch, seq, channels=1)
+        y_true_ = y_true
+        y_pred_ = y_pred
 
         # mask left-padded receptive field
         if receptive_field_size > 0:
@@ -157,14 +154,12 @@ def masked_multires_stft_loss(
 
 
 def combined_masked_loss(
-    receptive_field_size,
-    filter_column_idx=0,
-    alpha_mse=1.0,
-    beta_stft=0.2,
+    receptive_field_size: int,
+    alpha_mse: float = 1.0,
+    beta_stft: float = 0.2,
 ):
     combined_fn, _, _ = combined_masked_loss_terms(
         receptive_field_size,
-        filter_column_idx=filter_column_idx,
         alpha_mse=alpha_mse,
         beta_stft=beta_stft,
     )
@@ -172,22 +167,20 @@ def combined_masked_loss(
 
 
 def combined_masked_loss_terms(
-    receptive_field_size,
+    receptive_field_size: int,
     use_huber_loss: bool = False,
-    filter_column_idx=0,
-    alpha_mse=1.0,
-    beta_stft=0.2,
+    alpha_mse: float = 1.0,
+    beta_stft: float = 0.2,
 ):
     if use_huber_loss:
-        core_loss_fn = masked_huber(receptive_field_size, filter_column_idx)
+        core_loss_fn = masked_huber(receptive_field_size)
     else:
-        core_loss_fn = masked_mse(receptive_field_size, filter_column_idx)
+        core_loss_fn = masked_mse(receptive_field_size)
 
     # actually, STFT term can be spectral-only to avoid counting time MSE twice ?
     # so can remove w_time completely (?)
     stft_fn = masked_multires_stft_loss(
         receptive_field_size,
-        filter_column_idx=filter_column_idx,
         w_time=0.0,
         w_mag=0.8,
         w_sc=0.2,

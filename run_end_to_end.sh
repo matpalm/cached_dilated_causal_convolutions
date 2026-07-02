@@ -3,8 +3,8 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export RUN=225_8_3x24
-export FILTERS="8 24 24 24"
+export RUN=228_loss_smoke
+export FILTERS="4 4 4"
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
@@ -97,7 +97,7 @@ fxp_math_equiv_test() {
 }
 
 pretrain
-finetune
+#finetune
 #fxp_math_equiv_test finetune
 
 # build both versions
@@ -119,7 +119,7 @@ pdm_build() {
 }
 
 #pdm_build 3 15 pretrain &
-pdm_build 3 6 finetune &
+#pdm_build 3 6 finetune &
 wait
 
 #openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit || true

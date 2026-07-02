@@ -26,6 +26,11 @@ class CheckYPred(tf.keras.callbacks.Callback):
             break  # just one batch
 
     def _plot_as_numpy(self, x, y_true, y_pred):
+        assert y_true.shape == y_pred.shape
+        assert y_true.shape[-1] == 1
+
+        # TODO: derive figsize from S in y_true shape
+
         df = pd.DataFrame()
         df["phase_sin"] = x[:, 0]
         df["e0"] = x[:, 2]
@@ -39,7 +44,7 @@ class CheckYPred(tf.keras.callbacks.Callback):
         with io.BytesIO() as img_buffer:
             with warnings.catch_warnings():
                 warnings.simplefilter(action="ignore", category=FutureWarning)
-                fig, ax = plt.subplots(figsize=(200, 4))
+                fig, ax = plt.subplots(figsize=(20, 4))
                 sns.lineplot(wide_df, x="n", y="value", hue="variable", ax=ax)
                 ax.set_ylim((-2, 2))
                 fig.savefig(img_buffer, format="png")
