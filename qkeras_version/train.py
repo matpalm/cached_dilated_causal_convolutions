@@ -16,7 +16,8 @@ from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import QKerasModelBuilder
-from ..common.losses import combined_masked_loss_terms
+from common.losses import combined_masked_loss_terms
+from common.callbacks import setup_beta_stft_var_and_update_callback
 
 import warnings
 
@@ -123,16 +124,6 @@ if __name__ == "__main__":
         str_opts = {k: str(v) for k, v in vars(opts).items()}
         json.dump(str_opts, f)
 
-    if (
-        opts.beta_stft_warmup < 0
-        or opts.beta_stft_warmup > 1
-        or opts.beta_stft_ramp < 0
-        or opts.beta_stft_ramp > 1
-    ):
-        raise Exception(
-            "--beta-stft-warmup & --beta-stft-ramp are propotions of --epochs must be (0, 1)"
-        )
-
     data = Embed2DQuadratureData(
         min_note=opts.min_note,
         max_note=opts.max_note,
@@ -230,53 +221,16 @@ if __name__ == "__main__":
             except FileNotFoundError:
                 pass
             os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
+
     callbacks.append(SaveQuantisedWeights())
 
     # If warm-up/ramp is requested, start from zero.
-    use_beta_schedule = opts.beta_stft_warmup > 0 or opts.beta_stft_ramp > 0
-    beta_stft_init = opts.beta_stft if not use_beta_schedule else 0.0
-    beta_stft = tf.Variable(beta_stft_init, trainable=False, dtype=tf.float32)
-    if use_beta_schedule:
 
-        class RampBetaStft(tf.keras.callbacks.Callback):
-
-            def __init__(
-                self,
-                beta_var: tf.Variable,
-                target: float,
-                warmup_epochs: int,
-                ramp_epochs: int,
-            ):
-                self.beta_var = beta_var
-                self.target = float(target)
-                self.warmup_epochs = max(0, int(warmup_epochs))
-                self.ramp_epochs = max(1, int(ramp_epochs))
-
-            def on_epoch_begin(self, epoch, logs=None):
-                # epoch is 0-indexed.
-                if epoch < self.warmup_epochs:
-                    value = 0.0
-                elif self.ramp_epochs == 1:
-                    value = self.target
-                else:
-                    ramp_epoch = epoch - self.warmup_epochs
-                    value = self.target * min(ramp_epoch / (self.ramp_epochs - 1), 1.0)
-                self.beta_var.assign(value)
-                print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
-
-        warmup_epochs = int(opts.beta_stft_warmup * opts.epochs)
-        ramp_epochs = int(opts.beta_stft_ramp * opts.epochs)
-        print(
-            f"derived warmup_epochs={warmup_epochs} ramp_epochs={ramp_epochs} ( epochs={opts.epochs} )"
-        )
-        callbacks.append(
-            RampBetaStft(
-                beta_var=beta_stft,
-                target=opts.beta_stft,
-                warmup_epochs=warmup_epochs,
-                ramp_epochs=ramp_epochs,
-            )
-        )
+    ramp_callback, beta_stft = setup_beta_stft_var_and_update_callback(
+        opts.epochs, opts.beta_stft_warmup, opts.beta_stft_ramp, opts.beta_stft
+    )
+    if ramp_callback is not None:
+        callbacks.append(ramp_callback)
 
     # def lr_schedule(epoch, lr):
     #     if epoch <= 40:
@@ -290,7 +244,7 @@ if __name__ == "__main__":
     # compile and train
     combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
         RECEPTIVE_FIELD_SIZE,
-        use_huber=False,  # for now
+        use_huber_loss=False,  # for now
         alpha_mse=opts.alpha_mse,
         beta_stft=beta_stft,
     )

@@ -160,11 +160,13 @@ def masked_multires_stft_loss(
 
 def combined_masked_loss(
     receptive_field_size: int = None,
+    use_huber_loss: bool = False,
     alpha_mse: float = 1.0,
     beta_stft: float = 0.2,
 ):
     combined_fn, _, _ = combined_masked_loss_terms(
         receptive_field_size,
+        use_huber_loss=use_huber_loss,
         alpha_mse=alpha_mse,
         beta_stft=beta_stft,
     )

@@ -99,7 +99,8 @@ if __name__ == "__main__":
     with open("runs" / opts.run / "model_config.json", "w") as f:
         json.dump(model_config, f)
     train_model = create_dilated_model(**model_config)
-    train_model.compile(Adam(opts.learning_rate), loss=masked_mse(RECEPTIVE_FIELD_SIZE))
+    loss_fn = masked_mse(RECEPTIVE_FIELD_SIZE)
+    train_model.compile(Adam(opts.learning_rate), loss=loss_fn)
 
     callbacks = []
     callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=str(tensorboard_dir)))
