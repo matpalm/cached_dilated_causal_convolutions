@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import datetime
+from PIL import Image
 
 
 def fade_in_out(buffer, fade_in_out_samples: int):
@@ -26,5 +27,6 @@ def DTS():
 
 
 def min_max_scale(a):
+    raise Exception("use sklearn")
     diff = a.max() - a.min()
     return (a - a.min()) / diff

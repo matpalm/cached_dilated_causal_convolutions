@@ -5,6 +5,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 
 from audio_interface import SAMPLE_RATE_HZ
 
@@ -66,3 +67,33 @@ def play_sample(
     if play_offset is not None:
         series = series[play_offset : play_offset + play_len]
     return Audio(series.astype(np.float32), rate=SAMPLE_RATE_HZ, autoplay=autoplay)
+
+
+def collage(pil_imgs, side_by_side: bool = False, stacked: bool = False):
+    if not (side_by_side ^ stacked):
+        raise Exception("side_by_side xor stacked")
+    # if passed something that isn't pil images, try to convert...
+    # if type(pil_imgs[0]) != Image:
+    #    pil_imgs = [img_a_to_pil(a) for a in pil_imgs]
+    # use largest w and h for collage cells
+    w, h = 0, 0
+    for p in pil_imgs:
+        iw, ih = p.size
+        w = max(w, iw)
+        h = max(h, ih)
+    w, h = w + 2, h + 2
+    if side_by_side:
+        collage = Image.new("RGB", (len(pil_imgs) * w, h), (255, 0, 0))
+        for idx, img in enumerate(pil_imgs):
+            collage.paste(img, (idx * w, 0))
+    elif stacked:
+        collage = Image.new("RGB", (w, len(pil_imgs) * h), (255, 0, 0))
+        for idx, img in enumerate(pil_imgs):
+            collage.paste(img, (0, idx * h))
+    else:
+        n = math.ceil(math.sqrt(len(pil_imgs)))
+        collage = Image.new("RGB", (n * w, n * h), (255, 0, 0))
+        for idx, img in enumerate(pil_imgs):
+            r, c = idx % n, idx // n
+            collage.paste(img, (r * w, c * h))
+    return collage

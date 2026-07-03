@@ -9,6 +9,7 @@ import numpy as np
 from scipy.signal import lfilter, lfilter_zi
 import argparse
 from tqdm import tqdm
+from numcodecs import Blosc
 
 # def two_stage_one_pole_lowpass(x: np.ndarray, alpha: float = 0.6) -> np.ndarray:
 #     b = np.array([alpha])
@@ -16,7 +17,6 @@ from tqdm import tqdm
 #     stage1 = lfilter(b, a, x)
 #     stage2 = lfilter(b, a, stage1)
 #     return stage2
-
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--run", type=Path, required=True)
@@ -40,7 +40,8 @@ model_data_z = zarr.open(
     mode="w",
     shape=(total_entries, 5),
     chunks=(chunk_rows, 5),
-    dtype=np.float32,
+    dtype="<f2",  # f16
+    compressor=Blosc(cname="zstd", clevel=4, shuffle=Blosc.SHUFFLE),  # dft clevel=5
 )
 
 # have to inline this filter or it's sooooo slow across chunk boundaries

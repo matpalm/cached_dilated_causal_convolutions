@@ -4,15 +4,16 @@ import zarr
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 
-from plotting import *
+from plotting import collage, plot
 import random
 
 
-def _fig_to_rgb_array(fig):
+def _fig_to_pil_img(fig):
     fig.canvas.draw()
     rgba = np.asarray(fig.canvas.buffer_rgba(), dtype=np.uint8)
-    return rgba[:, :, :3].copy()
+    return Image.fromarray(rgba[:, :, :3].copy())
 
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -29,7 +30,9 @@ run_dir = Path("runs") / opts.run
 
 capture_buffers_zarr = zarr.open(run_dir / "capture_buffers.z", mode="r")
 cv_buffers_zarr = zarr.open(run_dir / "cv_buffers.z", mode="r")
+model_data_zarr = zarr.open(run_dir / "model_data.z", mode="r")
 assert capture_buffers_zarr.shape == cv_buffers_zarr.shape
+assert len(capture_buffers_zarr) == len(model_data_zarr)
 
 plots_dir = run_dir / "plots"
 plots_dir.mkdir(parents=True, exist_ok=True)
@@ -46,34 +49,30 @@ if opts.num:
 for i in tqdm(range(num)):
     b_idx = idxs[i]
 
-    cv_buffer = cv_buffers_zarr.blocks[idxs[i]]
+    cv_buffer = cv_buffers_zarr.blocks[b_idx]
     capture_buffer = capture_buffers_zarr.blocks[b_idx]
-    assert cv_buffer.shape == capture_buffer.shape
+    model_data_buffer = model_data_zarr.blocks[b_idx]
 
     sample_len, _channels = capture_buffer.shape
 
     plot_len = 2_000
     plot_offset = random.randint(500, sample_len - plot_len)
 
-    cv_fig = plot(
-        cv_buffer,
-        title=f"b{b_idx} offset{str(plot_offset)}",
-        fname=None,
-        plot_offset=plot_offset,
-        plot_len=plot_len,
-    )
-    cv_img_a = _fig_to_rgb_array(cv_fig)
+    def plot_buffer(buffer):
+        fig = plot(
+            buffer,
+            title=f"b{b_idx} offset{str(plot_offset)}",
+            fname=None,
+            plot_offset=plot_offset,
+            plot_len=plot_len,
+        )
+        pil_img = _fig_to_pil_img(fig)
+        plt.close(fig)
+        return pil_img
 
-    capture_fig = plot(
-        capture_buffer,
-        title=f"b{b_idx} offset{str(plot_offset)}",
-        fname=None,
-        plot_offset=plot_offset,
-        plot_len=plot_len,
-    )
-    capture_img_a = _fig_to_rgb_array(capture_fig)
+    cv_pil_img = plot_buffer(cv_buffer)
+    capture_pil_img = plot_buffer(capture_buffer)
+    model_pil_img = plot_buffer(model_data_buffer)
 
-    combined = np.concatenate([cv_img_a, capture_img_a], axis=1)
-    plt.imsave(plots_dir / f"{b_idx:06d}.buffers.jpg", combined)
-    plt.close(cv_fig)
-    plt.close(capture_fig)
+    combined = collage([cv_pil_img, capture_pil_img, model_pil_img], side_by_side=True)
+    combined.save(plots_dir / f"{b_idx:06d}.buffers.jpg")
