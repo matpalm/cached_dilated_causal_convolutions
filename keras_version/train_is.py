@@ -13,8 +13,9 @@ from .keras_model import create_dilated_model
 
 # from cmsisdsp_py_version.cached_block_model import create_cached_block_model_from_keras_model
 
-# from tf_data_pipeline.data import Embed2DWaveFormData
 from tf_data_pipeline.pcapture_data import ParametricCaptureData
+from tf_data_pipeline.pcapture_is_data import ParametricCaptureImportanceSampledData
+
 from .util import CheckYPred
 from common.losses import combined_masked_loss_terms
 from common.callbacks import setup_beta_stft_var_and_update_callback
@@ -31,10 +32,22 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument(
-        "--capture-run",
+        "--unbiased-capture-run",
         type=str,
         required=True,
-        help="capture run for training data zarr",
+        help="half of each batch is from this capture run; unbiased from sobol",
+    )
+    parser.add_argument(
+        "--biased-capture-run",
+        type=str,
+        required=True,
+        help="half of each batch is from this capture run; sampled with importance sampling",
+    )
+    parser.add_argument(
+        "--keras-model",
+        type=str,
+        required=True,
+        help="the keras model losses to use from db for importance sampling",
     )
     parser.add_argument("--num-train-batches", type=int, default=10_000)
     parser.add_argument("--num-validate-batches", type=int, default=10)
@@ -87,14 +100,18 @@ if __name__ == "__main__":
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
-    data = ParametricCaptureData(capture_run=opts.capture_run)
-    train_ds = data.tf_training_dataset(
+    unbiased_data = ParametricCaptureData(capture_run=opts.unbiased_capture_run)
+
+    biased_data = ParametricCaptureImportanceSampledData(
+        capture_run=opts.biased_capture_run, keras_model=opts.keras_model
+    )
+
+    train_ds = biased_data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
         num_batches=opts.num_train_batches,
         batch_size=opts.batch_size,
-        cache_fname=opts.cache_fname,
     )
-    validate_ds = data.tf_training_dataset(
+    validate_ds = unbiased_data.tf_training_dataset(
         seq_len=TEST_SEQ_LEN,
         num_batches=opts.num_validate_batches,
         batch_size=opts.batch_size,
@@ -142,4 +159,76 @@ if __name__ == "__main__":
         metrics=[mse_loss_metric, stft_loss_metric],
     )
 
-    train_model.fit(train_ds, callbacks=callbacks, epochs=opts.epochs)
+    metric_core_name = getattr(mse_loss_metric, "__name__", "masked_mse")
+    metric_stft_name = getattr(stft_loss_metric, "__name__", "masked_stft")
+
+    callback_list = tf.keras.callbacks.CallbackList(
+        callbacks,
+        add_history=True,
+        add_progbar=True,
+        model=train_model,
+        verbose=1,
+        epochs=opts.epochs,
+        steps=opts.num_train_batches,
+    )
+    callback_list.set_params(
+        {
+            "verbose": 1,
+            "epochs": opts.epochs,
+            "steps": opts.num_train_batches,
+            "metrics": ["loss", metric_core_name, metric_stft_name],
+        }
+    )
+
+    train_loss = tf.keras.metrics.Mean(name="loss")
+    train_core = tf.keras.metrics.Mean(name=metric_core_name)
+    train_stft = tf.keras.metrics.Mean(name=metric_stft_name)
+
+    @tf.function
+    def train_step(x_b, y_b, weight_b):
+        with tf.GradientTape() as tape:
+            y_pred = train_model(x_b, training=True)
+            loss_value = combined_loss_fn(y_b, y_pred)
+        gradients = tape.gradient(loss_value, train_model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, train_model.trainable_variables))
+
+        core_value = mse_loss_metric(y_b, y_pred)
+        stft_value = stft_loss_metric(y_b, y_pred)
+        return loss_value, core_value, stft_value
+
+    callback_list.on_train_begin()
+    for epoch in range(opts.epochs):
+        callback_list.on_epoch_begin(epoch)
+        train_loss.reset_state()
+        train_core.reset_state()
+        train_stft.reset_state()
+
+        for step, (x_b, y_b, idx_b, weight_b) in enumerate(train_ds):
+
+            print("-" * 100)
+            print("--STEP", step)
+            print("idx_b", idx_b)
+            print("weight_b", weight_b)
+
+            callback_list.on_train_batch_begin(step)
+            loss_value, core_value, stft_value = train_step(x_b, y_b, weight_b)
+
+            train_loss.update_state(loss_value)
+            train_core.update_state(core_value)
+            train_stft.update_state(stft_value)
+
+            batch_logs = {
+                "loss": float(train_loss.result().numpy()),
+                metric_core_name: float(train_core.result().numpy()),
+                metric_stft_name: float(train_stft.result().numpy()),
+            }
+            callback_list.on_train_batch_end(step, batch_logs)
+
+        epoch_logs = {
+            "loss": float(train_loss.result().numpy()),
+            metric_core_name: float(train_core.result().numpy()),
+            metric_stft_name: float(train_stft.result().numpy()),
+        }
+        callback_list.on_epoch_end(epoch, epoch_logs)
+
+    callback_list.on_train_end()

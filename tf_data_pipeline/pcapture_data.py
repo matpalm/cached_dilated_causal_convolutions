@@ -5,6 +5,8 @@ import tensorflow as tf
 from tqdm import tqdm
 from typing import List
 
+from common.util import model_data_z_path_for
+
 IN_D = 4
 OUT_D = 1
 IGNORE_FADE_LEN = 500
@@ -23,33 +25,34 @@ def model_data_block_to_xs_ys(data):
     return xs, ys
 
 
-def interleaved_datasets(tf_datasets, repeats: List[bool], weights: List[int]):
-    """sample from the N ParametricCaptureData(model_data_z) proportional to weights"""
-    arg_lens = [len(tf_datasets), len(repeats), len(weights)]
-    if len(set(arg_lens)) != 1:
-        raise Exception("all lens must match")
-    # set repeat on requested datasets
-    # be careful! if they are all True this dataset is infinite
-    tf_datasets = [ds.repeat() if r else ds for ds, r in zip(tf_datasets, repeats)]
-    probabilities = [w / sum(weights) for w in weights]
-    return tf.data.Dataset.sample_from_datasets(
-        datasets=tf_datasets,
-        weights=probabilities,
-        seed=385,
-        stop_on_empty_dataset=True,
-    )
+# too ineffecient to use this?
+# def interleaved_datasets(tf_datasets, repeats: List[bool], weights: List[int]):
+#     """sample from the N ParametricCaptureData(model_data_z) proportional to weights"""
+#     arg_lens = [len(tf_datasets), len(repeats), len(weights)]
+#     if len(set(arg_lens)) != 1:
+#         raise Exception("all lens must match")
+#     # set repeat on requested datasets
+#     # be careful! if they are all True this dataset is infinite
+#     tf_datasets = [ds.repeat() if r else ds for ds, r in zip(tf_datasets, repeats)]
+#     probabilities = [w / sum(weights) for w in weights]
+#     return tf.data.Dataset.sample_from_datasets(
+#         datasets=tf_datasets,
+#         weights=probabilities,
+#         seed=385,
+#         stop_on_empty_dataset=True,
+#     )
 
 
 class ParametricCaptureData(object):
 
     def __init__(
         self,
-        model_data_z: Path,
+        capture_run: str,
         seed: int = 123,
     ):
-        self.model_data_z_path = str(model_data_z)
+        self.capture_run = capture_run
         try:
-            self.model_data_z = zarr.open(str(model_data_z), mode="r")
+            self.model_data_z = zarr.open(model_data_z_path_for(capture_run), mode="r")
         except zarr.errors.PathNotFoundError as e:
             print("files not found in", str(model_data_z), str(e))
             raise e
@@ -121,7 +124,7 @@ class ParametricCaptureData(object):
             for c in range(self.n_chunks):
                 data = self.model_data_z.blocks[c]
                 if return_sample_info:
-                    yield *model_data_block_to_xs_ys(data), self.model_data_z_path, c
+                    yield *model_data_block_to_xs_ys(data), self.capture_run, c
                 else:
                     yield model_data_block_to_xs_ys(data)
 

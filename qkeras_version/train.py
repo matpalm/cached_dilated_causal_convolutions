@@ -87,6 +87,11 @@ if __name__ == "__main__":
         help="weight for masked MSE in combined loss",
     )
     parser.add_argument(
+        "--use-huber-loss",
+        action="store_true",
+        help="if set use huber instead of MSE",
+    )
+    parser.add_argument(
         "--beta-stft",
         type=float,
         default=0.1,
@@ -244,7 +249,7 @@ if __name__ == "__main__":
     # compile and train
     combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
         RECEPTIVE_FIELD_SIZE,
-        use_huber_loss=False,  # for now
+        use_huber_loss=opts.use_huber_loss,  # for now
         alpha_mse=opts.alpha_mse,
         beta_stft=beta_stft,
     )
