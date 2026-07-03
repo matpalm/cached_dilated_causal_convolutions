@@ -227,7 +227,25 @@ class SampleDB(object):
         )
         self.conn.commit()
 
+    def delete_run(self, run: str):
+        c = self.conn.cursor()
+        c.execute("delete from cv_values where run=?", (run,))
+        c.execute("delete from losses where run=?", (run,))
+        self.conn.commit()
 
-# if __name__ == "__main__":
-#     db = SampleDB()
-#     print(db.losses_for(run=4, model="parametric_capture/runs/004/model_data.z"))
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--run", type=str, required=True, nargs="+")
+    parser.add_argument("--delete", action="store_true")
+    opts = parser.parse_args()
+
+    db = SampleDB()
+
+    if opts.delete:
+        for run in opts.run:
+            db.delete_run(run)

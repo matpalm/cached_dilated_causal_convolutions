@@ -9,12 +9,15 @@ import json
 
 from tensorflow.keras.optimizers import Adam
 
-from .keras_model import create_dilated_model, masked_mse
+from .keras_model import create_dilated_model
+
 # from cmsisdsp_py_version.cached_block_model import create_cached_block_model_from_keras_model
 
 # from tf_data_pipeline.data import Embed2DWaveFormData
 from tf_data_pipeline.pcapture_data import ParametricCaptureData, interleaved_datasets
 from .util import CheckYPred
+from common.losses import combined_masked_loss_terms
+from common.callbacks import setup_beta_stft_var_and_update_callback
 
 if __name__ == "__main__":
 
@@ -28,9 +31,38 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--training-data-z", type=Path, required=True, nargs="+")
-    parser.add_argument("--num-train-batches", type=int, default=1_000)
+    parser.add_argument("--num-train-batches", type=int, default=10_000)
     parser.add_argument("--num-validate-batches", type=int, default=10)
     parser.add_argument("--cache-fname", type=str, default=None)
+    parser.add_argument(
+        "--alpha-mse",
+        type=float,
+        default=1.0,
+        help="weight for masked MSE/Huber in combined loss",
+    )
+    parser.add_argument(
+        "--use-huber-loss",
+        action="store_true",
+        help="if set use huber instead of MSE",
+    )
+    parser.add_argument(
+        "--beta-stft",
+        type=float,
+        default=0.1,
+        help="target STFT-loss weight after warm up and ramp",
+    )
+    parser.add_argument(
+        "--beta-stft-warmup",
+        type=float,
+        default=0,
+        help="keep beta_stft at 0 for this proportion of epochs at start",
+    )
+    parser.add_argument(
+        "--beta-stft-ramp",
+        type=float,
+        default=0,
+        help="linearly ramp beta_stft from 0 to target over this many proportion of epochs ( post warmup )",
+    )
     opts = parser.parse_args()
     print("opts", opts)
 
@@ -99,8 +131,6 @@ if __name__ == "__main__":
     with open("runs" / opts.run / "model_config.json", "w") as f:
         json.dump(model_config, f)
     train_model = create_dilated_model(**model_config)
-    loss_fn = masked_mse(RECEPTIVE_FIELD_SIZE)
-    train_model.compile(Adam(opts.learning_rate), loss=loss_fn)
 
     callbacks = []
     callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=str(tensorboard_dir)))
@@ -111,5 +141,23 @@ if __name__ == "__main__":
         )
     )
     callbacks.append(CheckYPred(tb_dir=str(tensorboard_dir), dataset=validate_ds))
+
+    ramp_callback, beta_stft = setup_beta_stft_var_and_update_callback(
+        opts.epochs, opts.beta_stft_warmup, opts.beta_stft_ramp, opts.beta_stft
+    )
+    if ramp_callback is not None:
+        callbacks.append(ramp_callback)
+
+    combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
+        RECEPTIVE_FIELD_SIZE,
+        use_huber_loss=opts.use_huber_loss,
+        alpha_mse=opts.alpha_mse,
+        beta_stft=beta_stft,
+    )
+    train_model.compile(
+        Adam(opts.learning_rate),
+        loss=combined_loss_fn,
+        metrics=[mse_loss_metric, stft_loss_metric],
+    )
 
     train_model.fit(train_ds, callbacks=callbacks, epochs=opts.epochs)

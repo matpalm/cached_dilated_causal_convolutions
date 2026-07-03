@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from .keras_model import create_dilated_model
 from tf_data_pipeline.pcapture_data import ParametricCaptureData
-from qkeras_version.losses import masked_multires_stft_loss
+from common.losses import masked_multires_stft_loss
 from parametric_capture.sample_db import SampleDB
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -37,6 +37,7 @@ inference_model = create_dilated_model(**model_config)
 
 ckpts = (Path("runs") / opts.keras_run / "weights" / "keras").iterdir()
 latest_ckpt = list(sorted(ckpts))[-1]
+print("using ckpt", latest_ckpt)
 inference_model.load_weights(str(latest_ckpt))
 
 print(inference_model.summary())

@@ -21,7 +21,7 @@ export BUILD=nw_${RUN_ID}_psram-1
 # sanity config
 export MIN_NOTE=A3
 export MAX_NOTE=A5
-export TRAIN_EGS=10000
+export TRAIN_EGS=100
 export PRETRAIN_EPOCHS=20
 export FINETUNE_EPOCHS=10
 export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
@@ -48,7 +48,7 @@ pretrain() {
     --train-seq-len-multiplier 2 \
     --fp-int 3 --fp-frac 15 \
     --filter-sizes $FILTERS --relu-upper-bound 4 \
-    --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
+    --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
     --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
     --learning-rate 1e-3 --l2 1e-4 \
     | tee runs/$RUN/pretrain/qkeras_version.train.out

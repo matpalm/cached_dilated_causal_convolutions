@@ -59,20 +59,21 @@ set -ex
 # done
 
 # loss based search
-rm src_run.txt
+export KERAS_RUN=230_keras/i0
+:> src_run.txt
 echo 004 >> src_run.txt
 for D in `seq 200 209`; do
    printf -v FD "%03d" $D
    uv run generate_candidates_by_loss.py \
      --src-run-file src_run.txt \
-     --keras-run 229_keras/i0 \
+     --keras-run $KERAS_RUN \
      --dest-run $FD \
      --num-candidates 32 --density-weight 1
    uv run capture.py --run $FD
    uv run generate_model_data.py --run $FD
    pushd ..
    uv run -m keras_version.score_captures \
-     --keras-run 229_keras/i0 \
+     --keras-run $KERAS_RUN \
      --model-data-z parametric_capture/runs/$FD/model_data.z/
    popd
    echo $FD >> src_run.txt
