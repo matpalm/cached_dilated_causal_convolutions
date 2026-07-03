@@ -39,6 +39,18 @@ parser.add_argument(
 parser.add_argument(
     "--dest-run", type=Path, required=True, help="where to write stats on candidates"
 )
+parser.add_argument(
+    "--alpha-huber",
+    type=float,
+    default=1.0,
+    help="--alpha-huber from converged keras model",
+)
+parser.add_argument(
+    "--beta-stft",
+    type=float,
+    default=0.01,
+    help="--beta-stft from converged keras model",
+)
 opts = parser.parse_args()
 print(opts)
 
@@ -131,14 +143,16 @@ for e, edge in enumerate(unique_edges):
     # losses
     record["mean_huber"] = (hubers[pi] + hubers[pj]) / 2
     record["mean_stft"] = (stft[pi] + stft[pj]) / 2
-    record["loss_sum"] = record["mean_huber"] + record["mean_stft"]
+    record["loss"] = (
+        opts.alpha_huber * record["mean_huber"] + opts.beta_stft * record["mean_stft"]
+    )
 
     # local density
     local_density = densities[e]
     record["local_density"] = local_density
 
     # combined overall score
-    score = record["loss_sum"] / (1.0 + (opts.density_weight * local_density))
+    score = record["loss"] / (1.0 + (opts.density_weight * local_density))
     record["score"] = score
 
     records.append(record)
@@ -149,7 +163,7 @@ edge_scores_df = pd.DataFrame(records)
 with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "w") as f:
     print("opts", opts, file=f)
     print("src_runs", list(map(str, src_runs)), file=f)
-    for col in ["loss_sum", "local_density", "score"]:
+    for col in ["loss", "local_density", "score"]:
         print("top by", col, file=f)
         print(edge_scores_df.sort_values(col, ascending=False).head(10), file=f)
 with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "r") as f:

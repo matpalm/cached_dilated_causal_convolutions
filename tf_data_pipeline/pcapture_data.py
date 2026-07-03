@@ -2,8 +2,6 @@ from pathlib import Path
 import zarr
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from scipy.signal import lfilter
 from tqdm import tqdm
 from typing import List
 
