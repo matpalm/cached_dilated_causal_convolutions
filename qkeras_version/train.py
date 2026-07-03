@@ -16,7 +16,7 @@ from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import QKerasModelBuilder
-from .losses import combined_masked_loss_terms
+from ..common.losses import combined_masked_loss_terms
 
 import warnings
 
@@ -290,6 +290,7 @@ if __name__ == "__main__":
     # compile and train
     combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
         RECEPTIVE_FIELD_SIZE,
+        use_huber=False,  # for now
         alpha_mse=opts.alpha_mse,
         beta_stft=beta_stft,
     )
