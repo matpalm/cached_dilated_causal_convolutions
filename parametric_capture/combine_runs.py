@@ -3,8 +3,9 @@ from pathlib import Path
 import zarr
 import numpy as np
 
-from pack_z_array import pack_z_array
-from sample_db import SampleDB
+from .pack_z_array import pack_z_array
+from common.sample_db import SampleDB
+from common.util import model_data_z_path_for
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--srcs", type=str, required=True, nargs="+")
@@ -16,18 +17,10 @@ db = SampleDB()
 
 def combine(srcs, dest, dir_name_z, update_db: bool):
 
-    # for src_z in srcs:
-    #     if not src_z.exists():
-    #         src_orig_d = Path(str(src_z).replace(".z", ""))
-    #         if not src_orig_d.exists():
-    #             raise Exception("src_orig_d", src_orig_d, "doesn't even exist")
-    #         print("packing", src_orig_d, "to", src_z)
-    #         pack_z_array(src_orig_d, src_z)
-
     axis = 0
 
     # open srcs; use first as assumed config for rest
-    src_zarrs = [zarr.open(Path("runs") / f / dir_name_z, mode="r") for f in srcs]
+    src_zarrs = [zarr.open(model_data_z_path_for(s)) for s in srcs]
     first_z = src_zarrs[0]
     base_shape = list(first_z.shape)
     chunks = first_z.chunks
@@ -41,7 +34,7 @@ def combine(srcs, dest, dir_name_z, update_db: bool):
     combined_shape[axis] = total_axis_length
 
     # open output
-    dest_path = Path("runs") / dest / dir_name_z
+    dest_path = Path(model_data_z_path_for(dest, check_exists=False))
     dest_path.mkdir(parents=True, exist_ok=True)
     dest_zarr = zarr.open(
         dest_path,

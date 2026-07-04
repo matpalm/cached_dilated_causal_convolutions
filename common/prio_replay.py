@@ -8,7 +8,8 @@ from collections import Counter
 import math
 import numpy as np
 import random
-
+from pathlib import Path
+from contextlib import redirect_stdout, redirect_stderr
 
 class SumTree(object):
     """SumTree datastructure for storing priority values in binary heap like structure for fast sampling"""
@@ -84,8 +85,7 @@ class SumTree(object):
         return samples
 
     def dump(self, additional_idx_data=None):
-        print(">>dump")
-        print("total", self.total())
+        print("SUM_TREE total", self.total())
         for idx, value in enumerate(self.tree):
             real_idx = idx - self.num_elements
             if real_idx < 0:
@@ -93,19 +93,32 @@ class SumTree(object):
                 additional_data = "."
             elif additional_idx_data:
                 additional_data = additional_idx_data[real_idx]
-            print("\t".join(map(str, [idx, real_idx, additional_data, value])))
-        print("<<dump")
+            print(
+                "SUM_TREE", "\t".join(map(str, [idx, real_idx, additional_data, value]))
+            )
 
 
 class PrioExperienceReplay(object):
-    def __init__(self, size, p_epsilon=1.0, p_alpha=0.6, p_beta=0.4, p_max=100.0):
+
+    def __init__(
+        self,
+        size,
+        p_epsilon=1.0,
+        p_alpha=0.6,
+        p_beta=0.4,
+        p_max=100.0,
+        dump_log: Path = None,
+    ):
         """size: sum_tree max size
         p_epsilon: small value to add to every loss. larger values => more uniform sampling
         p_alpha: pow to raise loss to (after adding p_epsilon), 0=>uniform sampling. 1=>linear
         p_beta: importance sampling bias correction rescaling factor.
         p_max: max value p_i can take (after raising by p_alpha)
+        dump_log: if set dump logs to this file
         use p_alpha & p_beta dfts from paper sec4
         """
+
+        assert p_epsilon > 0, "p_epsilon has to strictly positive"
         self.sum_tree = SumTree(size)
         self.p_epsilon = p_epsilon
         self.p_alpha = p_alpha
@@ -113,66 +126,49 @@ class PrioExperienceReplay(object):
         self.p_max = p_max
         self.num_times_sampled = Counter()
 
-        # we use a special priority value for storing new experiences, one that is slightly larger
-        # than the maximum value. this makes new experiences most likely to be sampled (though
-        # not guaranteed) while always allowing us to cleanly identify them during sampling so we can
-        # assign an importance reweighting of 1.0 (since we don't know anything about them yet...)
-        # the alternate, allowing them to be reweighted down, would penalise them the first time
-        # they were trained against, though maybe this is OK since next time they are sampled
-        # they'd have proper weights...
-        # self.p_new_experience = self.p_max + 1
+        if dump_log is None:
+            self.dump_log = None
+        else:
+            Path(dump_log).parent.mkdir(parents=True, exist_ok=True)
+            self.dump_log = open(Path(dump_log), "w")
+            self.first_dump_log_entry = True
 
-    # def new_experience(self, idx):
-    #     """
-    #     add a completely new entry to replay memory. these entries take priority in next
-    #     batch and are given an importance weight of 1.0
-    #     """
-    #     #    print "prio_replay.new_experience", idx
-    #     self.sum_tree.update(idx, self.p_new_experience)
-    #     del self.num_times_sampled[idx]
+    def sample(self, n, max_normalise: bool = True):
+        """sample a set of n (idxs, importance_sampling weights)
 
-    def sample(self, n):
-        """sample a set of n (idxs, importance_sampling weights)"""
-        print(">sample")
+        Args:
+            n: number of examples to sample
+            max_normalise: if set, normalise weights so max is 1.0
+        """
 
         # sample idxs and priorities
         idx_prios = self.sum_tree.sample(n)
 
         # calculate importance sampling weights
         unscaled_weights = []
-        print(
-            "sum_tree.total()",
-            self.sum_tree.total(),
-            "sum_tree.size()",
-            self.sum_tree.size,
-            "p_beta",
-            self.p_beta,
-        )
-        print("\t".join(["idx", "prio", "p_j", "w_j"]))
         for idx, prio in idx_prios:
             # convert priority to prob_j by normalising based on total
             p_j = prio / self.sum_tree.total()
             # convert to importance weight
             w_j = math.pow(self.sum_tree.size * p_j, -self.p_beta)
-            print("i_%d\t%f\t%f\t%f" % (idx, prio, p_j, w_j))
             unscaled_weights.append(w_j)
             self.num_times_sampled[idx] += 1
 
-        # zip idxs with unscaled_weights and rescale them so max w_i in the batch has
-        # weight 1.0.
-        weight_scaling_factor = 1.0 / max(unscaled_weights)
+        # zip idxs with unscaled_weights and rescale them, if arg set,
+        # so max w_i in the batch has weight 1.0.
+        weight_scaling_factor = 1.0
+        if max_normalise:
+            weight_scaling_factor /= max(unscaled_weights)
         idxs, weights = [], []
         for (idx, prio), unscaled_weight in zip(idx_prios, unscaled_weights):
             idxs.append(idx)
             weights.append(unscaled_weight * weight_scaling_factor)
 
-        print("<prio_replay.sample", zip(idxs, weights))
         return idxs, weights
 
-    def update_priorities(self, idxs, losses):
-        """update a set of prios. called after a sampling with new losses"""
+    def update(self, idxs, losses):
+        """update a set of losses. called either at init, or after a sampling with new losses"""
         for idx, loss in zip(idxs, losses):
-            #      print "prio_replay.update_priorities idx", idx, "loss", loss
             # always add a small minimum amount. higher => more uniform sampling.
             prio = loss + self.p_epsilon
             # rescale; 0=>uniform, i.e. ignore scale of p_i; 1=>linear
@@ -180,17 +176,22 @@ class PrioExperienceReplay(object):
             # clip at some max value
             prio = min(prio, self.p_max)
             self.sum_tree.update(idx, prio)
-        print("<prio_replay.update_priorities -> dump")
-        self.dump()
+        # print("<prio_replay.update_priorities -> dump")
+        # self.dump()
 
-    def dump(self):
-        print(">sumtree dump")
-        self.sum_tree.dump(self.num_times_sampled)
-        print(">most_common")
-        print("idx\tfreq\tvalue")
+    def dump(self, epoch: int):
+        if self.dump_log is None:
+            return
+        if self.first_dump_log_entry:
+            print("\t".join(["epoch", "idx", "freq", "sum_tree_v"]), file=self.dump_log)
+            self.first_dump_log_entry = False
         most_common = self.num_times_sampled.most_common(200)
         for idx, freq in most_common:
-            print("\t".join(map(str, [idx, freq, self.sum_tree.value_at(idx)])))
+            print(
+                "\t".join(map(str, [epoch, idx, freq, self.sum_tree.value_at(idx)])),
+                file=self.dump_log,
+            )
+        self.dump_log.flush()
 
 
 #    print "value percentiles", map(float, per.sum_tree.value_ntiles(n=11))

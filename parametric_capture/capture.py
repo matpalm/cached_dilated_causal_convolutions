@@ -4,12 +4,12 @@ from pathlib import Path
 from tqdm import tqdm
 import zarr
 import signal
+import numpy as np
 
-from audio_interface import AudioInterface, SAMPLE_RATE_HZ
-from sampling import *
-from util import *
-from pack_z_array import pack_z_array
-from sample_db import SampleDB
+from .audio_interface import AudioInterface, SAMPLE_RATE_HZ
+from .pack_z_array import pack_z_array
+from common.sample_db import SampleDB
+from .sampling import generate_cv_schroeder_multisine
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--run", type=Path, required=True)

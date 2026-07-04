@@ -2,8 +2,7 @@ import numpy as np
 import random
 from scipy.stats import qmc
 
-from audio_interface import SAMPLE_RATE_HZ
-
+from .audio_interface import SAMPLE_RATE_HZ
 
 def generate_cv_schroeder_multisine(
     freq_spacing_hz: float = 500,

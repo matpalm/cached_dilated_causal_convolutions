@@ -190,7 +190,7 @@ class SampleDB(object):
             do update set huber=excluded.huber,
                           stft=excluded.stft
             """,
-            (run, idx, str(model), huber, stft),
+            (run, idx, str(model), loss, huber, stft),
         )
         self.conn.commit()
 
@@ -212,9 +212,10 @@ class SampleDB(object):
         self, src_run: str, dest_run: str, idx_offset: int
     ):
         """
-        duplicate entries from src_run as dest_run but with dest_run.idx values
-        offset by +idx_offset
+        duplicate entries from src_run as dest_run
+        but with dest_run.idx values offset by +idx_offset in cv_values
         """
+
         assert idx_offset >= 0
         src_run = str(src_run)
         dest_run = str(dest_run)
@@ -229,6 +230,16 @@ class SampleDB(object):
             """,
             (dest_run, idx_offset, src_run),
         )
+        c.execute(
+            """
+            insert into losses
+            (run, idx, model, loss, huber, stft)
+                select ?, idx + ?, model, loss, huber, stft
+                from losses
+                where run=?
+            """,
+            (dest_run, idx_offset, src_run),
+        )
         self.conn.commit()
 
     def delete_run(self, run: str):
@@ -237,6 +248,23 @@ class SampleDB(object):
         c.execute("delete from losses where run=?", (run,))
         self.conn.commit()
 
+    def dump_stats(self):
+        c = self.conn.cursor()
+        c.execute("""
+            select run, count(*) as c
+            from cv_values
+            group by run order by run
+            """)
+        for r in c.fetchall():
+            print(r)
+        c.execute("""
+            select run, model, count(*) as c
+            from losses
+            group by run, model
+            """)
+        for r in c.fetchall():
+            print(r)
+
 
 if __name__ == "__main__":
     import argparse
@@ -244,7 +272,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    parser.add_argument("--run", type=str, required=True, nargs="+")
+    parser.add_argument("--run", type=str, nargs="+")
     parser.add_argument("--delete", action="store_true")
     opts = parser.parse_args()
 
@@ -253,3 +281,7 @@ if __name__ == "__main__":
     if opts.delete:
         for run in opts.run:
             db.delete_run(run)
+
+    db.dump_stats()
+
+    # always do stats

@@ -1,7 +1,7 @@
 import sounddevice as sd
 import numpy as np
 
-from util import fade_in_out
+from .util import fade_in_out
 
 SAMPLE_RATE_HZ = 48_000
 

@@ -7,7 +7,6 @@ import seaborn as sns
 from pathlib import Path
 from sklearn.neighbors import NearestNeighbors
 from tqdm import tqdm
-from util import *
 import pickle
 from sklearn.preprocessing import MinMaxScaler
 
@@ -16,7 +15,7 @@ import warnings
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
-from sample_db import SampleDB
+from common.sample_db import SampleDB
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument(

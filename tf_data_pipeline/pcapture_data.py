@@ -51,21 +51,21 @@ class ParametricCaptureData(object):
         seed: int = 123,
     ):
         self.capture_run = capture_run
-        try:
-            self.model_data_z = zarr.open(model_data_z_path_for(capture_run), mode="r")
-        except zarr.errors.PathNotFoundError as e:
-            print("files not found in", str(model_data_z), str(e))
-            raise e
+        self.model_data_z = zarr.open(model_data_z_path_for(capture_run), mode="r")
         self.n_chunks = self.model_data_z.nchunks
         self.chunk_len = self.model_data_z.blocks[0].shape[0]
-        # print("self.n_chunks", self.n_chunks, "self.chunk_len", self.chunk_len)
         self.rng = np.random.default_rng(seed=seed)
 
     def num_examples(self):
         return self.n_chunks
 
     def tf_training_dataset(
-        self, seq_len: int, num_batches: int, batch_size: int, cache_fname: str = None
+        self,
+        seq_len: int,
+        num_batches: int,
+        batch_size: int,
+        cache_fname: str = None,
+        emit_idx: bool = False,
     ):
         """
         Generate num_samples samples of shape (batch_size, seq_len, 4)
@@ -74,6 +74,8 @@ class ParametricCaptureData(object):
             seq_len: second axis for batch
             num_batches: total number of batches generated
             batch_size: batch size
+            cache_fname: if set, cache to this file
+            emit_idx: if false dataset is just (x, y) but if true return (x, y, eg_idx)
         """
 
         def sample_generator():
@@ -86,14 +88,20 @@ class ParametricCaptureData(object):
                 r_seq_to = r_seq_from + seq_len
                 # grab relevant pieces
                 data = self.model_data_z.blocks[r_chunk][r_seq_from:r_seq_to]
-                yield model_data_block_to_xs_ys(data)
+                if emit_idx:
+                    yield *model_data_block_to_xs_ys(data), r_chunk
+                else:
+                    yield model_data_block_to_xs_ys(data)
+
+        output_signature = [
+            tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float32),
+            tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float32),
+        ]
+        if emit_idx:
+            output_signature.append(tf.TensorSpec(shape=(), dtype=tf.int32))
 
         ds = tf.data.Dataset.from_generator(
-            sample_generator,
-            output_signature=(
-                tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float32),
-                tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float32),
-            ),
+            sample_generator, output_signature=tuple(output_signature)
         )
         if cache_fname is not None:
             ds = ds.cache(cache_fname)
@@ -124,7 +132,7 @@ class ParametricCaptureData(object):
             for c in range(self.n_chunks):
                 data = self.model_data_z.blocks[c]
                 if return_sample_info:
-                    yield *model_data_block_to_xs_ys(data), self.capture_run, c
+                    yield *model_data_block_to_xs_ys(data), str(self.capture_run), c
                 else:
                     yield model_data_block_to_xs_ys(data)
 

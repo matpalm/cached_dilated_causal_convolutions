@@ -58,23 +58,37 @@ set -ex
 #   echo $FD >> src_run.txt
 # done
 
+# --------------------------------
+# importance sampling run
+
+# initial short run on sobol data to get model for scoring
+# uv run -m keras_version.train \
+#  --run 231_keras/i0 \
+#  --capture-run 004 \
+#  --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 \
+#  --batch-size 64 --num-train-batches 1000 --epochs 1
+
+# score sobol samples for guiding hard example generation
+# uv run -m keras_version.score_captures \
+#  --keras-run 231_keras/i0 \
+#  --capture-run 004
+
 # loss based search
-export KERAS_RUN=230_keras/i0
+export KERAS_RUN=231_keras/i0
 :> src_run.txt
 echo 004 >> src_run.txt
-for D in `seq 200 209`; do
+for D in `seq 201 209`; do
    printf -v FD "%03d" $D
-   uv run generate_candidates_by_loss.py \
+   uv run -m parametric_capture.generate_candidates_by_loss \
      --src-run-file src_run.txt \
      --keras-run $KERAS_RUN \
      --dest-run $FD \
      --num-candidates 32 --density-weight 1
-   uv run capture.py --run $FD
-   uv run generate_model_data.py --run $FD
-   pushd ..
+   uv run -m parametric_capture.capture --run $FD
+   uv run -m parametric_capture.generate_model_data --run $FD
    uv run -m keras_version.score_captures \
      --keras-run $KERAS_RUN \
-     --model-data-z parametric_capture/runs/$FD/model_data.z/
-   popd
+     --capture-run $FD
    echo $FD >> src_run.txt
 done
+
