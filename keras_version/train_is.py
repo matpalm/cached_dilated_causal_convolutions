@@ -36,17 +36,18 @@ if __name__ == "__main__":
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--hard-batch-egs", type=int, default=4)
     parser.add_argument(
         "--sobol-capture-run",
         type=str,
         required=True,
-        help="half of each batch is from this capture run; unbiased from sobol",
+        help="batch_size - hard_batch_egs of each batch is from this capture run; unbiased from sobol",
     )
     parser.add_argument(
         "--hard-capture-run",
         type=str,
         required=True,
-        help="half of each batch is from this capture run; sampled with importance sampling",
+        help="hard_batch_egs of each batch is from this capture run; sampled with importance sampling",
     )
     parser.add_argument(
         "--keras-model",
@@ -105,11 +106,14 @@ if __name__ == "__main__":
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
     print("TEST_SEQ_LEN", TEST_SEQ_LEN)
 
+    assert 0 < opts.hard_batch_egs < opts.batch_size
+    sobol_batch_egs = opts.batch_size - opts.hard_batch_egs
+
     sobol_data = ParametricCaptureData(capture_run=opts.sobol_capture_run)
     sobol_train_ds = sobol_data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
         num_batches=opts.train_batches_per_epoch,
-        batch_size=opts.batch_size // 2,
+        batch_size=sobol_batch_egs,
         emit_idx=True,
     )
     print("sobol", opts.sobol_capture_run, "|egs|", sobol_data.num_examples())
@@ -121,7 +125,7 @@ if __name__ == "__main__":
     hard_train_ds = hard_data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
         num_batches=opts.train_batches_per_epoch,
-        batch_size=opts.batch_size // 2,
+        batch_size=opts.hard_batch_egs,
     )
 
     validate_ds = sobol_data.tf_training_dataset(
@@ -273,7 +277,8 @@ if __name__ == "__main__":
 
                 callback_list.on_train_batch_begin(step)
 
-                # the sobol and hard examples provide half the batch each
+                # sobol provides (batch_size - hard_batch_egs) and hard provides
+                # hard_batch_egs of each batch
                 x_sobol_b, y_sobol_b, idx_sobol_b = next(sobol_train_iter)
                 x_hard_b, y_hard_b, idx_is_b, weight_is_b = next(hard_train_iter)
 
@@ -305,14 +310,6 @@ if __name__ == "__main__":
                     x_b, y_b, weight_b
                 )
 
-                print(
-                    "loss_value",
-                    loss_value,
-                    "core_value",
-                    core_value,
-                    "stft_value",
-                    stft_value,
-                )
                 per_element_loss_b = per_element_loss_b.numpy().tolist()
 
                 # print("per_element_loss_b", list(enumerate(per_element_loss_b)))
