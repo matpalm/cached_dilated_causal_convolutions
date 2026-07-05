@@ -3,17 +3,11 @@ import numpy as np
 from scipy.spatial import Delaunay
 import zarr
 import pandas as pd
-import seaborn as sns
 from pathlib import Path
 from sklearn.neighbors import NearestNeighbors
 from tqdm import tqdm
 import pickle
 from sklearn.preprocessing import MinMaxScaler
-
-# seaborn just wont shut up
-import warnings
-
-warnings.simplefilter(action="ignore", category=FutureWarning)
 
 from common.sample_db import SampleDB
 
@@ -39,10 +33,10 @@ parser.add_argument(
     "--dest-run", type=Path, required=True, help="where to write stats on candidates"
 )
 parser.add_argument(
-    "--alpha-huber",
+    "--alpha-mse",
     type=float,
     default=1.0,
-    help="--alpha-huber from converged keras model",
+    help="--alpha-mse from converged keras model",
 )
 parser.add_argument(
     "--beta-stft",
@@ -131,7 +125,7 @@ hubers = np.array(losses_df["huber"])
 stft = np.array(losses_df["stft"])
 
 records = []
-for e, edge in enumerate(unique_edges):
+for e, edge in tqdm(enumerate(unique_edges)):
     record = {}
 
     # record pts

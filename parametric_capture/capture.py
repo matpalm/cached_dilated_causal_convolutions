@@ -27,7 +27,7 @@ opts = parser.parse_args()
 if opts.explicitly_use_channels:
     raise Exception("broke support for this sample_db changes. needs updating!")
 
-run_dir = Path("runs") / opts.run
+run_dir = Path(__file__).parent / "runs" / opts.run
 
 # fetch from sample_db the count of captures done and pending for this run
 db = SampleDB()

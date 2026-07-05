@@ -34,7 +34,7 @@ def combine(srcs, dest, dir_name_z, update_db: bool):
     combined_shape[axis] = total_axis_length
 
     # open output
-    dest_path = Path(model_data_z_path_for(dest, check_exists=False))
+    dest_path = Path(model_data_z_path_for(opts.dest, check_exists=False))
     dest_path.mkdir(parents=True, exist_ok=True)
     dest_zarr = zarr.open(
         dest_path,

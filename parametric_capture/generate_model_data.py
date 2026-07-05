@@ -11,6 +11,8 @@ import argparse
 from tqdm import tqdm
 from numcodecs import Blosc
 
+from common.util import zarr_base_path_for
+
 # def two_stage_one_pole_lowpass(x: np.ndarray, alpha: float = 0.6) -> np.ndarray:
 #     b = np.array([alpha])
 #     a = np.array([1.0, -(1.0 - alpha)])
@@ -22,11 +24,10 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument("--run", type=Path, required=True)
 opts = parser.parse_args()
 
-if ("runs" / opts.run / "model_data.z").exists():
-    raise Exception(str("runs" / opts.run / "model_data.z"), "already exists")
+zarr_base = zarr_base_path_for(opts.run)
 
-capture_buffer_z = zarr.open("runs" / opts.run / "capture_buffers.z", mode="r")
-cv_buffer_z = zarr.open("runs" / opts.run / "cv_buffers.z", mode="r")
+capture_buffer_z = zarr.open(zarr_base / "capture_buffers.z", mode="r")
+cv_buffer_z = zarr.open(zarr_base / "cv_buffers.z", mode="r")
 assert capture_buffer_z.nchunks == cv_buffer_z.nchunks
 print("capture_buffer_z.nchunks", capture_buffer_z.nchunks)
 assert capture_buffer_z.shape == cv_buffer_z.shape
@@ -36,7 +37,7 @@ total_entries = capture_buffer_z.shape[0]
 chunk_rows = capture_buffer_z.chunks[0]
 
 model_data_z = zarr.open(
-    "runs" / opts.run / "model_data.z",
+    zarr_base / "model_data.z",
     mode="w",
     shape=(total_entries, 5),
     chunks=(chunk_rows, 5),
