@@ -33,10 +33,10 @@ parser.add_argument(
     "--dest-run", type=Path, required=True, help="where to write stats on candidates"
 )
 parser.add_argument(
-    "--alpha-mse",
+    "--alpha-huber",
     type=float,
     default=1.0,
-    help="--alpha-mse from converged keras model",
+    help="--alpha-mse ( huber ) from converged keras model",
 )
 parser.add_argument(
     "--beta-stft",
@@ -125,7 +125,7 @@ hubers = np.array(losses_df["huber"])
 stft = np.array(losses_df["stft"])
 
 records = []
-for e, edge in tqdm(enumerate(unique_edges)):
+for e, edge in enumerate(unique_edges):
     record = {}
 
     # record pts

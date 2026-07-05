@@ -99,7 +99,6 @@ set -ex
 
 # PLOT 3d vis of cv_values for 210
 
-
 # run importance sampling using sobol and these hard examples
 # uv run -m keras_version.train_is \
 #  --run 231_keras/i1 --restore-run 231_keras/i0 \
@@ -141,6 +140,10 @@ set -ex
 #  --srcs 210 `seq -s" " 220 229` \
 #  --dest 230
 
+# uv run -m parametric_capture.combine_runs \
+#  --srcs `seq -s" " 220 229` \
+#  --dest 220_229
+
 # PLOT 3d vis of cv_values for 220 to 229   ( ie without 210 )
 
 # second round of importance sampling training
@@ -165,12 +168,149 @@ set -ex
 #  --capture-runs 230
 
 # PLOT sobol/hard huber/stft runs plot
+
+# generate new candidates by loss and cv_space density and capture them
+# do 20 runs, not just 10 this time
+# export KERAS_RUN=231_keras/i2
+# :> src_run.txt
+# echo 004 >> src_run.txt
+# echo 230 >> src_run.txt
+# for D in `seq 240 259`; do
+#    printf -v FD "%03d" $D
+#    uv run -m parametric_capture.generate_candidates_by_loss \
+#      --src-run-file src_run.txt \
+#      --keras-run $KERAS_RUN \
+#      --dest-run $FD \
+#      --num-candidates 32 --density-weight 1
+#    uv run -m parametric_capture.capture --run $FD
+#    uv run -m parametric_capture.generate_model_data --run $FD
+#    uv run -m keras_version.score_captures \
+#      --keras-run $KERAS_RUN \
+#      --capture-runs $FD
+#    echo $FD >> src_run.txt
+# done
+
+# combine runs 210 + last => 640 egs
+# uv run -m parametric_capture.combine_runs \
+#   --srcs `seq -s" " 240 259` \
+#   --dest 240_259
+# uv run -m parametric_capture.combine_runs \
+#   --srcs 230 `seq -s" " 240 259` \
+#   --dest 260
+
+# third round of importance sampling training
+#  - no beta warmup/ramp
+#  - 200 epochs
+# uv run -m keras_version.train_is \
+#  --run 231_keras/i3 --restore-run 231_keras/i2 \
+#  --sobol-capture-run 004 \
+#  --hard-capture-run 260 --keras-model 231_keras/i2 \
+#  --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0 --beta-stft-ramp 0 \
+#  --batch-size 64 --hard-batch-egs 8 \
+#  --train-batches-per-epoch 200 \
+#  --epochs 10
+
+# uv run -m keras_version.score_captures \
+#  --keras-run 231_keras/i3 \
+#  --capture-runs 004 260
+
+# PLOT sobol/hard huber/stft runs plot
+
+# generate new candidates by loss and cv_space density and capture them
+# increase from 20 to 30 capture run loops
+# also drop density weight from 1.0 to 0.1
+# export KERAS_RUN=231_keras/i3
+# export HARD_EGS_RUN=260
+# :> src_run.txt
+# echo 004 >> src_run.txt
+# echo $HARD_EGS_RUN >> src_run.txt
+# for D in `seq 270 299`; do
+#    printf -v FD "%03d" $D
+#    uv run -m parametric_capture.generate_candidates_by_loss \
+#      --src-run-file src_run.txt \
+#      --keras-run $KERAS_RUN \
+#      --dest-run $FD \
+#      --num-candidates 32 --density-weight 0.1
+#    uv run -m parametric_capture.capture --run $FD
+#    uv run -m parametric_capture.generate_model_data --run $FD
+#    uv run -m keras_version.score_captures \
+#      --keras-run $KERAS_RUN \
+#      --capture-runs $FD
+#    echo $FD >> src_run.txt
+# done
+
+# # combine runs 210 + last => 640 egs
+# export NEW_HARD_EGS_RUN=300
+# uv run -m parametric_capture.combine_runs \
+#   --srcs `seq -s" " 270 299` \
+#   --dest 270_299
+# uv run -m parametric_capture.combine_runs \
+#   --srcs $HARD_EGS_RUN `seq -s" " 270 299` \
+#   --dest $NEW_HARD_EGS_RUN
+
+# # 4th round of importance sampling training
+# #  - no beta warmup/ramp
+# #  - 300 epochs
+# export NEW_KERAS_RUN=231_keras/i4
+# uv run -m keras_version.train_is \
+#  --run $NEW_KERAS_RUN --restore-run $KERAS_RUN \
+#  --sobol-capture-run 004 \
+#  --hard-capture-run $NEW_HARD_EGS_RUN --keras-model $KERAS_RUN \
+#  --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0 --beta-stft-ramp 0 \
+#  --batch-size 64 --hard-batch-egs 8 \
+#  --train-batches-per-epoch 300 \
+#  --epochs 10
+# uv run -m keras_version.score_captures \
+#  --keras-run $NEW_KERAS_RUN \
+#  --capture-runs 004 $NEW_HARD_EGS_RUN
+
+# PLOT sobol/hard huber/stft runs plot
+
+# generate new candidates by loss and cv_space density and capture them
+# increase from 20 to 30 capture run loops
+# also drop density weight from 1.0 to 0.1
+export KERAS_RUN=231_keras/i4
+export HARD_EGS_RUN=300
+export NEW_HARD_FROM=301
+export NEW_HARD_TO=319
+export NEW_HARD_EGS_RUN=320
+export NEW_KERAS_RUN=231_keras/i5
+
 :> src_run.txt
 echo 004 >> src_run.txt
-#echo 230 >> src_run.txt
-uv run -m parametric_capture.generate_candidates_by_loss_diff \
-    --src-run-file src_run.txt \
-    --dest-run 666 \
-    --num-candidates 32 --density-weight 1
+echo $HARD_EGS_RUN >> src_run.txt
+for D in `seq $NEW_HARD_FROM $NEW_HARD_TO`; do
+   printf -v FD "%03d" $D
+   uv run -m parametric_capture.generate_candidates_by_loss \
+     --src-run-file src_run.txt \
+     --keras-run $KERAS_RUN \
+     --dest-run $FD \
+     --num-candidates 32 --density-weight 0.25
+   uv run -m parametric_capture.capture --run $FD
+   uv run -m parametric_capture.generate_model_data --run $FD
+   uv run -m keras_version.score_captures \
+     --keras-run $KERAS_RUN \
+     --capture-runs $FD
+   echo $FD >> src_run.txt
+done
+uv run -m parametric_capture.combine_runs \
+  --srcs `seq -s" " $NEW_HARD_FROM $NEW_HARD_TO` \
+  --dest ${NEW_HARD_FROM}_${NEW_HARD_TO}
+uv run -m parametric_capture.combine_runs \
+  --srcs $HARD_EGS_RUN `seq -s" " $NEW_HARD_FROM $NEW_HARD_TO` \
+  --dest $NEW_HARD_EGS_RUN
 
-
+# # 4th round of importance sampling training
+# #  - no beta warmup/ramp
+# #  - 300 epochs
+uv run -m keras_version.train_is \
+ --run $NEW_KERAS_RUN --restore-run $KERAS_RUN \
+ --sobol-capture-run 004 \
+ --hard-capture-run $NEW_HARD_EGS_RUN --keras-model $KERAS_RUN \
+ --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0 --beta-stft-ramp 0 \
+ --batch-size 64 --hard-batch-egs 8 \
+ --train-batches-per-epoch 300 \
+ --epochs 10
+uv run -m keras_version.score_captures \
+ --keras-run $NEW_KERAS_RUN \
+ --capture-runs 004 $NEW_HARD_EGS_RUN

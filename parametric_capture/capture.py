@@ -44,7 +44,6 @@ if captured_stats[True] == 0:
     run_dir.mkdir(parents=True, exist_ok=True)
     num_todo = captured_stats[False]
     assert num_todo > 0
-    print("first time running", run_dir, "setup zarrays to hold", num_todo, "samples")
     sample_len = opts.sample_len_sec * SAMPLE_RATE_HZ
     num_channels = 4
     cv_buffers_z = zarr.open(

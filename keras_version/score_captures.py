@@ -52,8 +52,6 @@ latest_ckpt = list(sorted(ckpts))[-1]
 print("using ckpt", latest_ckpt)
 inference_model.load_weights(str(latest_ckpt))
 
-print(inference_model.summary())
-
 print("WARNING: assuming use_huber_loss=True")
 _combined_loss_fn, mse_loss_fn, stft_loss_fn = combined_masked_loss_terms(
     receptive_field_size=None,

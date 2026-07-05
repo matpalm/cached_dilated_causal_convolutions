@@ -23,3 +23,7 @@ old_runs
 datalogger_firmware/data
 parametric_capture/src_run.txt
 sample.db
+loss_log.tsv
+src_run.txt
+train_is.out
+common/sample.db.bu
