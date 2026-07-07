@@ -24,9 +24,6 @@ parser.add_argument(
 parser.add_argument("--sample-len-sec", type=float, default=2.0)
 opts = parser.parse_args()
 
-if opts.explicitly_use_channels:
-    raise Exception("broke support for this sample_db changes. needs updating!")
-
 run_dir = Path(__file__).parent / "runs" / opts.run
 
 # fetch from sample_db the count of captures done and pending for this run
@@ -135,15 +132,8 @@ def cv_a_to_audio_buffer(cv_values, amp):
 audio = AudioInterface()
 
 for s, idx in enumerate(tqdm(sample_ids, desc="capture")):
-    #  capture_dts = DTS()
     cv_buffer = cv_a_to_audio_buffer(cv_values[s], amplitudes[s])
     cv_buffers_z.blocks[idx] = cv_buffer
-    #    np.save(run_dir / "cv_buffers" / f"{capture_dts}.npy", cv_buffer)
     capture_buffer = audio.send(cv_buffer)
     capture_buffers_z.blocks[idx] = capture_buffer
-    #    np.save(run_dir / "capture_buffers" / f"{capture_dts}.npy", capture_buffer)
     db.set_captured(run=opts.run, idx=idx)
-
-
-# pack_z_array(run_dir / "capture_buffers", run_dir / "capture_buffers.z")
-# pack_z_array(run_dir / "cv_buffers", run_dir / "cv_buffers.z")

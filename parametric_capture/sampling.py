@@ -82,3 +82,24 @@ class SobolSampler(object):
             self.sampler.fast_forward(fast_forward)
         samples = self.sampler.random(n=num_samples_po2)  # (num_samples, num_d) (0, 1)
         return qmc.scale(samples, self.lower_bounds, self.upper_bounds)
+
+
+class UniformSampler(object):
+
+    def __init__(
+        self,
+        bounds,  # list of 2 tuples
+        seed: int,
+    ):
+        for b in bounds:
+            if len(b) != 2:
+                raise Exception("bounds should be list of 2 tuples")
+        self.lower_bounds, upper_bounds = list(zip(*bounds))
+        self.lower_bounds = np.array(self.lower_bounds)
+        upper_bounds = np.array(upper_bounds)
+        self.bounds_diffs = upper_bounds - self.lower_bounds
+        self.rng = np.random.default_rng(seed)
+
+    def samples(self, num_samples: int):
+        rnd_0_1 = self.rng.uniform(size=(num_samples, self.lower_bounds.size))
+        return self.lower_bounds + self.bounds_diffs * rnd_0_1

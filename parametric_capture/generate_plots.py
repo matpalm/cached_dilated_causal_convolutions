@@ -5,10 +5,10 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-
-from plotting import collage, plot
 import random
 
+from .plotting import collage, plot
+from common.util import zarr_base_path_for
 
 def _fig_to_pil_img(fig):
     fig.canvas.draw()
@@ -26,7 +26,7 @@ parser.add_argument(
 )
 opts = parser.parse_args()
 
-run_dir = Path("runs") / opts.run
+run_dir = zarr_base_path_for(opts.run)
 
 capture_buffers_zarr = zarr.open(run_dir / "capture_buffers.z", mode="r")
 cv_buffers_zarr = zarr.open(run_dir / "cv_buffers.z", mode="r")
@@ -48,31 +48,9 @@ if opts.num:
 
 for i in tqdm(range(num)):
     b_idx = idxs[i]
-
     cv_buffer = cv_buffers_zarr.blocks[b_idx]
     capture_buffer = capture_buffers_zarr.blocks[b_idx]
     model_data_buffer = model_data_zarr.blocks[b_idx]
-
-    sample_len, _channels = capture_buffer.shape
-
-    plot_len = 2_000
-    plot_offset = random.randint(500, sample_len - plot_len)
-
-    def plot_buffer(buffer):
-        fig = plot(
-            buffer,
-            title=f"b{b_idx} offset{str(plot_offset)}",
-            fname=None,
-            plot_offset=plot_offset,
-            plot_len=plot_len,
-        )
-        pil_img = _fig_to_pil_img(fig)
-        plt.close(fig)
-        return pil_img
-
-    cv_pil_img = plot_buffer(cv_buffer)
-    capture_pil_img = plot_buffer(capture_buffer)
-    model_pil_img = plot_buffer(model_data_buffer)
-
-    combined = collage([cv_pil_img, capture_pil_img, model_pil_img], side_by_side=True)
+    plots = [plot(cv_buffer), plot(capture_buffer), plot(model_data_buffer)]
+    combined = collage(plots, side_by_side=True)
     combined.save(plots_dir / f"{b_idx:06d}.buffers.jpg")

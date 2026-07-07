@@ -83,6 +83,14 @@ class SampleDB(object):
         self.conn.commit()
 
     def cv_values_for(self, run: str, idx: int = None):
+        """
+        Args:
+            run: always needs to be set
+            idx: if None, return all ( ordered by idx )
+                 if a list, return entries as dict { entry: cv_values }
+                 if int, return just that entry
+        """
+
         run = str(run)
         c = self.conn.cursor()
         if idx is None:
@@ -251,19 +259,18 @@ class SampleDB(object):
     def dump_stats(self):
         c = self.conn.cursor()
         c.execute("""
-            select run, count(*) as c
-            from cv_values
-            group by run order by run
-            """)
-        for r in c.fetchall():
-            print(r)
-        c.execute("""
             select run, model, count(*) as c
             from losses
             group by run, model
             """)
-        for r in c.fetchall():
-            print(r)
+        print("\n".join(map(str, c.fetchall())))
+        print()
+        c.execute("""
+            select run, count(*) as c
+            from cv_values
+            group by run order by run
+            """)
+        print("\n".join(map(str, c.fetchall())))
 
 
 if __name__ == "__main__":
@@ -281,6 +288,7 @@ if __name__ == "__main__":
     if opts.delete:
         for run in opts.run:
             db.delete_run(run)
+        exit()
 
     db.dump_stats()
 

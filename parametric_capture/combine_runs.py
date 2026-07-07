@@ -5,7 +5,7 @@ import numpy as np
 
 from .pack_z_array import pack_z_array
 from common.sample_db import SampleDB
-from common.util import model_data_z_path_for
+from common.util import zarr_base_path_for
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--srcs", type=str, required=True, nargs="+")
@@ -20,7 +20,7 @@ def combine(srcs, dest, dir_name_z, update_db: bool):
     axis = 0
 
     # open srcs; use first as assumed config for rest
-    src_zarrs = [zarr.open(model_data_z_path_for(s)) for s in srcs]
+    src_zarrs = [zarr.open(zarr_base_path_for(s) / dir_name_z) for s in srcs]
     first_z = src_zarrs[0]
     base_shape = list(first_z.shape)
     chunks = first_z.chunks
@@ -34,7 +34,7 @@ def combine(srcs, dest, dir_name_z, update_db: bool):
     combined_shape[axis] = total_axis_length
 
     # open output
-    dest_path = Path(model_data_z_path_for(opts.dest, check_exists=False))
+    dest_path = Path(zarr_base_path_for(opts.dest, check_exists=False) / dir_name_z)
     dest_path.mkdir(parents=True, exist_ok=True)
     dest_zarr = zarr.open(
         dest_path,
@@ -62,9 +62,10 @@ def combine(srcs, dest, dir_name_z, update_db: bool):
         offset += axis_length
         db_idx_offset += z.nchunks
 
+    print("dir_name_z", dir_name_z)
     print("src_zarrs", [z.shape for z in src_zarrs])
     print("dest_zarr", dest_zarr.shape)
 
-
 combine(opts.srcs, opts.dest, dir_name_z="cv_buffers.z", update_db=True)
 combine(opts.srcs, opts.dest, dir_name_z="capture_buffers.z", update_db=False)
+combine(opts.srcs, opts.dest, dir_name_z="model_data.z", update_db=False)

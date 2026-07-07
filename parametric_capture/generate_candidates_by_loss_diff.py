@@ -10,6 +10,7 @@ import pickle
 from sklearn.preprocessing import MinMaxScaler
 
 from common.sample_db import SampleDB
+from common.loss_cache import CachedEdgeLoss
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument(
@@ -21,7 +22,7 @@ parser.add_argument(
     default=[],
 )
 parser.add_argument("--src-run-file", type=Path, help="if set, add runs from this list")
-parser.add_argument("--keras-run", type=str, help="for losses in db", required=True)
+# parser.add_argument("--keras-run", type=str, help="for losses in db", required=True)
 parser.add_argument("--num-candidates", type=int, default=256)
 parser.add_argument(
     "--density-weight",
@@ -50,6 +51,7 @@ print(opts)
 ("runs" / opts.dest_run).mkdir(parents=True, exist_ok=True)
 
 db = SampleDB()
+cached_edge_loss = CachedEdgeLoss()
 
 src_runs = []
 for src_run in opts.src_run:
@@ -59,25 +61,29 @@ if opts.src_run_file and opts.src_run_file.exists():
         for line in f.readlines():
             src_runs.append(Path(line.strip()))
 
-# load loss values for each run
-loss_rows = []
-for src_run in src_runs:
-    losses = db.losses_for(src_run, model=opts.keras_run)
-    print("src_run", src_run, "model", opts.keras_run, "|losses|", len(losses))
-    loss_rows.extend(losses)
-losses_df = pd.DataFrame(loss_rows)
-del loss_rows
-print(losses_df.describe())
-print("|losses|", len(losses_df))
-assert len(losses_df) > 0
+# # load loss values for each run
+# loss_rows = []
+# for src_run in src_runs:
+#     losses = db.losses_for(src_run, model=opts.keras_run)
+#     print("src_run", src_run, "model", opts.keras_run, "|losses|", len(losses))
+#     loss_rows.extend(losses)
+# losses_df = pd.DataFrame(loss_rows)
+# del loss_rows
+# print(losses_df.describe())
+# print("|losses|", len(losses_df))
+# assert len(losses_df) > 0
 
 cv_samples = []
+cv_sample_idx_to_run_and_idx = []
 for src_run in src_runs:
-    cv_samples.append(db.cv_values_for(src_run))
+    cv_values = db.cv_values_for(src_run)
+    cv_samples.append(cv_values)
+    for i in range(len(cv_values)):
+        cv_sample_idx_to_run_and_idx.append((str(src_run), i))
 cv_samples = np.vstack(cv_samples)
 print("cv_samples", cv_samples.shape)
-if len(losses_df) != len(cv_samples):
-    raise Exception(f"|losses_df| {len(losses_df)} != |cv_samples| {len(cv_samples)}")
+# if len(losses_df) != len(cv_samples):
+#     raise Exception(f"|losses_df| {len(losses_df)} != |cv_samples| {len(cv_samples)}")
 
 tri = Delaunay(cv_samples)
 num_simplex_vertices = tri.simplices.shape[-1]
@@ -91,6 +97,7 @@ for simplex in tri.simplices:
             edges.add(edge)
 unique_edges = list(edges)
 print("|unique_edges|", len(unique_edges))
+
 
 # calculate all edge midpoints and lengths
 # do this pass first to get density_scores
@@ -116,15 +123,15 @@ densities = np.array([len(neighbors) for neighbors in density_counts], dtype=flo
 # print("densities", list(densities))
 
 # scaling scoring pieces
-scaler = MinMaxScaler()
-for col in ["huber", "stft"]:
-    losses_df[col] = scaler.fit_transform(losses_df[[col]])
+# scaler = MinMaxScaler()
+# for col in ["huber", "stft"]:
+#     losses_df[col] = scaler.fit_transform(losses_df[[col]])
+# hubers = np.array(losses_df["huber"])
+# stft = np.array(losses_df["stft"])
 
-hubers = np.array(losses_df["huber"])
-stft = np.array(losses_df["stft"])
 
 records = []
-for e, edge in enumerate(unique_edges):
+for e, edge in enumerate(tqdm(unique_edges)):
     record = {}
 
     # record pts
@@ -132,19 +139,33 @@ for e, edge in enumerate(unique_edges):
     record["pi"] = pi
     record["pj"] = pj
 
+    # mark points in dataframe as run and idx
+    run_i, idx_i = cv_sample_idx_to_run_and_idx[pi]
+    run_j, idx_j = cv_sample_idx_to_run_and_idx[pj]
+    record["run_i"] = f"{run_i}_{idx_i}"
+    record["run_j"] = f"{run_j}_{idx_j}"
+
+    # cv distance
+    cv_dist = edge_lengths[e]
+    record["cv_dist"] = cv_dist
+
     # losses
-    record["mean_huber"] = (hubers[pi] + hubers[pj]) / 2
-    record["mean_stft"] = (stft[pi] + stft[pj]) / 2
-    record["loss"] = (
-        opts.alpha_huber * record["mean_huber"] + opts.beta_stft * record["mean_stft"]
-    )
+    _loss, huber, stft = cached_edge_loss.get(run_i, idx_i, run_j, idx_j)
+    record["huber"] = huber  # just to show
+    record["stft"] = stft
+    record["loss"] = stft
+
+    # gradient as spectral loss / cv distance
+    # high value => large change for small cv diff
+    local_grad = stft / cv_dist
+    record["local_grad"] = local_grad
 
     # local density
     local_density = densities[e]
     record["local_density"] = local_density
 
     # combined overall score
-    score = record["loss"] / (1.0 + (opts.density_weight * local_density))
+    score = local_grad / (1.0 + (opts.density_weight * local_density))
     record["score"] = score
 
     records.append(record)
@@ -156,8 +177,10 @@ with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "w") as f:
     print("opts", opts, file=f)
     print("src_runs", list(map(str, src_runs)), file=f)
     for col in ["loss", "local_density", "score"]:
-        print("top by", col, file=f)
+        print("----------- top by", col, file=f)
         print(edge_scores_df.sort_values(col, ascending=False).head(10), file=f)
+        print("----------- bottom by", col, file=f)
+        print(edge_scores_df.sort_values(col, ascending=True).head(10), file=f)
 with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "r") as f:
     print(f.read())
 

@@ -1,16 +1,34 @@
 # seaborn just wont shut up
 import warnings
+import io
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 import matplotlib.pyplot as plt
 import numpy as np
+import librosa
 from PIL import Image
 
-from audio_interface import SAMPLE_RATE_HZ
+from .audio_interface import SAMPLE_RATE_HZ
+
+
+def fig_as_pil(fig):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=150)
+    buf.seek(0)
+    pil_img = Image.open(buf).convert("RGB")
+    pil_img.load()  # or we loss it via close
+    buf.close()
+    plt.close(fig)  # otherwise notebook shows _two_ plots inline :/
+    return pil_img
+
 
 def plot(
-    array, title: str = "", fname=None, plot_offset: int = None, plot_len: int = None
+    array,
+    title: str = "",
+    fname: str = None,
+    plot_offset: int = 20_000,
+    plot_len: int = 2_000,
 ):
     if len(array.shape) == 1:
         array = array.reshape((-1, 1))
@@ -28,30 +46,67 @@ def plot(
         axes[i].set_title(f"ch{i} {title}")
         axes[i].set_ylabel("Amplitude")
         axes[i].set_ylim(-1.0, 1.0)
-
     axes[-1].set_xlabel("sample")
+
     fig.tight_layout()
     if fname is None:
-        plt.close(fig)  # otherwise notebook shows _two_ plots inline :/
-        return fig
-
+        return fig_as_pil(fig)
     fig.savefig(fname, dpi=500)
     plt.close(fig)
 
 
-def plot_spectrogram(series, fname, max_freq_hz: float = 6_000):
+def plot_spectrogram(
+    series,
+    title: str = "spectrogram",
+    fname: str = None,
+    plot_offset: int = None,
+    plot_len: int = None,
+    max_freq_hz: float = 6_000,
+):
     # NFFT=4096 gives ~2.9 Hz bins at 12 kHz, resolving 5 Hz spacing
+    series = np.asarray(series)
+    if plot_offset is not None:
+        series = series[plot_offset : plot_offset + plot_len]
+
     nfft = 4096
     noverlap = nfft * 3 // 4
+    hop_length = 256
+
+    # Generate an STFT spectrogram in dB using librosa, then render with matplotlib.
+    stft = librosa.stft(series.astype(np.float32), n_fft=nfft, hop_length=hop_length)
+    spec_db = librosa.power_to_db(np.abs(stft) ** 2, ref=np.max)
+
+    freqs = librosa.fft_frequencies(sr=SAMPLE_RATE_HZ, n_fft=nfft)
+    times = librosa.frames_to_time(
+        np.arange(spec_db.shape[1]),
+        sr=SAMPLE_RATE_HZ,
+        hop_length=hop_length,
+    )
+
+    if times.size == 0:
+        time_extent_max = 0.0
+    else:
+        time_extent_max = times[-1]
+
     fig, ax = plt.subplots(figsize=(12, 4))
-    ax.specgram(series, Fs=SAMPLE_RATE_HZ, NFFT=nfft, noverlap=noverlap, cmap="inferno")
+    ax.imshow(
+        spec_db,
+        origin="lower",
+        aspect="auto",
+        cmap="inferno",
+        extent=[0.0, time_extent_max, freqs[0], freqs[-1]],
+        interpolation="nearest",
+    )
     ax.set_ylim(0, max_freq_hz)
     ax.set_yticks(np.arange(0, max_freq_hz + 1, 5))
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Frequency (Hz)")
-    ax.set_title("spectrogram")
+    ax.set_title(title)
+
     fig.tight_layout()
-    fig.savefig(fname, dpi=150)
+    if fname is None:
+        return fig_as_pil(fig)
+    fig.savefig(fname, dpi=500)
     plt.close(fig)
 
 

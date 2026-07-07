@@ -63,7 +63,7 @@ _combined_loss_fn, mse_loss_fn, stft_loss_fn = combined_masked_loss_terms(
 
 
 # delta=0.1 reasonable for (-1, .1)
-batch_size = 8
+batch_size = 16
 for capture_run in opts.capture_runs:
     pcapture_data = ParametricCaptureData(capture_run)
     ds = pcapture_data.tf_inference_dataset(

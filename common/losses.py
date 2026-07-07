@@ -201,14 +201,17 @@ def combined_masked_loss_terms(
         reduce_mean=reduce_mean,
     )
 
+    @tf.function
     def loss_fn(y_true, y_pred):
         return alpha_mse * core_loss_fn(y_true, y_pred) + beta_stft * stft_fn(
             y_true, y_pred
         )
 
+    @tf.function
     def core_component(y_true, y_pred):
         return core_loss_fn(y_true, y_pred)
 
+    @tf.function
     def stft_component(y_true, y_pred):
         return stft_fn(y_true, y_pred)
 

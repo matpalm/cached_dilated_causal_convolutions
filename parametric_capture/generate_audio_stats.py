@@ -141,6 +141,9 @@ def calculate_audio_stats(series, ignore_in_out: int = 500):
 
 
 if __name__ == "__main__":
+
+    raise Exception("out of date")
+
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )

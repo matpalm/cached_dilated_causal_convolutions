@@ -33,7 +33,7 @@ class ParametricCaptureImportanceSampledData(object):
             "size_next_po2", size_next_po2, "from n_chunks", self.model_data_z.nchunks
         )
         self.prio_replay = PrioExperienceReplay(
-            size=size_next_po2, dump_log="/dev/shm/prio_replay_dump_log.tsv"
+            size=size_next_po2  # , dump_log="/dev/shm/prio_replay_dump_log.tsv"
         )
         idxs, losses = [], []
         for loss_row in self.db.losses_for(run=capture_run, model=keras_model):
