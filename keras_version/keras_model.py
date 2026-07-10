@@ -2,19 +2,21 @@ import tensorflow as tf
 from tensorflow.keras.layers import Input, Conv1D, Add, Activation
 from tensorflow.keras.models import Model
 from typing import List
+from pathlib import Path
+import json
 
-def masked_mse(receptive_field_size):
-    def loss_fn(y_true, y_pred):
-        assert len(y_true.shape) == 3, "expected (batch, sequence_length, output_dim)"
-        assert y_true.shape == y_pred.shape
-        # average over elements of y
-        mse = tf.reduce_mean(tf.square(y_true - y_pred), axis=-1)
-        # we want to ignore the first elements of the loss since they
-        # have been fed with left padded data
-        mse = mse[:,receptive_field_size:]
-        # return average over batch and sequence
-        return tf.reduce_mean(mse)
-    return loss_fn
+
+def create_dilated_model_from_config_and_latest_ckpt(run: str):
+    run_dir_path = Path("runs") / run
+    with open(run_dir_path / "model_config.json", "r") as f:
+        model_config = json.load(f)
+    print("model_config", model_config)
+    model = create_dilated_model(**model_config)
+    ckpts = (run_dir_path / "weights" / "keras").iterdir()
+    latest_ckpt = list(sorted(ckpts))[-1]
+    print("using ckpt", latest_ckpt)
+    model.load_weights(str(latest_ckpt))
+    return model
 
 
 def create_dilated_model(

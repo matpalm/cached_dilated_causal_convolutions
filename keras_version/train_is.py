@@ -98,7 +98,7 @@ if __name__ == "__main__":
     IN_D = 4  # triangle, 3 cvs
     OUT_D = 1  # output wave
     K = 4
-    FILTER_SIZES = [8, 16, 32, 64, 128]
+    FILTER_SIZES = [16, 32, 64, 128, 128]
     RECEPTIVE_FIELD_SIZE = K ** len(FILTER_SIZES)
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 10
@@ -243,9 +243,9 @@ if __name__ == "__main__":
 
     callback_list.on_train_begin()
 
-    loss_log = open("loss_log.tsv", "w")
+    loss_log = open("runs" / opts.run / "loss_log.tsv", "w")
     print(
-        "\t".join("epoch step batch_idx eg_type idx freq weight loss".split(" ")),
+        "\t".join("epoch step eg_type idx freq weight loss".split(" ")),
         file=loss_log,
     )
 
@@ -345,9 +345,7 @@ if __name__ == "__main__":
                     w = float(weight_b[b_idx])
                     l = float(per_element_loss_b[b_idx])
                     print(
-                        "\t".join(
-                            map(str, [epoch, step, b_idx, eg_type, idx, freq, w, l])
-                        ),
+                        "\t".join(map(str, [epoch, step, eg_type, idx, freq, w, l])),
                         file=loss_log,
                     )
                 loss_log.flush()

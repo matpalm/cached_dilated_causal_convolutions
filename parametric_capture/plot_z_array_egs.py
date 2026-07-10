@@ -17,12 +17,12 @@ opts = parser.parse_args()
 
 
 @cache
-def buffers(run):
-    bp = zarr_base_path_for(run)
-    cv_z = zarr.open(str(bp / "cv_buffers.z"), "r")
-    cb_z = zarr.open(str(bp / "capture_buffers.z"), "r")
-    md_z = zarr.open(str(bp / "model_data.z"), "r")
-    return cv_z, cb_z, md_z
+def open_zarr(run, z_name):
+    try:
+        return zarr.open(str(zarr_base_path_for(run) / z_name), "r")
+    except zarr.errors.PathNotFoundError:
+        print("NOT FOUND", run, z_name)
+        return None
 
 
 pil_plots = []
@@ -30,52 +30,52 @@ pil_plots = []
 for eg in opts.egs:
     run, idx = eg.split("_")
     idx = int(idx)
-    cv_z, cb_z, md_z = buffers(run)
 
-    plots = [
-        plot(
-            cv_z.blocks[idx],
-            title="cv_buffers",
-            plot_offset=opts.plot_offset,
-            plot_len=opts.plot_len,
+    plots = []
+    for z_name, ch_names in [
+        ("cv_buffers.z", ["a_cv", "b_cv", "morph", "v/oct"]),
+        ("capture_buffers.z", ["morph out", "a out", "b out", "tri out"]),
+        ("model_data.z", ["x_tri", "x_a_cv", "x_b_cv", "x_morph", "y_true"]),
+        (
+            "model_data_t.z",
+            ["x_tri", "x_a_cv", "x_b_cv", "x_morph", "y_true", "y_pred_teacher"],
         ),
-        plot(
-            cb_z.blocks[idx],
-            title="capture_buffers",
-            plot_offset=opts.plot_offset,
-            plot_len=opts.plot_len,
-        ),
-        plot(
-            md_z.blocks[idx],
-            title="model_data",
-            plot_offset=opts.plot_offset,
-            plot_len=opts.plot_len,
-        ),
-    ]
+    ]:
+        z = open_zarr(run, z_name)
+        if z:
+            plots.append(
+                plot(
+                    z.blocks[idx],
+                    title=z_name,
+                    ch_names=ch_names,
+                    plot_offset=opts.plot_offset,
+                    plot_len=opts.plot_len,
+                )
+            )
     collage_fname = f"zarr_eg.buffer.r{run}_i{idx}.jpg"
     collage(plots, side_by_side=True).save(collage_fname)
     print("plotted", collage_fname)
 
-    plots = [
-        plot_spectrogram(
-            cv_z.blocks[idx][:, 0],
-            title="cv_buffers",
-            plot_offset=opts.plot_offset,
-            plot_len=opts.plot_len,
-        ),
-        plot_spectrogram(
-            cb_z.blocks[idx][:, 0],
-            title="capture_buffers",
-            plot_offset=opts.plot_offset,
-            plot_len=opts.plot_len,
-        ),
-        plot_spectrogram(
-            md_z.blocks[idx][:, 0],
-            title="model_data",
-            plot_offset=opts.plot_offset,
-            plot_len=opts.plot_len,
-        ),
-    ]
-    collage_fname = f"zarr_eg.spectrogram.r{run}_i{idx}.jpg"
-    collage(plots, stacked=True).save(collage_fname)
-    print("plotted", collage_fname)
+    # plots = [
+    #     plot_spectrogram(
+    #         cv_z.blocks[idx][:, 0],
+    #         title="cv_buffers",
+    #         plot_offset=opts.plot_offset,
+    #         plot_len=opts.plot_len,
+    #     ),
+    #     plot_spectrogram(
+    #         cb_z.blocks[idx][:, 0],
+    #         title="capture_buffers",
+    #         plot_offset=opts.plot_offset,
+    #         plot_len=opts.plot_len,
+    #     ),
+    #     plot_spectrogram(
+    #         md_z.blocks[idx][:, 0],
+    #         title="model_data",
+    #         plot_offset=opts.plot_offset,
+    #         plot_len=opts.plot_len,
+    #     ),
+    # ]
+    # collage_fname = f"zarr_eg.spectrogram.r{run}_i{idx}.jpg"
+    # collage(plots, stacked=True).save(collage_fname)
+    # print("plotted", collage_fname)

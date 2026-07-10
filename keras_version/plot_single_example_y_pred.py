@@ -10,7 +10,7 @@ import io
 import seaborn as sns
 import warnings
 
-from .keras_model import create_dilated_model
+from .keras_model import create_dilated_model_from_config_and_latest_ckpt
 from tf_data_pipeline.pcapture_data import model_data_block_to_xs_ys
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -23,15 +23,7 @@ parser.add_argument("--plot-fname", type=str, required=True)
 opts = parser.parse_args()
 print("opts", opts)
 
-with open("runs" / opts.keras_run / "model_config.json", "r") as f:
-    model_config = json.load(f)
-    print("model_config", model_config)
-
-inference_model = create_dilated_model(**model_config)
-
-ckpts = (Path("runs") / opts.keras_run / "weights" / "keras").iterdir()
-latest_ckpt = list(sorted(ckpts))[-1]
-inference_model.load_weights(str(latest_ckpt))
+inference_model = create_dilated_model_from_config_and_latest_ckpt(opts.keras_run)
 
 model_data_z = zarr.open(str(opts.model_data_z), mode="r")
 try:

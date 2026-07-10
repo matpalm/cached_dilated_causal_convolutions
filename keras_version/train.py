@@ -71,6 +71,9 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     print("opts", opts)
 
+    print("tf", tf.__version__)
+    print("tf devices", tf.config.list_physical_devices())
+
     tensorboard_dir = "runs" / opts.run / "tb"
     tensorboard_dir.mkdir(parents=True, exist_ok=True)
     weights_dir = "runs" / opts.run / "weights" / "keras"
@@ -79,7 +82,7 @@ if __name__ == "__main__":
     IN_D = 4  # triangle, 3 cvs
     OUT_D = 1  # output wave
     K = 4
-    FILTER_SIZES = [8, 16, 32, 64, 128]
+    FILTER_SIZES = [16, 32, 64, 128, 128]
     RECEPTIVE_FIELD_SIZE = K ** len(FILTER_SIZES)
     TRAIN_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 5
     TEST_SEQ_LEN = RECEPTIVE_FIELD_SIZE * 10
@@ -94,6 +97,7 @@ if __name__ == "__main__":
         batch_size=opts.batch_size,
         cache_fname=opts.cache_fname,
     )
+
     validate_ds = data.tf_training_dataset(
         seq_len=TEST_SEQ_LEN,
         num_batches=opts.num_validate_batches,
@@ -109,9 +113,11 @@ if __name__ == "__main__":
         "out_d": OUT_D,
         "all_outputs": False,
     }
+    print("model_config", model_config)
     with open("runs" / opts.run / "model_config.json", "w") as f:
         json.dump(model_config, f)
     train_model = create_dilated_model(**model_config)
+    train_model.summary()
 
     callbacks = []
     callbacks.append(tf.keras.callbacks.TensorBoard(log_dir=str(tensorboard_dir)))
@@ -140,6 +146,42 @@ if __name__ == "__main__":
         optimizer,
         loss=combined_loss_fn,
         metrics=[mse_loss_metric, stft_loss_metric],
+        jit_compile=False,  # XLA problem with STFT ???
     )
 
-    train_model.fit(train_ds, callbacks=callbacks, epochs=opts.epochs)
+    def run_fit_loop():
+        train_model.fit(train_ds, callbacks=callbacks, epochs=opts.epochs)
+        # train_model.fit(train_ds, callbacks=[], epochs=opts.epochs)
+
+    # def run_custom():
+
+    #     @tf.function
+    #     def train_step(x_b, y_b):
+    #         with tf.GradientTape() as tape:
+    #             y_pred = train_model(x_b, training=True)
+    #             loss = combined_loss_fn(y_b, y_pred)
+    #         gradients = tape.gradient(loss, train_model.trainable_variables)
+    #         optimizer.apply_gradients(zip(gradients, train_model.trainable_variables))
+    #         return loss
+
+    #     fetch_ts = []
+    #     step_ts = []
+    #     last_t = overall_start_t = time.perf_counter()
+    #     for i, (xs_b, ys_b) in enumerate(train_ds):
+    #         print(xs_b.shape)
+    #         fetch_t = time.perf_counter() - last_t  # data time (the real ~8s)
+    #         fetch_ts.append(fetch_t)
+    #         start_t = time.perf_counter()
+    #         loss = train_step(xs_b, ys_b)
+    #         step_t = time.perf_counter() - start_t  # compute (~0.002s)
+    #         step_ts.append(step_t)
+    #         print(i, "fetch", fetch_t, "step", step_t)
+    #         last_t = time.perf_counter()
+    #     total_t = time.perf_counter() - overall_start_t
+    #     print("total_t", total_t)
+
+    #     print("fetch_ts mean", np.mean(fetch_ts), "std", np.std(fetch_ts))
+    #     print("step_ts mean", np.mean(step_ts), "std", np.std(step_ts))
+
+    run_fit_loop()
+    # run_custom()

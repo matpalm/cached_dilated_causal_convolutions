@@ -131,7 +131,7 @@ def cv_a_to_audio_buffer(cv_values, amp):
 
 audio = AudioInterface()
 
-for s, idx in enumerate(tqdm(sample_ids, desc="capture")):
+for s, idx in enumerate(tqdm(sample_ids, desc=f"capture {opts.run}")):
     cv_buffer = cv_a_to_audio_buffer(cv_values[s], amplitudes[s])
     cv_buffers_z.blocks[idx] = cv_buffer
     capture_buffer = audio.send(cv_buffer)

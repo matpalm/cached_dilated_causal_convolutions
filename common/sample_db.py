@@ -263,6 +263,7 @@ class SampleDB(object):
             from losses
             group by run, model
             """)
+        print("losses")
         print("\n".join(map(str, c.fetchall())))
         print()
         c.execute("""
@@ -270,6 +271,7 @@ class SampleDB(object):
             from cv_values
             group by run order by run
             """)
+        print("cv_values")
         print("\n".join(map(str, c.fetchall())))
 
 

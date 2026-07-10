@@ -18,29 +18,11 @@ def model_data_block_to_xs_ys(data):
     #  - cv value a_cv
     #  - cv_value b_cv
     #  - cv_value morph
-    xs = data[:, :4]
+    xs = data[..., :4]
     # build y
     #  - just morph output ( from capture )
-    ys = data[:, 4:5]
+    ys = data[..., 4:5]
     return xs, ys
-
-
-# too ineffecient to use this?
-# def interleaved_datasets(tf_datasets, repeats: List[bool], weights: List[int]):
-#     """sample from the N ParametricCaptureData(model_data_z) proportional to weights"""
-#     arg_lens = [len(tf_datasets), len(repeats), len(weights)]
-#     if len(set(arg_lens)) != 1:
-#         raise Exception("all lens must match")
-#     # set repeat on requested datasets
-#     # be careful! if they are all True this dataset is infinite
-#     tf_datasets = [ds.repeat() if r else ds for ds, r in zip(tf_datasets, repeats)]
-#     probabilities = [w / sum(weights) for w in weights]
-#     return tf.data.Dataset.sample_from_datasets(
-#         datasets=tf_datasets,
-#         weights=probabilities,
-#         seed=385,
-#         stop_on_empty_dataset=True,
-#     )
 
 
 class ParametricCaptureData(object):
@@ -159,35 +141,45 @@ class ParametricCaptureData(object):
 if __name__ == "__main__":
     import argparse
 
-    def is_true_str(value):
-        return value.lower() == "true"
-
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    data = ParametricCaptureData(capture_run="006")
+    train_ds = data.tf_training_dataset(
+        seq_len=1280,
+        num_batches=100,
+        batch_size=32,
+        cache_fname=None,
     )
-    parser.add_argument("--root-zarr-dir", type=Path, nargs="+")
-    parser.add_argument("--repeats", type=is_true_str, nargs="+")
-    parser.add_argument("--weights", type=float, nargs="+")
-    parser.add_argument("--batch-size", type=int, default=4)
-    opts = parser.parse_args()
-    print("opts", opts)
+    for xs, ys in train_ds:
+        print(xs.shape, ys.shape)
 
-    assert len(opts.root_zarr_dir) == len(opts.repeats)
-    assert len(opts.repeats) == len(opts.weights)
+    # def is_true_str(value):
+    #     return value.lower() == "true"
 
-    datasets = []
-    for zarr_d in opts.root_zarr_dir:
-        pc_data = ParametricCaptureData(zarr_d)
-        datasets.append(
-            pc_data.tf_inference_dataset(batch_size=None, return_sample_info=True)
-        )
+    # parser = argparse.ArgumentParser(
+    #     formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    # )
+    # parser.add_argument("--root-zarr-dir", type=Path, nargs="+")
+    # parser.add_argument("--repeats", type=is_true_str, nargs="+")
+    # parser.add_argument("--weights", type=float, nargs="+")
+    # parser.add_argument("--batch-size", type=int, default=4)
+    # opts = parser.parse_args()
+    # print("opts", opts)
 
-    ds = interleaved_datasets(datasets, opts.repeats, opts.weights).batch(4)
+    # assert len(opts.root_zarr_dir) == len(opts.repeats)
+    # assert len(opts.repeats) == len(opts.weights)
 
-    for i, r in enumerate(ds):
-        if len(r) == 2:
-            x, y = r
-            print(i, "x", x.shape, "y", y.shape)
-        elif len(r) == 4:
-            x, y, m, c = r
-            print(i, "x", x.shape, "y", y.shape, "m", m, "c", c)
+    # datasets = []
+    # for zarr_d in opts.root_zarr_dir:
+    #     pc_data = ParametricCaptureData(zarr_d)
+    #     datasets.append(
+    #         pc_data.tf_inference_dataset(batch_size=None, return_sample_info=True)
+    #     )
+
+    # ds = interleaved_datasets(datasets, opts.repeats, opts.weights).batch(4)
+
+    # for i, r in enumerate(ds):
+    #     if len(r) == 2:
+    #         x, y = r
+    #         print(i, "x", x.shape, "y", y.shape)
+    #     elif len(r) == 4:
+    #         x, y, m, c = r
+    #         print(i, "x", x.shape, "y", y.shape, "m", m, "c", c)

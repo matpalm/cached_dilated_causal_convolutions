@@ -1,6 +1,7 @@
 # seaborn just wont shut up
 import warnings
 import io
+from typing import List
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
@@ -26,6 +27,7 @@ def fig_as_pil(fig):
 def plot(
     array,
     title: str = "",
+    ch_names: List[str] = None,
     fname: str = None,
     plot_offset: int = 20_000,
     plot_len: int = 2_000,
@@ -41,9 +43,11 @@ def plot(
     axes = np.atleast_1d(axes)
 
     for i in range(c):
+        ch_name = ch_names[i] if ch_names is not None else f"ch{i}"
+        ch_name += f" {title}"
         data = array[:, i]
         axes[i].plot(data)
-        axes[i].set_title(f"ch{i} {title}")
+        axes[i].set_title(ch_name)
         axes[i].set_ylabel("Amplitude")
         axes[i].set_ylim(-1.0, 1.0)
     axes[-1].set_xlabel("sample")

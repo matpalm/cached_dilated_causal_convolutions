@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 import zarr
 import tensorflow as tf
+import json
+from tqdm import tqdm
 
 from .keras_model import create_dilated_model_from_config_and_latest_ckpt
 from common.util import zarr_base_path_for
@@ -34,6 +36,7 @@ parser.add_argument(
 opts = parser.parse_args()
 print("opts", opts)
 
+db = SampleDB()
 
 # build inference model and restore ckpt
 inference_model = create_dilated_model_from_config_and_latest_ckpt(opts.keras_run)
@@ -69,22 +72,20 @@ inference_model = create_dilated_model_from_config_and_latest_ckpt(opts.keras_ru
 
 # open srcs; use first as assumed config for rest
 src_zarrs = [zarr.open(zarr_base_path_for(s) / "model_data.z") for s in opts.src_runs]
-first_z = src_zarrs[0]
-base_shape = first_z.shape
-print("base_zarr_shape", base_shape)
-chunks = first_z.chunks
-sample_shape = first_z.blocks[0].shape
-print("sample_shape", sample_shape)
-dtype = first_z.dtype
-num_fields = base_shape[-1]
-total_samples = sum(z.shape[0] for z in src_zarrs)  # total rows across srcs
-total_blocks = sum(z.nchunks for z in src_zarrs)  # one block == one sample
+seq_len, num_fields = src_zarrs[0].blocks[0].shape
+print("seq_len", seq_len)
+print("num_fields", num_fields)
+dtype = src_zarrs[0].dtype
+total_src_samples = sum(z.shape[0] for z in src_zarrs)  # total rows across srcs
+total_src_chunks = sum(z.nchunks for z in src_zarrs)  # one block == one sample
 
-# calc target shape
-combined_shape = list(base_shape)
-combined_shape[0] = total_samples
-combined_shape[-1] = num_fields + 1
+# target shape is the combined number of samples, but with extra feature column
+combined_shape = (total_src_samples, num_fields + 1)
 print("combined_shape", combined_shape)
+
+# chunk size for output is same as input, but with extra feature column
+combined_chunks = (seq_len, num_fields + 1)
+print("combined_chunks", combined_chunks)
 
 # open output
 dest_path = Path(
@@ -94,45 +95,50 @@ dest_path.mkdir(parents=True, exist_ok=True)
 dest_zarr = zarr.open(
     dest_path,
     mode="w",
-    shape=tuple(combined_shape),
-    chunks=chunks,
+    shape=combined_shape,
+    chunks=combined_chunks,
     dtype=dtype,
 )
 
-
-def all_src_examples_gen(batch_size: int = 8):
-    for src_model_data_z, run_str in zip(src_zarrs, opts.src_runs):
-        print("processing", run_str)
-        n_blocks = src_model_data_z.nchunks
-        for start in range(0, n_blocks, batch_size):
-            end = min(start + batch_size, n_blocks)
-            yield src_model_data_z.blocks[start:end].reshape((-1, *sample_shape))
-
-
+# duplicate rows in db
 write_idx = 0
-for eg_b in all_src_examples_gen(batch_size=opts.batch_size):
-    x_b, y_true_b = model_data_block_to_xs_ys(eg_b)
-    y_teacher_b = inference_model(x_b, training=False).numpy()
-    batch_size = len(x_b)  # may be <full for last batch in runs
-    out_b = np.concatenate([eg_b, y_teacher_b], axis=-1)
-    for b in range(batch_size):
-        dest_zarr.blocks[write_idx] = out_b[b].reshape((-1, 6))
-        write_idx += 1
+for src_zarr, run_str in zip(src_zarrs, opts.src_runs):
+    print("duplicate_run_with_idx_offset", run_str, write_idx)
+    db.duplicate_run_with_idx_offset(
+        src_run=run_str, dest_run=opts.dest_run, idx_offset=write_idx
+    )
+    write_idx += src_zarr.nchunks
+
+# for debugging later we make a list [src_run, src_run, ...]
+# so we can map the rows in dest_run back to src_run for debugging
+src_runs = []
+write_idx = 0
+for src_model_data_z, run_str in zip(src_zarrs, opts.src_runs):
+    n_blocks = src_model_data_z.nchunks
+    batch_size = 32
+    starts = list(range(0, n_blocks, batch_size))
+    for start in tqdm(starts, desc=f"processing {run_str}"):
+        end = min(start + batch_size, n_blocks)
+        eg_b = src_model_data_z.blocks[start:end].reshape((-1, seq_len, num_fields))
+        x_b, _y_true_b = model_data_block_to_xs_ys(eg_b)
+        y_teacher_b = inference_model(x_b, training=False).numpy()
+        batch_size = len(x_b)  # may be <full for last batch in runs
+        out_b = np.concatenate([eg_b, y_teacher_b], axis=-1)
+        for b in range(batch_size):
+            dest_zarr.blocks[write_idx] = out_b[b].reshape((-1, num_fields + 1))
+            write_idx += 1
+            src_runs.append(str(run_str))
+        # print(
+        #     "<process_batch start",
+        #     start,
+        #     "batch_size",
+        #     batch_size,
+        #     "write_idx",
+        #     write_idx,
+        # )
+
+with open(zarr_base_path_for(opts.dest_run) / "src_runs.json", "w") as f:
+    json.dump(src_runs, fp=f)
+
 print("wrote", write_idx, "samples to", dest_path)
-
-# also write losses numpy; one for each samples
-db = SampleDB()
-losses = []
-for s in opts.src_runs:
-    losses.extend([l.loss for l in db.losses_for(s, model=opts.keras_run)])
-losses = np.array(losses)
-total_losses = len(losses)
-np_path = zarr_base_path_for(opts.dest_run) / "model_data_t.losses.npy"
-np.save(np_path, losses)
-print(f"wrote losses ({losses.shape}) to {np_path}")
-
-assert write_idx == total_blocks == total_losses, (
-    write_idx,
-    total_blocks,
-    total_losses,
-)
+assert write_idx == total_src_chunks, (write_idx, total_src_chunks)

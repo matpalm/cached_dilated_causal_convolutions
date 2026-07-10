@@ -8,7 +8,7 @@ import pandas as pd
 from tensorflow.keras.losses import MSE, Huber
 from tqdm import tqdm
 
-from .keras_model import create_dilated_model
+from .keras_model import create_dilated_model_from_config_and_latest_ckpt
 from tf_data_pipeline.pcapture_data import ParametricCaptureData
 from common.losses import combined_masked_loss_terms
 from common.sample_db import SampleDB
@@ -41,16 +41,7 @@ print("opts", opts)
 
 db = SampleDB()
 
-with open("runs" / opts.keras_run / "model_config.json", "r") as f:
-    model_config = json.load(f)
-    print("model_config", model_config)
-
-inference_model = create_dilated_model(**model_config)
-
-ckpts = (Path("runs") / opts.keras_run / "weights" / "keras").iterdir()
-latest_ckpt = list(sorted(ckpts))[-1]
-print("using ckpt", latest_ckpt)
-inference_model.load_weights(str(latest_ckpt))
+inference_model = create_dilated_model_from_config_and_latest_ckpt(opts.keras_run)
 
 print("WARNING: assuming use_huber_loss=True")
 _combined_loss_fn, mse_loss_fn, stft_loss_fn = combined_masked_loss_terms(
@@ -67,10 +58,13 @@ batch_size = 16
 for capture_run in opts.capture_runs:
     pcapture_data = ParametricCaptureData(capture_run)
     ds = pcapture_data.tf_inference_dataset(
-        batch_size=batch_size, return_sample_info=True
+        batch_size=batch_size,
+        return_sample_info=True,
     )
     num_batches = math.ceil(pcapture_data.n_chunks / batch_size)
-    for x_b, y_true_b, _model_path_z_b, idx_b in tqdm(ds, total=num_batches):
+    for x_b, y_true_b, _model_path_z_b, idx_b in tqdm(
+        ds, total=num_batches, desc=f"scoring {capture_run}"
+    ):
         y_pred_b = inference_model(x_b)
         batch_n = y_true_b.shape[0]
         for i in range(batch_n):
