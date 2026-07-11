@@ -24,10 +24,18 @@ class ParametricCaptureStaticData(object):
         seed: int = 123,
     ):
 
+        # TOOD: given the static data includes a y_teacher baked in it only
+        #       makes sense to use one model. so these losses should be
+        #       be written in add_y_pred and then read from capture_run model_data_t (?)
+
         db = SampleDB()
         loss_rows = db.losses_for(capture_run, keras_model)
         self.losses = np.array([l.loss for l in loss_rows], dtype=np.float64)
         print("self.losses", self.losses)
+        if len(self.losses) == 0:
+            raise Exception(
+                f"no scores in db for run={capture_run} model={keras_model} ?"
+            )
         del db
 
         self.capture_run = capture_run
@@ -56,52 +64,60 @@ class ParametricCaptureStaticData(object):
         self.rng = np.random.default_rng(seed=seed)
 
         # compute static priorities
-        high_loss_skew = 1.0  # 1 denotes skewing proportional to loss
+        # TODO: try high_loss_skew in 0.4, 0.7 range
+        #  0.0 => uniform ( ignore loss )
+        #  1.0 => denotes skewing proportional to loss
+        high_loss_skew = 1.0
         f64eps = np.finfo(np.float64).eps
         static_priorities = self.losses**high_loss_skew + f64eps
-        print("static_priorities", static_priorities)
+        # print("static_priorities", static_priorities)
 
         # convert priorities to sampling probabilies ( just by normalisation )
         self.sampling_probabilies = static_priorities / static_priorities.sum()
-        print("self.sampling_probabilies", self.sampling_probabilies)
-        print("sum self.sampling_probabilies", self.sampling_probabilies.sum())
+        # print("self.sampling_probabilies", self.sampling_probabilies)
+        # print("sum self.sampling_probabilies", self.sampling_probabilies.sum())
         # self.db = SampleDB()
 
         # since we are leaning heavily on converged ( ish ) loss of a large model
         # we can try to just calculate importance weights purely on that loss
         # i.e. regardless of where they came from; sobol, is_weights, uniform etc
         # this might be super naive... we'll see...
-        bias_correction = 1.0  # no bias correction, we might need to drop this for stability? ( i.e more explore )
+        # TODO: try bias_correction in 0.5, 1.0
+        #  0 => w_i=1 for all => keeps all bias from sampling prio
+        #  1 => full correction => weighting cancels out sampling prio
+        bias_correction = 1.0
         num_examples = len(self.sampling_probabilies)
         unnormalised_static_importance_weights = (
-            1.0 / num_examples * self.sampling_probabilies
+            1.0 / (num_examples * self.sampling_probabilies)
         ) ** bias_correction
-        print(
-            "unnormalised_static_importance_weights",
-            unnormalised_static_importance_weights,
-        )
-        print(
-            "sum unnormalised_static_importance_weights",
-            unnormalised_static_importance_weights.sum(),
-        )
+        # print(
+        #     "unnormalised_static_importance_weights",
+        #     unnormalised_static_importance_weights,
+        # )
+        # print(
+        #     "sum unnormalised_static_importance_weights",
+        #     unnormalised_static_importance_weights.sum(),
+        # )
         self.static_importance_weights = (
             unnormalised_static_importance_weights
             / unnormalised_static_importance_weights.max()
         )
-        print(
-            "self.static_importance_weights",
-            self.static_importance_weights,
-        )
-        print(
-            "min",
-            self.static_importance_weights.min(),
-            "max",
-            self.static_importance_weights.max(),
-        )
+        # print(
+        #     "self.static_importance_weights",
+        #     self.static_importance_weights,
+        # )
+        # print(
+        #     "min",
+        #     self.static_importance_weights.min(),
+        #     "max",
+        #     self.static_importance_weights.max(),
+        # )
 
         # read in debug mapping for src_runs ( which gives the src_run of each index )
         with open(zarr_base_path_for(capture_run) / "src_runs.json", "r") as f:
             src_runs = json.load(f)
+
+        # write key arrays for debugging
         df = pd.DataFrame(
             zip(src_runs, self.sampling_probabilies, self.static_importance_weights),
             columns=["run", "sampling_probability", "static_importance_weight"],
@@ -133,7 +149,8 @@ class ParametricCaptureStaticData(object):
     def tf_training_dataset(self, seq_len: int, num_batches: int, batch_size: int):
         """
         Generate num_samples samples of shape (batch_size, seq_len, 4)
-        sampling is done with importance sampling and
+        sampling is done with statically derived importance sampling probabilities
+        and importance weights.
 
         Args:
             seq_len: second axis for batch
@@ -233,7 +250,16 @@ class ParametricCaptureStaticData(object):
 
 
 if __name__ == "__main__":
-    pd = ParametricCaptureStaticData(capture_run="600", keras_model="231_keras/i9")
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--run", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
+    opts = parser.parse_args()
+    print("opts", opts)
+    pd = ParametricCaptureStaticData(capture_run=opts.run, keras_model=opts.model)
     # for x, y, idxs, weights in pd.tf_training_dataset(
     #     seq_len=100, num_batches=5, batch_size=8
     # ):

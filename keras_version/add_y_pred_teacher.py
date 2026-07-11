@@ -12,7 +12,7 @@ from tf_data_pipeline.pcapture_data import model_data_block_to_xs_ys
 from common.sample_db import SampleDB
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--keras-run", type=str, required=True)
+parser.add_argument("--model", type=str, required=True)
 parser.add_argument(
     "--src-runs",
     type=Path,
@@ -39,7 +39,7 @@ print("opts", opts)
 db = SampleDB()
 
 # build inference model and restore ckpt
-inference_model = create_dilated_model_from_config_and_latest_ckpt(opts.keras_run)
+inference_model = create_dilated_model_from_config_and_latest_ckpt(opts.model)
 
 # materialise (x, [y_true, y_teacher]) for every chunk across all capture runs
 
@@ -137,6 +137,8 @@ for src_model_data_z, run_str in zip(src_zarrs, opts.src_runs):
         #     write_idx,
         # )
 
+# TODO: src_runs.json is a bad idea, much better to have a lookup table in db
+#       we could set for anywhere we combine runs
 with open(zarr_base_path_for(opts.dest_run) / "src_runs.json", "w") as f:
     json.dump(src_runs, fp=f)
 

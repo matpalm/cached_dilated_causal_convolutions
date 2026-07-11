@@ -173,7 +173,10 @@ for e, edge in enumerate(tqdm(unique_edges)):
 edge_scores_df = pd.DataFrame(records)
 
 # write some stats to a file ( then stdout )
-with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "w") as f:
+stats_fname = (
+    "parametric_capture" / "runs" / opts.dest_run / "candidate_generation_stats.txt"
+)
+with open(stats_fname, "w") as f:
     print("opts", opts, file=f)
     print("src_runs", list(map(str, src_runs)), file=f)
     for col in ["loss", "local_density", "score"]:
@@ -181,7 +184,7 @@ with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "w") as f:
         print(edge_scores_df.sort_values(col, ascending=False).head(10), file=f)
         print("----------- bottom by", col, file=f)
         print(edge_scores_df.sort_values(col, ascending=True).head(10), file=f)
-with open("runs" / opts.dest_run / "candidate_generation_stats.txt", "r") as f:
+with open(stats_fname, "r") as f:
     print(f.read())
 
 # write candidates
