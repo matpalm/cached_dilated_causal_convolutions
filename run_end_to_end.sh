@@ -3,8 +3,10 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-export RUN=228_loss_smoke
-export FILTERS="4 4 4"
+#export RUN=229_test_no_quantise_output
+export RUN=230_test_quantise_output
+
+export FILTERS="16 16 16 16"
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
@@ -21,7 +23,7 @@ export BUILD=nw_${RUN_ID}_psram-1
 # sanity config
 export MIN_NOTE=A3
 export MAX_NOTE=A5
-export TRAIN_EGS=100
+export TRAIN_EGS=10000
 export PRETRAIN_EPOCHS=20
 export FINETUNE_EPOCHS=10
 export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
@@ -37,16 +39,19 @@ export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
 export SAMPLE_RATE_KHZ=192
 export BATCH_SIZE=32
 
+#time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
+
+# --quantise-output
 pretrain() {
     # pre train at FP3.15 ( relu4 )
     mkdir -p runs/$RUN/pretrain || true
-    time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
+    time uv run -m qkeras_version.train \
     --run $RUN/pretrain \
     --min-note $MIN_NOTE --max-note $MAX_NOTE \
     $WAVE_CONFIG \
     --sample-rate-khz $SAMPLE_RATE_KHZ \
     --train-seq-len-multiplier 2 \
-    --fp-int 3 --fp-frac 15 \
+    --fp-int 3 --fp-frac 4 \
     --filter-sizes $FILTERS --relu-upper-bound 4 \
     --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
     --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \

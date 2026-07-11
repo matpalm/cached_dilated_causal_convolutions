@@ -17,7 +17,10 @@ from qkeras.utils import model_save_quantized_weights
 from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import QKerasModelBuilder
 from common.losses import combined_masked_loss_terms
+<<<<<<< HEAD
 from common.callbacks import setup_beta_stft_var_and_update_callback
+=======
+>>>>>>> master
 
 import warnings
 
@@ -52,7 +55,7 @@ if __name__ == "__main__":
         "--train-seq-len-multiplier",
         type=int,
         default=5,
-        help="multiplier for receptive field to decide training sequence length."
+        help="multiplier for receptive field to decide training sequence length.",
     )
     parser.add_argument("--in-d", type=int, default=4)
     parser.add_argument("--out-d", type=int, default=1)
@@ -72,7 +75,7 @@ if __name__ == "__main__":
         "--init-weights",
         type=Path,
         default=None,
-        help="path to keras weights used to initialize fine-tuning",
+        help="path to keras weights used to initialise fine-tuning",
     )
     parser.add_argument("--relu-upper-bound", type=float, default=6)
     parser.add_argument("--min-note", type=str, default="A2")
@@ -133,6 +136,8 @@ if __name__ == "__main__":
         min_note=opts.min_note,
         max_note=opts.max_note,
         sample_rate_khz=opts.sample_rate_khz,
+        fp_int=opts.fp_int,
+        fp_frac=opts.fp_frac,
         harsh=opts.harsh_waves,
         soft_clip=opts.soft_clip,
         seed=456,

@@ -48,6 +48,8 @@ print("opts", opts)
 data = Embed2DQuadratureData(
     min_note=opts.min_note,
     max_note=opts.max_note,
+    fp_int=opts.fp_int,
+    fp_frac=opts.fp_frac,
     sample_rate_khz=opts.sample_rate_khz,
     seed=123,
 )
