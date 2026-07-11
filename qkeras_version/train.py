@@ -67,6 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-validate-egs", type=int, default=100)
     parser.add_argument("--fp-int", type=int, default=4)
     parser.add_argument("--fp-frac", type=int, default=12)
+    parser.add_argument("--quantise-output", action="store_true")
     parser.add_argument(
         "--init-weights",
         type=Path,
@@ -139,6 +140,7 @@ if __name__ == "__main__":
         sample_rate_khz=opts.sample_rate_khz,
         fp_int=opts.fp_int,
         fp_frac=opts.fp_frac,
+        quantise_y=opts.quantise_output,
         harsh=opts.harsh_waves,
         soft_clip=opts.soft_clip,
         seed=456,

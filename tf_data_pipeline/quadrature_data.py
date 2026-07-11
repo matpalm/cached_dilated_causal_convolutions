@@ -59,8 +59,9 @@ class Embed2DQuadratureData(object):
         min_note: str,
         max_note: str,
         sample_rate_khz: float,
-        fp_int: int,
-        fp_frac: int,
+        fp_int: int = 4,
+        fp_frac: int = 12,
+        quantise_y: bool = False,
         harsh: bool = False,
         soft_clip: bool = False,
         seed: int = 123,
@@ -76,6 +77,7 @@ class Embed2DQuadratureData(object):
         self.y_quantiser = quantized_bits(
             bits=fp_int + fp_frac, integer=fp_int, alpha=1
         )
+        self.quantise_y = quantise_y
 
     def calculate_wave(
         self,
@@ -157,7 +159,10 @@ class Embed2DQuadratureData(object):
         # scale and quantise for output
         phase_sin *= scale
         phase_cos *= scale
-        wave = self.y_quantiser(scale * result)
+
+        wave = scale * result
+        if self.quantise_y:
+            wave = self.y_quantiser(wave)
 
         return {
             "phase_sin": phase_sin,
@@ -355,6 +360,7 @@ if __name__ == "__main__":
         sample_rate_khz=192,
         fp_int=opts.fp_int,
         fp_frac=opts.fp_frac,
+        quantise_y=False,
         harsh=opts.harsh,
         soft_clip=opts.soft_clip,
         seed=123,

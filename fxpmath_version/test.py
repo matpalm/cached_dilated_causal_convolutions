@@ -78,6 +78,7 @@ data = Embed2DQuadratureData(
     sample_rate_khz=192,
     fp_int=opts.fp_int,
     fp_frac=opts.fp_frac,
+    quantise_y=False,
     seed=123,
 )
 
