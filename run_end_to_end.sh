@@ -51,7 +51,7 @@ pretrain() {
     $WAVE_CONFIG \
     --sample-rate-khz $SAMPLE_RATE_KHZ \
     --train-seq-len-multiplier 2 \
-    --fp-int 3 --fp-frac 4 \
+    --fp-int 3 --fp-frac 15 \
     --filter-sizes $FILTERS --relu-upper-bound 4 \
     --alpha-mse 1.0 --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
     --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
