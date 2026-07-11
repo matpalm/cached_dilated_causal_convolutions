@@ -5,14 +5,26 @@ import json
 import tensorflow as tf
 import pandas as pd
 
-# from common.prio_replay import PrioExperienceReplay
 from common.sample_db import SampleDB
 from common.util import zarr_base_path_for
-from .pcapture_data import model_data_block_to_xs_ys
 
 IN_D = 4
-OUT_D = 1
+OUT_D = 1  # TODO: change to 2 for y_teacher_pred
 IGNORE_FADE_LEN = 500
+
+
+def model_data_block_to_xs_ys(data):
+    # build x
+    #  - triangle / core wave ( from capture )
+    #  - cv value a_cv
+    #  - cv_value b_cv
+    #  - cv_value morph
+    xs = data[..., :4]
+    # build y
+    #  - y_true morph output ( from capture )
+    #  - IGNORE y_teacher_pred morph output ( from capture ) for NOW
+    ys = data[..., 4:5]
+    return xs, ys
 
 
 class ParametricCaptureStaticData(object):
@@ -70,13 +82,9 @@ class ParametricCaptureStaticData(object):
         high_loss_skew = 1.0
         f64eps = np.finfo(np.float64).eps
         static_priorities = self.losses**high_loss_skew + f64eps
-        # print("static_priorities", static_priorities)
 
         # convert priorities to sampling probabilies ( just by normalisation )
         self.sampling_probabilies = static_priorities / static_priorities.sum()
-        # print("self.sampling_probabilies", self.sampling_probabilies)
-        # print("sum self.sampling_probabilies", self.sampling_probabilies.sum())
-        # self.db = SampleDB()
 
         # since we are leaning heavily on converged ( ish ) loss of a large model
         # we can try to just calculate importance weights purely on that loss
@@ -90,33 +98,14 @@ class ParametricCaptureStaticData(object):
         unnormalised_static_importance_weights = (
             1.0 / (num_examples * self.sampling_probabilies)
         ) ** bias_correction
-        # print(
-        #     "unnormalised_static_importance_weights",
-        #     unnormalised_static_importance_weights,
-        # )
-        # print(
-        #     "sum unnormalised_static_importance_weights",
-        #     unnormalised_static_importance_weights.sum(),
-        # )
         self.static_importance_weights = (
             unnormalised_static_importance_weights
             / unnormalised_static_importance_weights.max()
         )
-        # print(
-        #     "self.static_importance_weights",
-        #     self.static_importance_weights,
-        # )
-        # print(
-        #     "min",
-        #     self.static_importance_weights.min(),
-        #     "max",
-        #     self.static_importance_weights.max(),
-        # )
 
         # read in debug mapping for src_runs ( which gives the src_run of each index )
         with open(zarr_base_path_for(capture_run) / "src_runs.json", "r") as f:
             src_runs = json.load(f)
-
         # write key arrays for debugging
         df = pd.DataFrame(
             zip(src_runs, self.sampling_probabilies, self.static_importance_weights),
@@ -124,29 +113,21 @@ class ParametricCaptureStaticData(object):
         )
         df.to_csv("/tmp/weights.tsv", sep="\t", index=False)
 
-        # size_next_po2 = 1 << (self.model_data_z.nchunks - 1).bit_length()
-        # print(
-        #     "size_next_po2", size_next_po2, "from n_chunks", self.model_data_z.nchunks
-        # )
-        # self.prio_replay = PrioExperienceReplay(
-        #     size=size_next_po2  # , dump_log="/dev/shm/prio_replay_dump_log.tsv"
-        # )
-        # idxs, losses = [], []
-        # for loss_row in self.db.losses_for(run=capture_run, model=keras_model):
-        #     idxs.append(loss_row.idx)
-        #     losses.append(loss_row.loss)
-        # if len(idxs) != self.n_chunks:
-        #     raise Exception(
-        #         f"#scores in db={len(idxs)} doesn't match #chunks={self.n_chunks} for run {capture_run}"
-        #     )
-        # self.prio_replay.update(idxs, losses)
-
-        # self.prio_replay.dump("init")
+        if (
+            self.n_chunks
+            != len(self.sampling_probabilies)
+            != len(self.static_importance_weights)
+        ):
+            raise Exception(
+                "mismatch between n_chunks, sampling_probabilies, static_importance_weights"
+            )
 
     def num_examples(self):
         return self.n_chunks
 
-    def tf_training_dataset(self, seq_len: int, num_batches: int, batch_size: int):
+    def tf_training_dataset(
+        self, seq_len: int, num_batches: int, batch_size: int, emit_weights: bool
+    ):
         """
         Generate num_samples samples of shape (batch_size, seq_len, 4)
         sampling is done with statically derived importance sampling probabilities
@@ -156,50 +137,53 @@ class ParametricCaptureStaticData(object):
             seq_len: second axis for batch
             num_batches: total number of batches generated
             batch_size: batch size
+            emit_weight: if true return _weight as 3rd
         """
 
         def sample_generator():
-            for _ in range(num_batches):
-                # note: since we are mixing with weights from sobol weights
-                #       we don't max normalise to 1.0 until after
-                idxs, weights = self.prio_replay.sample(batch_size, max_normalise=False)
-                for idx, weight in zip(idxs, weights):
-                    # sample offset/len
-                    r_seq_from = self.rng.integers(
-                        low=IGNORE_FADE_LEN,
-                        high=self.chunk_len - IGNORE_FADE_LEN - seq_len,
-                    )
-                    r_seq_to = r_seq_from + seq_len
-                    # grab relevant pieces
-                    try:
-                        block = self.model_data_z.blocks[idx]
-                    except zarr.errors.BoundsCheckError as e:
-                        print(
-                            "self.capture_run",
-                            self.capture_run,
-                            "self.n_chunks",
-                            self.n_chunks,
-                            "idx",
-                            idx,
-                        )
-                        raise e
+            for _ in range(num_batches * batch_size):
+                # sample idx
+                idx = self.rng.choice(self.n_chunks, p=self.sampling_probabilies)
+                # sample offset/len
+                r_seq_from = self.rng.integers(
+                    low=IGNORE_FADE_LEN,
+                    high=self.seq_len - IGNORE_FADE_LEN - seq_len,
+                )
+                r_seq_to = r_seq_from + seq_len
+                # grab relevant pieces
+                try:
+                    block = self.model_data_z.blocks[idx]
                     data = block[r_seq_from:r_seq_to]
-                    yield *model_data_block_to_xs_ys(data), idx, weight
+                except zarr.errors.BoundsCheckError as e:
+                    print(
+                        "self.capture_run",
+                        self.capture_run,
+                        "self.n_chunks",
+                        self.n_chunks,
+                        "idx",
+                        idx,
+                    )
+                    raise e
+                # return with weight for training
+                if emit_weights:
+                    weight = self.static_importance_weights[idx]
+                    yield *model_data_block_to_xs_ys(data), weight
+                else:
+                    yield model_data_block_to_xs_ys(data)
+
+        output_signature = [
+            tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float16),
+            tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float16),
+        ]
+        if emit_weights:
+            output_signature.append(tf.TensorSpec(shape=(), dtype=tf.float32))
 
         ds = tf.data.Dataset.from_generator(
-            sample_generator,
-            output_signature=(
-                tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float32),
-                tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float32),
-                tf.TensorSpec(shape=(), dtype=tf.int32),
-                tf.TensorSpec(shape=(), dtype=tf.float32),
-            ),
+            sample_generator, output_signature=tuple(output_signature)
         )
-        if num_batches is not None:
-            ds = ds.batch(batch_size)
 
-        # note: can't prefetch in importance sampling case since we need
-        #       to explicitly update loss values
+        ds = ds.batch(batch_size)
+        ds = ds.prefetch(tf.data.AUTOTUNE)
 
         return ds
 
@@ -218,24 +202,26 @@ class ParametricCaptureStaticData(object):
             seq_len: second axis for batch
             num_batches: total number of batches generated
             batch_size: batch size
-            return_sample_info: if True return (x, y, model_data_z, idx) otherwise return normal (x, y)
+            return_sample_info: if True return (x, y, model_data_z, idx, static_weight) otherwise return normal (x, y)
         """
 
         def sample_generator():
             for c in range(self.n_chunks):
                 data = self.model_data_z.blocks[c]
+                weight = self.static_importance_weights[idx]
                 if return_sample_info:
-                    yield *model_data_block_to_xs_ys(data), self.capture_run, c
+                    yield *model_data_block_to_xs_ys(data), self.capture_run, c, weight
                 else:
                     yield model_data_block_to_xs_ys(data)
 
         output_signature = [
-            tf.TensorSpec(shape=(self.chunk_len, IN_D), dtype=tf.float32),
-            tf.TensorSpec(shape=(self.chunk_len, OUT_D), dtype=tf.float32),
+            tf.TensorSpec(shape=(self.seq_len, IN_D), dtype=tf.float32),
+            tf.TensorSpec(shape=(self.seq_len, OUT_D), dtype=tf.float32),
         ]
         if return_sample_info:
             output_signature.append(tf.TensorSpec(shape=(), dtype=tf.string))
             output_signature.append(tf.TensorSpec(shape=(), dtype=tf.int32))
+            output_signature.append(tf.TensorSpec(shape=(), dtype=tf.float32))
 
         ds = tf.data.Dataset.from_generator(
             sample_generator, output_signature=tuple(output_signature)
@@ -260,6 +246,11 @@ if __name__ == "__main__":
     opts = parser.parse_args()
     print("opts", opts)
     pd = ParametricCaptureStaticData(capture_run=opts.run, keras_model=opts.model)
+
+    ds = pd.tf_training_dataset(seq_len=64, num_batches=4, batch_size=4)
+    for xs, ys, weights in ds:
+        print(xs.shape, ys.shape, weights)
+
     # for x, y, idxs, weights in pd.tf_training_dataset(
     #     seq_len=100, num_batches=5, batch_size=8
     # ):

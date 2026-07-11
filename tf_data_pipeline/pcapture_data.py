@@ -87,9 +87,8 @@ class ParametricCaptureData(object):
         )
         if cache_fname is not None:
             ds = ds.cache(cache_fname)
-        if num_batches is not None:
-            ds = ds.batch(batch_size)
-            ds = ds.prefetch(tf.data.AUTOTUNE)
+        ds = ds.batch(batch_size)
+        ds = ds.prefetch(tf.data.AUTOTUNE)
         return ds
 
     def tf_inference_dataset(

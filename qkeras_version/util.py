@@ -29,24 +29,46 @@ class CheckYPred(tf.keras.callbacks.Callback):
         assert y_true.shape == y_pred.shape
         assert y_true.shape[-1] == 1
 
-        # TODO: derive figsize from S in y_true shape
+        x = np.asarray(x, dtype=np.float32)
+        y_true = np.asarray(y_true, dtype=np.float32)
+        y_pred = np.asarray(y_pred, dtype=np.float32)
 
         df = pd.DataFrame()
-        df["phase_sin"] = x[:, 0]
-        df["e0"] = x[:, 2]
-        df["e1"] = x[:, 3]
-        df['y_true'] = y_true[:,0]
-        df['y_pred'] = y_pred[:,0]
+        df["triangle"] = x[:, 0]
+        df["a_cv"] = x[:, 1]
+        df["b_cv"] = x[:, 2]
+        df["morph_cv"] = x[:, 3]
+        df["y_true"] = y_true[:, 0]
+        df["y_pred"] = y_pred[:, 0]
         df['n'] = range(len(x))
-        wide_df = pd.melt(
-            df, id_vars=["n"], value_vars=["phase_sin", "y_pred", "y_true", "e0", "e1"]
+        control_df = pd.melt(
+            df,
+            id_vars=["n"],
+            value_vars=["triangle", "a_cv", "b_cv", "morph_cv"],
+        )
+        output_df = pd.melt(
+            df,
+            id_vars=["n"],
+            value_vars=["y_true", "y_pred"],
         )
         with io.BytesIO() as img_buffer:
             with warnings.catch_warnings():
                 warnings.simplefilter(action="ignore", category=FutureWarning)
-                fig, ax = plt.subplots(figsize=(20, 4))
-                sns.lineplot(wide_df, x="n", y="value", hue="variable", ax=ax)
-                ax.set_ylim((-2, 2))
+                fig, axes = plt.subplots(
+                    2,
+                    1,
+                    figsize=(20, 6),
+                    sharex=True,
+                    gridspec_kw={"height_ratios": [2, 1]},
+                )
+                sns.lineplot(control_df, x="n", y="value", hue="variable", ax=axes[0])
+                axes[0].set_ylim((-2, 2))
+                axes[0].set_ylabel("control")
+                sns.lineplot(output_df, x="n", y="value", hue="variable", ax=axes[1])
+                axes[1].set_ylim((-2, 2))
+                axes[1].set_ylabel("output")
+                axes[1].set_xlabel("n")
+                fig.tight_layout()
                 fig.savefig(img_buffer, format="png")
                 plt.close(fig)
             img_buffer.seek(0)
