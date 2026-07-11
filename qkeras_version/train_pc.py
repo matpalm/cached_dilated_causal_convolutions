@@ -250,7 +250,7 @@ if __name__ == "__main__":
         validation_data=None,  # just use validation for plots
         callbacks=callbacks,
         epochs=opts.epochs,
-        verbose=2,
+        # verbose=2,
     )
 
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:

@@ -53,7 +53,7 @@ class QKerasModelBuilder(object):
         out_filters: int,
         l2: float,
         relu: bool,
-        relu_upper_bound: float,
+        relu_upper_bound: float = None,
     ):
 
         layer_id = f"qconv_{layer_number}_qb"
@@ -167,9 +167,6 @@ class QKerasModelBuilder(object):
         if len(filter_sizes) == 0:
             raise ValueError("filter_sizes must contain at least one layer size")
 
-        # last layer always 4
-        filter_sizes.append(4)
-
         num_layers = len(filter_sizes)
         self.layer_info = []
 
@@ -177,29 +174,29 @@ class QKerasModelBuilder(object):
         y_pred = inp
 
         for layer_num in range(num_layers):
-
-            last_layer = layer_num == num_layers - 1
-            layer_filter_size = filter_sizes[layer_num]
-
             y_pred = self.add_quantized_bits_conv_block(
                 y_pred,
                 layer_number=layer_num,
-                out_filters=out_d if last_layer else layer_filter_size,
+                out_filters=filter_sizes[layer_num],
                 l2=l2,
-                relu=(not last_layer),
+                relu=True,
                 relu_upper_bound=relu_upper_bound,
             )
-
             # first layer dilates K, second K^2, etc
-            # no dilation after last layer
-            if not last_layer:
-                self.layer_info.append(
-                    {
-                        "type": "dilation",
-                        "amount": K ** (layer_num + 1),
-                        "depth": layer_filter_size,
-                    }
-                )
+            self.layer_info.append(
+                {
+                    "type": "dilation",
+                    "amount": K ** (layer_num + 1),
+                    "depth": filter_sizes[layer_num],
+                }
+            )
+
+        # explicitly add last layer
+        y_pred = self.add_quantized_bits_conv_block(
+            y_pred, layer_number=num_layers, out_filters=out_d, l2=l2, relu=False
+        )
+
+        # no dilation after last layer
 
         y_pred = QActivation(self.quant_output(), name="qout")(y_pred)
         self.layer_info.append(
