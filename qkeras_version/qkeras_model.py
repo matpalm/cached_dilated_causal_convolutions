@@ -43,6 +43,9 @@ class QKerasModelBuilder(object):
         else:
             return f"quantized_relu({self.n_word},{self.n_int},relu_upper_bound={upper_bound})"
 
+    def quant_output(self):
+        return quantized_bits(bits=self.n_word, integer=self.n_int, alpha=1)
+
     def add_quantized_bits_conv_block(
         self,
         inp,
@@ -197,6 +200,11 @@ class QKerasModelBuilder(object):
                         "depth": layer_filter_size,
                     }
                 )
+
+        y_pred = QActivation(self.quant_output(), name="qout")(y_pred)
+        self.layer_info.append(
+            {"type": "qout", "n_int": self.n_int, "n_frac": self.n_frac}
+        )
 
         # TODO: rewire in po2 stuff later
         # if po2_filter_size is None:
