@@ -11,6 +11,7 @@ IN_D = 4
 OUT_D = 1
 IGNORE_FADE_LEN = 500
 
+# generate random samples taken uniformly from capture data
 
 def model_data_block_to_xs_ys(data):
     # build x

@@ -12,8 +12,16 @@ IN_D = 4
 OUT_D = 1  # TODO: change to 2 for y_teacher_pred
 IGNORE_FADE_LEN = 500
 
+# generate samples based on materialised sampling probabilities / importance sampling
+# weights based on converged model loss. dataset includes y_teacher as possible output
 
-def model_data_block_to_xs_ys(data):
+
+def model_data_block_to_xs_ys(data, emit_y_teacher_pred: bool):
+    """
+    Args:
+        data: chunk from zarr model_data_t.z
+        emit_y_teacher_pred: if true emit y_teacher_pred, else emit y_true
+    """
     # build x
     #  - triangle / core wave ( from capture )
     #  - cv value a_cv
@@ -21,9 +29,12 @@ def model_data_block_to_xs_ys(data):
     #  - cv_value morph
     xs = data[..., :4]
     # build y
+    #  - y_teacher_pred morph output ( from capture ) for NOW or
     #  - y_true morph output ( from capture )
-    #  - IGNORE y_teacher_pred morph output ( from capture ) for NOW
-    ys = data[..., 4:5]
+    if emit_y_teacher_pred:
+        ys = data[..., 5:6]
+    else:
+        ys = data[..., 4:5]
     return xs, ys
 
 
@@ -126,7 +137,12 @@ class ParametricCaptureStaticData(object):
         return self.n_chunks
 
     def tf_training_dataset(
-        self, seq_len: int, num_batches: int, batch_size: int, emit_weights: bool
+        self,
+        seq_len: int,
+        num_batches: int,
+        batch_size: int,
+        emit_weights: bool,
+        emit_y_teacher_pred: bool,
     ):
         """
         Generate num_samples samples of shape (batch_size, seq_len, 4)
@@ -138,6 +154,7 @@ class ParametricCaptureStaticData(object):
             num_batches: total number of batches generated
             batch_size: batch size
             emit_weight: if true return _weight as 3rd
+            emit_y_teacher_pred: if y_true emit
         """
 
         def sample_generator():
@@ -164,12 +181,13 @@ class ParametricCaptureStaticData(object):
                         idx,
                     )
                     raise e
-                # return with weight for training
+                # return with weight for training and either y_true or y_teacher_pred
+                xs_ys = model_data_block_to_xs_ys(data, emit_y_teacher_pred)
                 if emit_weights:
                     weight = self.static_importance_weights[idx]
-                    yield *model_data_block_to_xs_ys(data), weight
+                    yield *xs_ys, weight
                 else:
-                    yield model_data_block_to_xs_ys(data)
+                    yield xs_ys
 
         output_signature = [
             tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float16),

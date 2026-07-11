@@ -12,6 +12,7 @@ IN_D = 4
 OUT_D = 1
 IGNORE_FADE_LEN = 500
 
+# generate samples based on online priority replay ( importance sampling )
 
 class ParametricCaptureImportanceSampledData(object):
 

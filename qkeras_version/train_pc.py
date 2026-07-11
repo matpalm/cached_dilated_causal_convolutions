@@ -70,6 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--fp-int", type=int, default=4)
     parser.add_argument("--fp-frac", type=int, default=12)
     parser.add_argument("--quantise-output", action="store_true")
+    parser.add_argument("--emit-y-teacher-pred", action="store_true")
     parser.add_argument(
         "--init-weights",
         type=Path,
@@ -166,6 +167,7 @@ if __name__ == "__main__":
         num_batches=opts.num_train_egs // opts.batch_size,
         batch_size=opts.batch_size,
         emit_weights=True,
+        emit_y_teacher_pred=opts.emit_y_teacher_pred,
     )
     # validate_ds = data.tf_inference_dataset(
     validate_ds = data.tf_training_dataset(
@@ -173,6 +175,7 @@ if __name__ == "__main__":
         num_batches=opts.num_validate_egs // opts.batch_size,
         batch_size=opts.batch_size,
         emit_weights=False,
+        emit_y_teacher_pred=opts.emit_y_teacher_pred,
     )
 
     # construct some callbacks...
