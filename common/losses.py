@@ -77,7 +77,6 @@ def masked_multires_stft_loss(
     fft_sizes=(512, 1024, 2048),
     hop_sizes=(128, 256, 512),
     win_lengths=(512, 1024, 2048),
-    w_time=0.5,
     w_mag=0.4,
     w_sc=0.1,
     reduce_mean: bool = True,
@@ -90,7 +89,6 @@ def masked_multires_stft_loss(
         fft_sizes: FFT sizes used at each STFT res
         hop_sizes: STFT hop sizes for each res
         win_lengths: STFT window lengths for each res
-        w_time: Weight for time-domain MSE term
         w_mag: Weight for log-magnitude spectral term
         w_sc: Weight for spectral-convergence term
     """
@@ -131,8 +129,6 @@ def masked_multires_stft_loss(
         y_true_1d = tf.squeeze(y_true_, axis=-1)
         y_pred_1d = tf.squeeze(y_pred_, axis=-1)
 
-        time_mse = tf.reduce_mean(tf.square(y_true_1d - y_pred_1d), axis=-1)
-
         mr_mag = tf.constant(0.0, dtype=tf.float32)
         mr_sc = tf.constant(0.0, dtype=tf.float32)
         eps = tf.constant(1e-6, dtype=tf.float32)
@@ -155,7 +151,7 @@ def masked_multires_stft_loss(
         mr_mag = tf.math.divide_no_nan(mr_mag, n)
         mr_sc = tf.math.divide_no_nan(mr_sc, n)
 
-        total = w_time * time_mse + w_mag * mr_mag + w_sc * mr_sc
+        total = w_mag * mr_mag + w_sc * mr_sc
         total = tf.where(tf.math.is_finite(total), total, tf.zeros_like(total))
         return tf.reduce_mean(total) if reduce_mean else total
 
@@ -195,7 +191,6 @@ def combined_masked_loss_terms(
     # so can remove w_time completely (?)
     stft_fn = masked_multires_stft_loss(
         receptive_field_size,
-        w_time=0.0,
         w_mag=0.8,
         w_sc=0.2,
         reduce_mean=reduce_mean,
