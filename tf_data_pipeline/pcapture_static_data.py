@@ -45,6 +45,7 @@ class ParametricCaptureStaticData(object):
         capture_run: str,
         keras_model: str,
         seed: int = 123,
+        uniform_sampling_floor: float = 0.2,
     ):
 
         # TOOD: given the static data includes a y_teacher baked in it only
@@ -86,16 +87,25 @@ class ParametricCaptureStaticData(object):
 
         self.rng = np.random.default_rng(seed=seed)
 
+        if uniform_sampling_floor < 0.0 or uniform_sampling_floor > 1.0:
+            raise ValueError("uniform_sampling_floor must be in [0, 1]")
+
         # compute static priorities
         # TODO: try high_loss_skew in 0.4, 0.7 range
         #  0.0 => uniform ( ignore loss )
         #  1.0 => denotes skewing proportional to loss
-        alpha_high_loss_skew = 1.0
+        alpha_high_loss_skew = 0.4
         f64eps = np.finfo(np.float64).eps
         static_priorities = self.losses**alpha_high_loss_skew + f64eps
 
-        # convert priorities to sampling probabilies ( just by normalisation )
-        self.sampling_probabilies = static_priorities / static_priorities.sum()
+        # convert priorities to sampling probabilities by normalization, then
+        # mix in a uniform floor so hard-mined examples cannot dominate.
+        # p' = (1-lambda)*p + lambda*(1/N)
+        raw_sampling_probabilities = static_priorities / static_priorities.sum()
+        uniform_prob = np.full_like(raw_sampling_probabilities, 1.0 / self.n_chunks)
+        self.sampling_probabilies = (
+            1.0 - uniform_sampling_floor
+        ) * raw_sampling_probabilities + uniform_sampling_floor * uniform_prob
 
         # since we are leaning heavily on converged ( ish ) loss of a large model
         # we can try to just calculate importance weights purely on that loss
@@ -104,7 +114,7 @@ class ParametricCaptureStaticData(object):
         # TODO: try bias_correction in 0.5, 1.0
         #  0 => w_i=1 for all => keeps all bias from sampling prio
         #  1 => full correction => weighting cancels out sampling prio
-        beta_bias_correction = 1.0
+        beta_bias_correction = 0.6
         num_examples = len(self.sampling_probabilies)
         unnormalised_static_importance_weights = (
             1.0 / (num_examples * self.sampling_probabilies)
@@ -261,9 +271,14 @@ if __name__ == "__main__":
     )
     parser.add_argument("--run", type=str, required=True)
     parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--uniform-sampling-floor", type=float, default=0.2)
     opts = parser.parse_args()
     print("opts", opts)
-    pd = ParametricCaptureStaticData(capture_run=opts.run, keras_model=opts.model)
+    pd = ParametricCaptureStaticData(
+        capture_run=opts.run,
+        keras_model=opts.model,
+        uniform_sampling_floor=opts.uniform_sampling_floor,
+    )
 
     ds = pd.tf_training_dataset(seq_len=64, num_batches=4, batch_size=4)
     for xs, ys, weights in ds:

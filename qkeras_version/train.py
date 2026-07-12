@@ -11,6 +11,7 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 from tf_data_pipeline.pcapture_static_data import ParametricCaptureStaticData
+from tf_data_pipeline.pcapture_data import ParametricCaptureData
 from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
@@ -124,12 +125,6 @@ if __name__ == "__main__":
         str_opts = {k: str(v) for k, v in vars(opts).items()}
         json.dump(str_opts, f)
 
-    data = ParametricCaptureStaticData(
-        capture_run=opts.capture_run,
-        keras_model=opts.keras_model,
-        seed=123,
-    )
-
     # all convolutions use K=4
     K = 4
     num_layers = len(opts.filter_sizes) + 1
@@ -172,7 +167,11 @@ if __name__ == "__main__":
     else:
         init_weights_path = None
 
-    # make tf datasets
+    data = ParametricCaptureStaticData(
+        capture_run=opts.capture_run,
+        keras_model=opts.keras_model,
+        seed=123,
+    )
     train_ds = data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
         num_batches=opts.num_train_egs // opts.batch_size,
@@ -180,7 +179,6 @@ if __name__ == "__main__":
         emit_weights=True,
         emit_y_teacher_pred=opts.emit_y_teacher_pred,
     )
-    # validate_ds = data.tf_inference_dataset(
     validate_ds = data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
         num_batches=opts.num_validate_egs // opts.batch_size,
@@ -188,6 +186,21 @@ if __name__ == "__main__":
         emit_weights=False,
         emit_y_teacher_pred=opts.emit_y_teacher_pred,
     )
+
+    # data = ParametricCaptureData(
+    #     capture_run=opts.capture_run,
+    #     seed=123,
+    # )
+    # train_ds = data.tf_training_dataset(
+    #     seq_len=TRAIN_SEQ_LEN,
+    #     num_batches=opts.num_train_egs // opts.batch_size,
+    #     batch_size=opts.batch_size,
+    # )
+    # validate_ds = data.tf_training_dataset(
+    #     seq_len=TRAIN_SEQ_LEN,
+    #     num_batches=opts.num_validate_egs // opts.batch_size,
+    #     batch_size=opts.batch_size,
+    # )
 
     # construct some callbacks...
     callbacks = []
@@ -256,13 +269,6 @@ if __name__ == "__main__":
         loss=combined_loss_fn,
         metrics=[mse_loss_metric, stft_loss_metric],
     )
-    train_model.fit(
-        train_ds,
-        validation_data=None,  # just use validation for plots
-        callbacks=callbacks,
-        epochs=opts.epochs,
-        # verbose=2,
-    )
 
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
         with contextlib.redirect_stdout(f):
@@ -278,3 +284,11 @@ if __name__ == "__main__":
             },
             f,
         )
+
+    train_model.fit(
+        train_ds,
+        validation_data=None,  # just use validation for plots
+        callbacks=callbacks,
+        epochs=opts.epochs,
+        # verbose=2,
+    )

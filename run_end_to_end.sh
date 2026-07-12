@@ -8,11 +8,15 @@ export TF_USE_LEGACY_KERAS=1
 #export RUN=251_pc600_project_skips_longer
 #export RUN=252_pc600_no_stft_for_losses
 #export RUN=253_pc600_stft_tweaks_skip_none
-export RUN=255_pc600_stft_tweaks_skip_8d
+#export RUN=255_pc600_stft_tweaks_skip_8d
 #export RUN=255_pc600_stft_tweaks_skip_16d
+#export RUN=256_uniform
+#export RUN=257_sobol
+#export RUN=259_pc600_tuned_is_weights
+#export RUN=260_pc600_candidate
+export RUN=261_pc600_candidate
 
 export FILTERS="16 16 16 16"
-
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
@@ -29,15 +33,15 @@ export BUILD=nw_${RUN_ID}_psram-1
 # export FINETUNE_EPOCHS=10
 
 # onight config
-export TRAIN_EGS=100_000
+export TRAIN_EGS=200_000
 export PRETRAIN_EPOCHS=30
 export FINETUNE_EPOCHS=60
 
 export SAMPLE_RATE_KHZ=48
 export BATCH_SIZE=32
 
-# --quantise-output
-# --skip-project-dim 8
+# --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
+
 pretrain() {
     # pre train at FP3.15 ( relu4 )
     mkdir -p runs/$RUN/pretrain || true
@@ -65,8 +69,9 @@ finetune() {
         --capture-run 600 --keras-model 232_keras/i9 \
         --fp-int 3 --fp-frac 6 \
         --filter-sizes $FILTERS --relu-upper-bound 4 \
+        --skip-project-dim 8 \
         --init-weights runs/$RUN/pretrain/weights/keras/ \
-        --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.75 --beta-stft-ramp 0.25 \
+        --alpha-mse 1.0 --use-huber-loss \
         --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size $BATCH_SIZE \
         --learning-rate 1e-4 --l2 1e-4 \
         | tee runs/$RUN/finetune/qkeras_version.train.out
