@@ -3,15 +3,15 @@ import tensorflow as tf
 
 def setup_beta_stft_var_and_update_callback(
     epochs: int,
-    beta_stft_warmup: float,
-    beta_stft_ramp: float,
+    beta_stft_warmup: int,
+    beta_stft_ramp: int,
     beta_stft: float,
 ):
     """
     Args:
         epochs: total epochs being run
-        beta_stft_warmup: proportion of epochs to keep beta_stft at 0
-        beta_stft_ramp: proportion of epochs to ramp up, after warmup
+        beta_stft_warmup: number of epochs to keep beta_stft at 0
+        beta_stft_ramp: number of epochs to ramp up, after warmup
         beta_stft: final target beta_stft value
     Returns:
         callback, beta_stft_var
@@ -20,14 +20,9 @@ def setup_beta_stft_var_and_update_callback(
         beta_stft_var for passing to loss_fn
     """
 
-    if (
-        beta_stft_warmup < 0
-        or beta_stft_warmup > 1
-        or beta_stft_ramp < 0
-        or beta_stft_ramp > 1
-    ):
+    if beta_stft_warmup > epochs or beta_stft_ramp > epochs:
         raise Exception(
-            "--beta-stft-warmup & --beta-stft-ramp are propotions of --epochs must be (0, 1)"
+            "--beta-stft-warmup & --beta-stft-ramp must not exceed --epochs"
         )
 
     use_beta_schedule = beta_stft_warmup > 0 or beta_stft_ramp > 0
@@ -64,15 +59,10 @@ def setup_beta_stft_var_and_update_callback(
             self.beta_var.assign(value)
             print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
 
-    warmup_epochs = int(beta_stft_warmup * epochs)
-    ramp_epochs = int(beta_stft_ramp * epochs)
-    print(
-        f"derived warmup_epochs={warmup_epochs} ramp_epochs={ramp_epochs} ( epochs={epochs} )"
-    )
     ramp_callback = RampBetaStft(
         beta_var=beta_stft_var,
         target=beta_stft,
-        warmup_epochs=warmup_epochs,
-        ramp_epochs=ramp_epochs,
+        warmup_epochs=beta_stft_warmup,
+        ramp_epochs=beta_stft_ramp,
     )
     return ramp_callback, beta_stft_var

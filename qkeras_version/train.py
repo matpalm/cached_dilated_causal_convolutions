@@ -105,15 +105,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--beta-stft-warmup",
-        type=float,
+        type=int,
         default=0,
-        help="keep beta_stft at 0 for this proportion of epochs at start",
+        help="keep beta_stft at 0 for this many epochs at start",
     )
     parser.add_argument(
         "--beta-stft-ramp",
-        type=float,
+        type=int,
         default=0,
-        help="linearly ramp beta_stft from 0 to target over this many proportion of epochs ( post warmup )",
+        help="linearly ramp beta_stft from 0 to target over this many epochs after warmup",
     )
     opts = parser.parse_args()
 
@@ -178,6 +178,7 @@ if __name__ == "__main__":
         batch_size=opts.batch_size,
         emit_weights=True,
         emit_y_teacher_pred=opts.emit_y_teacher_pred,
+        rnd_flip_a_b=True,
     )
     validate_ds = data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,

@@ -38,11 +38,9 @@ def format_cv(v: float) -> str:
     return f"{float(v):.4f}".rstrip("0").rstrip(".")
 
 
-test_set_dir = Path(__file__).parent / "test_cvs" / opts.test_set
-cv_csv_path = test_set_dir / "cv_values.csv"
+cv_csv_path = Path(__file__).parent / "test_cvs" / opts.test_set / "cv_values.csv"
 if not cv_csv_path.exists():
     raise FileNotFoundError(f"cv_values.csv not found at {cv_csv_path}")
-
 
 def load_cv_rows(csv_path: Path):
     df = pd.read_csv(csv_path)
@@ -62,7 +60,11 @@ cv_rows = load_cv_rows(cv_csv_path)
 if len(cv_rows) == 0:
     raise ValueError(f"{cv_csv_path} has no rows")
 
-for jpg in test_set_dir.glob("*.jpg"):
+
+img_output_path = Path("runs") / opts.run / "test_cvs" / opts.test_set
+img_output_path.mkdir(parents=True, exist_ok=True)
+
+for jpg in img_output_path.glob("*.jpg"):
     jpg.unlink()
 
 test_model, receptive_field_size = create_dilated_model_from_config_and_latest_ckpt(
@@ -112,7 +114,7 @@ for i, (a_cv, b_cv, morph_cv) in enumerate(cv_rows):
 
     fig.tight_layout()
     plot_path = (
-        test_set_dir
+        img_output_path
         / f"fixed_cv_{i:03d}_{format_cv(a_cv)}_{format_cv(b_cv)}_{format_cv(morph_cv)}.jpg"
     )
     fig.savefig(plot_path)

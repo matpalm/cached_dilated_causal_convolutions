@@ -16,18 +16,25 @@ IGNORE_FADE_LEN = 500
 # weights based on converged model loss. dataset includes y_teacher as possible output
 
 
-def model_data_block_to_xs_ys(data, emit_y_teacher_pred: bool):
+def model_data_block_to_xs_ys(data, emit_y_teacher_pred: bool, flip_a_b: bool = False):
     """
     Args:
         data: chunk from zarr model_data_t.z
         emit_y_teacher_pred: if true emit y_teacher_pred, else emit y_true
     """
-    # build x
-    #  - triangle / core wave ( from capture )
-    #  - cv value a_cv
-    #  - cv_value b_cv
-    #  - cv_value morph
-    xs = data[..., :4]
+    if flip_a_b:
+        #  - triangle / core wave ( from capture )
+        #  - cv_value b_cv
+        #  - cv value a_cv
+        #  - cv_value -morph
+        xs = np.array(data[..., [0, 2, 1, 3]], copy=True)  # copy for mutate
+        xs[..., 3] *= -1
+    else:
+        #  - triangle / core wave ( from capture )
+        #  - cv value a_cv
+        #  - cv_value b_cv
+        #  - cv_value morph
+        xs = data[..., [0, 1, 2, 3]]
     # build y
     #  - y_teacher_pred morph output ( from capture ) for NOW or
     #  - y_true morph output ( from capture )
@@ -153,6 +160,7 @@ class ParametricCaptureStaticData(object):
         batch_size: int,
         emit_weights: bool,
         emit_y_teacher_pred: bool,
+        rnd_flip_a_b: bool = False,
     ):
         """
         Generate num_samples samples of shape (batch_size, seq_len, 4)
@@ -165,6 +173,7 @@ class ParametricCaptureStaticData(object):
             batch_size: batch size
             emit_weight: if set we return _weight as 3rd tuple element
             emit_y_teacher_pred: if set we emit y_teacher_pred instead of y_true
+            rnd_flip_a_b: if set then 1/2 times we flip a_cv and b_cv and set -morph_cv
         """
 
         def sample_generator():
@@ -191,8 +200,10 @@ class ParametricCaptureStaticData(object):
                         idx,
                     )
                     raise e
+                # if configured, flip 50% of data
+                flip_a_b = rnd_flip_a_b and self.rng.uniform() < 0.5
                 # return with weight for training and either y_true or y_teacher_pred
-                xs_ys = model_data_block_to_xs_ys(data, emit_y_teacher_pred)
+                xs_ys = model_data_block_to_xs_ys(data, emit_y_teacher_pred, flip_a_b)
                 if emit_weights:
                     weight = self.static_importance_weights[idx]
                     yield *xs_ys, weight
