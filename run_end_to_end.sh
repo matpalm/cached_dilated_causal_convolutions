@@ -3,85 +3,73 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-#export RUN=229_test_no_quantise_output
-export RUN=230_test_quantise_output
+
+#export RUN=250_pc600_no_project_longer
+#export RUN=251_pc600_project_skips_longer
+#export RUN=252_pc600_no_stft_for_losses
+#export RUN=253_pc600_stft_tweaks_skip_none
+export RUN=255_pc600_stft_tweaks_skip_8d
+#export RUN=255_pc600_stft_tweaks_skip_16d
 
 export FILTERS="16 16 16 16"
+
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
 export BUILD=nw_${RUN_ID}_psram-1
 
 # smoke config
-# export MIN_NOTE=A4
-# export MAX_NOTE=A4
-# export TRAIN_EGS=2
+# export TRAIN_EGS=1_000
 # export PRETRAIN_EPOCHS=1
 # export FINETUNE_EPOCHS=1
-# export WAVE_CONFIG="--train-interp"
 
 # sanity config
-export MIN_NOTE=A3
-export MAX_NOTE=A5
-export TRAIN_EGS=10000
-export PRETRAIN_EPOCHS=20
-export FINETUNE_EPOCHS=10
-export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
+# export TRAIN_EGS=10_000
+# export PRETRAIN_EPOCHS=20
+# export FINETUNE_EPOCHS=10
 
 # onight config
-# export MIN_NOTE=A2
-# export MAX_NOTE=A6
-# export TRAIN_EGS=100000
-# export PRETRAIN_EPOCHS=30
-# export FINETUNE_EPOCHS=60
-# export WAVE_CONFIG="--train-interp --harsh --soft-clip --double-interp"
+export TRAIN_EGS=100_000
+export PRETRAIN_EPOCHS=30
+export FINETUNE_EPOCHS=60
 
-export SAMPLE_RATE_KHZ=192
+export SAMPLE_RATE_KHZ=48
 export BATCH_SIZE=32
 
-#time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
-
 # --quantise-output
+# --skip-project-dim 8
 pretrain() {
     # pre train at FP3.15 ( relu4 )
     mkdir -p runs/$RUN/pretrain || true
     time uv run -m qkeras_version.train \
-    --run $RUN/pretrain \
-    --min-note $MIN_NOTE --max-note $MAX_NOTE \
-    $WAVE_CONFIG \
-    --sample-rate-khz $SAMPLE_RATE_KHZ \
-    --train-seq-len-multiplier 2 \
-    --fp-int 3 --fp-frac 15 \
-    --filter-sizes $FILTERS --relu-upper-bound 4 \
-    --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
-    --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
-    --learning-rate 1e-3 --l2 1e-4 \
-    | tee runs/$RUN/pretrain/qkeras_version.train.out
-    # time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.test \
-    #  --fp-int 4 --fp-frac 12 \
-    #  --filter-sizes $FILTERS \
-    #  --load-weights runs/$RUN/pretrain/weights/keras/ \
-    #  --wave sine --min-note A4 --max-note A4 \
-    #  --test-seq-len 1000 \
-    #  | tee runs/$RUN/pretrain/qkeras_version.test.out
+        --run $RUN/pretrain \
+        --sample-rate-khz $SAMPLE_RATE_KHZ \
+        --train-seq-len-multiplier 2 \
+        --capture-run 600 --keras-model 232_keras/i9 \
+        --fp-int 3 --fp-frac 15 \
+        --filter-sizes $FILTERS --relu-upper-bound 4 \
+        --skip-project-dim 8 \
+        --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
+        --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
+        --learning-rate 1e-3 --l2 1e-4 \
+        | tee runs/$RUN/pretrain/qkeras_version.train.out
 }
 
 finetune() {
     # fine tune at FP3.6 ( relu4 )
     mkdir -p runs/$RUN/finetune || true
-    time uv run --with "tensorflow[and-cuda]==2.16.2" --with "tf_keras" -m qkeras_version.train \
-    --run ${RUN}/finetune \
-    --min-note $MIN_NOTE --max-note $MAX_NOTE\
-    $WAVE_CONFIG \
-    --sample-rate-khz $SAMPLE_RATE_KHZ \
-    --train-seq-len-multiplier 2 \
-    --fp-int 3 --fp-frac 6 \
-    --filter-sizes $FILTERS --relu-upper-bound 4 \
-    --init-weights runs/$RUN/pretrain/weights/keras/ \
-    --alpha-mse 1.0 --beta-stft 0.0 \
-    --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size $BATCH_SIZE \
-    --learning-rate 1e-4 --l2 1e-4 \
-    | tee runs/$RUN/finetune/qkeras_version.train.out
+    time uv run -m qkeras_version.train \
+        --run ${RUN}/finetune \
+        --sample-rate-khz $SAMPLE_RATE_KHZ \
+        --train-seq-len-multiplier 2 \
+        --capture-run 600 --keras-model 232_keras/i9 \
+        --fp-int 3 --fp-frac 6 \
+        --filter-sizes $FILTERS --relu-upper-bound 4 \
+        --init-weights runs/$RUN/pretrain/weights/keras/ \
+        --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.75 --beta-stft-ramp 0.25 \
+        --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size $BATCH_SIZE \
+        --learning-rate 1e-4 --l2 1e-4 \
+        | tee runs/$RUN/finetune/qkeras_version.train.out
 }
 
 fxp_math_equiv_test() {

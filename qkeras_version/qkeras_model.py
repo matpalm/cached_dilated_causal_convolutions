@@ -140,7 +140,7 @@ class QKerasModelBuilder(object):
 
         return y_pred
 
-    def projection_layer(name: str, filters: int):
+    def projection_layer(self, name: str, filters: int):
         return QConv1D(
             name=name,
             filters=filters,
@@ -155,7 +155,7 @@ class QKerasModelBuilder(object):
         num_targets: int,
         # l2: float,
     ):
-        y_pred = projection_layer("qconv_regressor_qb", num_targets)(inp)
+        y_pred = self.projection_layer("qconv_regressor_qb", num_targets)(inp)
         self.layer_info.append({"type": "regressor", "num_targets": num_targets})
 
         y_pred = QActivation(self.quant_output(), name="qout")(y_pred)
@@ -231,7 +231,9 @@ class QKerasModelBuilder(object):
             # all projections are summed once, then requantised once.
             skip_sum = None
             for i, layer_out in enumerate(collected_layers):
-                proj = projection_layer(f"skip_proj_{i}", skip_project_dim)(layer_out)
+                proj = self.projection_layer(f"skip_proj_{i}", skip_project_dim)(
+                    layer_out
+                )
                 self.layer_info.append(
                     {"type": "skip_proj", "layer": i, "dim": skip_project_dim}
                 )
@@ -247,7 +249,9 @@ class QKerasModelBuilder(object):
             # if projection dim != final layer width we need one extra
             # projection so we can channel add the residual
             if skip_project_dim != filter_sizes[-1]:
-                skip_sum = projection_layer("skip_out_proj", filter_sizes[-1])(skip_sum)
+                skip_sum = self.projection_layer("skip_out_proj", filter_sizes[-1])(
+                    skip_sum
+                )
                 self.layer_info.append(
                     {"type": "skip_out_proj", "dim": filter_sizes[-1]}
                 )

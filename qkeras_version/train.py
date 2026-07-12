@@ -10,8 +10,7 @@ from pathlib import Path
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
-# from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
-from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
+from tf_data_pipeline.pcapture_static_data import ParametricCaptureStaticData
 from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
@@ -38,6 +37,8 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("--run", type=str, required=True)
+    parser.add_argument("--capture-run", type=str, required=True)
+    parser.add_argument("--keras-model", type=str, required=True)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=5)
@@ -63,12 +64,19 @@ if __name__ == "__main__":
         required=True,
         help="sfeature depths for each layer; last layer always 4",
     )
+    parser.add_argument(
+        "--skip-project-dim",
+        type=int,
+        default=None,
+        help="is set use wavenet style skip connections ( with this projection dim )",
+    )
     # parser.add_argument("--po2-filter-size", type=int, default=None)
     parser.add_argument("--num-train-egs", type=int, default=200_000)
     parser.add_argument("--num-validate-egs", type=int, default=100)
     parser.add_argument("--fp-int", type=int, default=4)
     parser.add_argument("--fp-frac", type=int, default=12)
     parser.add_argument("--quantise-output", action="store_true")
+    parser.add_argument("--emit-y-teacher-pred", action="store_true")
     parser.add_argument(
         "--init-weights",
         type=Path,
@@ -76,10 +84,6 @@ if __name__ == "__main__":
         help="path to keras weights used to initialise fine-tuning",
     )
     parser.add_argument("--relu-upper-bound", type=float, default=6)
-    parser.add_argument("--min-note", type=str, default="A2")
-    parser.add_argument("--max-note", type=str, default="A4")
-    parser.add_argument("--harsh-waves", action="store_true")
-    parser.add_argument("--soft-clip", action="store_true")
     parser.add_argument("--sample-rate-khz", type=float, default=192)
     parser.add_argument(
         "--alpha-mse",
@@ -110,16 +114,6 @@ if __name__ == "__main__":
         default=0,
         help="linearly ramp beta_stft from 0 to target over this many proportion of epochs ( post warmup )",
     )
-    parser.add_argument(
-        "--train-interp",
-        action="store_true",
-        help="whether to train with interpolated samples",
-    )
-    parser.add_argument(
-        "--double-interp",
-        action="store_true",
-        help="if set, and training with --train-interp, we interpolate e0 and e1 across sample",
-    )
     opts = parser.parse_args()
 
     print("opts", opts)
@@ -130,16 +124,10 @@ if __name__ == "__main__":
         str_opts = {k: str(v) for k, v in vars(opts).items()}
         json.dump(str_opts, f)
 
-    data = Embed2DQuadratureData(
-        min_note=opts.min_note,
-        max_note=opts.max_note,
-        sample_rate_khz=opts.sample_rate_khz,
-        fp_int=opts.fp_int,
-        fp_frac=opts.fp_frac,
-        quantise_y=opts.quantise_output,
-        harsh=opts.harsh_waves,
-        soft_clip=opts.soft_clip,
-        seed=456,
+    data = ParametricCaptureStaticData(
+        capture_run=opts.capture_run,
+        keras_model=opts.keras_model,
+        seed=123,
     )
 
     # all convolutions use K=4
@@ -159,15 +147,20 @@ if __name__ == "__main__":
 
     # construct model
     builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
-    train_model = builder.create_dilated_model(
-        TRAIN_SEQ_LEN,
-        in_d=opts.in_d,
-        out_d=opts.out_d,
-        filter_sizes=opts.filter_sizes,
+    model_config = {
+        "seq_len": TRAIN_SEQ_LEN,
+        "in_d": opts.in_d,
+        "out_d": opts.out_d,
+        "filter_sizes": opts.filter_sizes,
         # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
-        l2=opts.l2,
-        relu_upper_bound=opts.relu_upper_bound,
-    )
+        "l2": opts.l2,
+        "relu_upper_bound": opts.relu_upper_bound,
+        "skip_project_dim": opts.skip_project_dim,
+    }
+    train_model = builder.create_dilated_model(**model_config)
+
+    with open(f"runs/{opts.run}/model_config.json", "w") as f:
+        json.dump(model_config, f)
 
     train_model.summary()
 
@@ -180,21 +173,20 @@ if __name__ == "__main__":
         init_weights_path = None
 
     # make tf datasets
-    train_ds = data.tf_dataset(
-        batch_size=opts.batch_size,
+    train_ds = data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
-        num_samples=opts.num_train_egs,
-        emit_endpt_samples=True,
-        emit_interpolated_samples=opts.train_interp,
-        emit_double_interpolated_samples=opts.double_interp,
+        num_batches=opts.num_train_egs // opts.batch_size,
+        batch_size=opts.batch_size,
+        emit_weights=True,
+        emit_y_teacher_pred=opts.emit_y_teacher_pred,
     )
-    validate_ds = data.tf_dataset(
-        batch_size=opts.batch_size,
+    # validate_ds = data.tf_inference_dataset(
+    validate_ds = data.tf_training_dataset(
         seq_len=TRAIN_SEQ_LEN,
-        num_samples=opts.num_validate_egs,
-        emit_endpt_samples=True,
-        emit_interpolated_samples=opts.train_interp,
-        emit_double_interpolated_samples=opts.double_interp,
+        num_batches=opts.num_validate_egs // opts.batch_size,
+        batch_size=opts.batch_size,
+        emit_weights=False,
+        emit_y_teacher_pred=opts.emit_y_teacher_pred,
     )
 
     # construct some callbacks...
@@ -256,6 +248,7 @@ if __name__ == "__main__":
         use_huber_loss=opts.use_huber_loss,  # for now
         alpha_mse=opts.alpha_mse,
         beta_stft=beta_stft,
+        reduce_mean=False,  # return (batch,) for importance weights
     )
 
     train_model.compile(
@@ -268,7 +261,7 @@ if __name__ == "__main__":
         validation_data=None,  # just use validation for plots
         callbacks=callbacks,
         epochs=opts.epochs,
-        verbose=2,
+        # verbose=2,
     )
 
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
