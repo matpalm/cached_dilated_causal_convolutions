@@ -1,8 +1,8 @@
 import os
-from typing import List
+from typing import List, Optional
 
 import tensorflow as tf
-from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Input, Add
 from tensorflow.keras.models import Model
 from tensorflow.keras import regularizers
 import qkeras
@@ -140,6 +140,31 @@ class QKerasModelBuilder(object):
 
         return y_pred
 
+    def projection_layer(name: str, filters: int):
+        return QConv1D(
+            name=name,
+            filters=filters,
+            kernel_size=1,
+            kernel_quantizer=self.quantiser(),
+            bias_quantizer=self.quantiser(double_width=True),
+        )
+
+    def add_quantized_bits_regressor(
+        self,
+        inp,
+        num_targets: int,
+        # l2: float,
+    ):
+        y_pred = projection_layer("qconv_regressor_qb", num_targets)(inp)
+        self.layer_info.append({"type": "regressor", "num_targets": num_targets})
+
+        y_pred = QActivation(self.quant_output(), name="qout")(y_pred)
+        self.layer_info.append(
+            {"type": "qout", "n_int": self.n_int, "n_frac": self.n_frac}
+        )
+
+        return y_pred
+
     def create_dilated_model(
         self,
         seq_len: int,
@@ -149,6 +174,7 @@ class QKerasModelBuilder(object):
         # po2_filter_size: int,
         l2: float,
         relu_upper_bound: float,
+        skip_project_dim: int = None,
     ):
         """
         create a qkeras model with a stack of dilation 1d convolutions
@@ -160,6 +186,10 @@ class QKerasModelBuilder(object):
             filter_sizes: output depth for each convolution layer. Number of
                 layers is inferred from len(filter_sizes).
             l2: l2 penality for convolution kerne & bias
+            skip_project_dim: if None, regress only on the final layer output.
+                if set use this as feature dim for 1x1 projections for skips.
+                note: if skip_project_dim != filter_sizes[-1] we need one extra 1x1
+                to match channel widths before the residual add.
         Returns:
             qkeras model
         """
@@ -172,6 +202,7 @@ class QKerasModelBuilder(object):
 
         inp = Input((seq_len, in_d))
         y_pred = inp
+        collected_layers = []
 
         for layer_num in range(num_layers):
             y_pred = self.add_quantized_bits_conv_block(
@@ -191,17 +222,46 @@ class QKerasModelBuilder(object):
                 }
             )
 
-        # explicitly add last layer
-        y_pred = self.add_quantized_bits_conv_block(
-            y_pred, layer_number=num_layers, out_filters=out_d, l2=l2, relu=False
-        )
+            if skip_project_dim is not None:
+                collected_layers.append(y_pred)
 
-        # no dilation after last layer
+        # build the input to the regressor
+        if skip_project_dim is not None:
+            # each layer gets its own learned 1x1 projection into skip space;
+            # all projections are summed once, then requantised once.
+            skip_sum = None
+            for i, layer_out in enumerate(collected_layers):
+                proj = projection_layer(f"skip_proj_{i}", skip_project_dim)(layer_out)
+                self.layer_info.append(
+                    {"type": "skip_proj", "layer": i, "dim": skip_project_dim}
+                )
+                if skip_sum is None:
+                    skip_sum = proj
+                else:
+                    skip_sum = Add(name=f"skip_proj_add_{i}")([skip_sum, proj])
 
-        y_pred = QActivation(self.quant_output(), name="qout")(y_pred)
-        self.layer_info.append(
-            {"type": "qout", "n_int": self.n_int, "n_frac": self.n_frac}
-        )
+            skip_sum = QActivation(
+                self.quant_relu(relu_upper_bound), name="skip_merge_qrelu"
+            )(skip_sum)
+
+            # if projection dim != final layer width we need one extra
+            # projection so we can channel add the residual
+            if skip_project_dim != filter_sizes[-1]:
+                skip_sum = projection_layer("skip_out_proj", filter_sizes[-1])(skip_sum)
+                self.layer_info.append(
+                    {"type": "skip_out_proj", "dim": filter_sizes[-1]}
+                )
+
+            # add as residual on top of the final layer output
+            merged = Add(name="skip_final_add")([y_pred, skip_sum])
+            merged = QActivation(
+                self.quant_relu(relu_upper_bound), name="skip_final_qrelu"
+            )(merged)
+            regressor_inp = merged
+        else:
+            regressor_inp = y_pred
+
+        y_pred = self.add_quantized_bits_regressor(regressor_inp, num_targets=out_d)
 
         # TODO: rewire in po2 stuff later
         # if po2_filter_size is None:

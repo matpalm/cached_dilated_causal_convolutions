@@ -3,10 +3,16 @@ set -ex
 # qkeras 0.9.0 not compatible with keras from in tf 2.16; force legacy package
 export TF_USE_LEGACY_KERAS=1
 
-#export RUN=229_test_no_quantise_output
-export RUN=234_pc600
+
+#export RUN=250_pc600_no_project_longer
+#export RUN=251_pc600_project_skips_longer
+#export RUN=252_pc600_no_stft_for_losses
+#export RUN=253_pc600_stft_tweaks_skip_none
+export RUN=254_pc600_stft_tweaks_skip_8d
+#export RUN=255_pc600_stft_tweaks_skip_16d
 
 export FILTERS="16 16 16 16"
+
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
@@ -31,6 +37,7 @@ export SAMPLE_RATE_KHZ=48
 export BATCH_SIZE=32
 
 # --quantise-output
+# --skip-project-dim 8
 pretrain() {
     # pre train at FP3.15 ( relu4 )
     mkdir -p runs/$RUN/pretrain || true
@@ -41,6 +48,7 @@ pretrain() {
         --capture-run 600 --keras-model 232_keras/i9 \
         --fp-int 3 --fp-frac 15 \
         --filter-sizes $FILTERS --relu-upper-bound 4 \
+        --skip-project-dim 8 \
         --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
         --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
         --learning-rate 1e-3 --l2 1e-4 \
@@ -82,7 +90,7 @@ fxp_math_equiv_test() {
 }
 
 pretrain
-finetune
+#finetune
 #fxp_math_equiv_test finetune
 
 # build both versions

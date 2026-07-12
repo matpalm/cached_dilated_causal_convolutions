@@ -64,6 +64,12 @@ if __name__ == "__main__":
         required=True,
         help="sfeature depths for each layer; last layer always 4",
     )
+    parser.add_argument(
+        "--skip-project-dim",
+        type=int,
+        default=None,
+        help="is set use wavenet style skip connections ( with this projection dim )",
+    )
     # parser.add_argument("--po2-filter-size", type=int, default=None)
     parser.add_argument("--num-train-egs", type=int, default=200_000)
     parser.add_argument("--num-validate-egs", type=int, default=100)
@@ -149,6 +155,7 @@ if __name__ == "__main__":
         # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
         l2=opts.l2,
         relu_upper_bound=opts.relu_upper_bound,
+        skip_project_dim=opts.skip_project_dim,
     )
 
     train_model.summary()

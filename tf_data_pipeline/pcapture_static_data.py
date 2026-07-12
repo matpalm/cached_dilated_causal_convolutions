@@ -153,8 +153,8 @@ class ParametricCaptureStaticData(object):
             seq_len: second axis for batch
             num_batches: total number of batches generated
             batch_size: batch size
-            emit_weight: if true return _weight as 3rd
-            emit_y_teacher_pred: if y_true emit
+            emit_weight: if set we return _weight as 3rd tuple element
+            emit_y_teacher_pred: if set we emit y_teacher_pred instead of y_true
         """
 
         def sample_generator():
