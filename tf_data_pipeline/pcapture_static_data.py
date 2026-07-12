@@ -90,9 +90,9 @@ class ParametricCaptureStaticData(object):
         # TODO: try high_loss_skew in 0.4, 0.7 range
         #  0.0 => uniform ( ignore loss )
         #  1.0 => denotes skewing proportional to loss
-        high_loss_skew = 1.0
+        alpha_high_loss_skew = 1.0
         f64eps = np.finfo(np.float64).eps
-        static_priorities = self.losses**high_loss_skew + f64eps
+        static_priorities = self.losses**alpha_high_loss_skew + f64eps
 
         # convert priorities to sampling probabilies ( just by normalisation )
         self.sampling_probabilies = static_priorities / static_priorities.sum()
@@ -104,11 +104,11 @@ class ParametricCaptureStaticData(object):
         # TODO: try bias_correction in 0.5, 1.0
         #  0 => w_i=1 for all => keeps all bias from sampling prio
         #  1 => full correction => weighting cancels out sampling prio
-        bias_correction = 1.0
+        beta_bias_correction = 1.0
         num_examples = len(self.sampling_probabilies)
         unnormalised_static_importance_weights = (
             1.0 / (num_examples * self.sampling_probabilies)
-        ) ** bias_correction
+        ) ** beta_bias_correction
         self.static_importance_weights = (
             unnormalised_static_importance_weights
             / unnormalised_static_importance_weights.max()

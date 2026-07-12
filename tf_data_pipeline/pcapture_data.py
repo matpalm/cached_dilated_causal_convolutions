@@ -5,13 +5,13 @@ import tensorflow as tf
 from tqdm import tqdm
 from typing import List
 
-from common.util import model_data_z_path_for
+from common.util import zarr_base_path_for
 
 IN_D = 4
 OUT_D = 1
 IGNORE_FADE_LEN = 500
 
-# generate random samples taken uniformly from capture data
+# generate random samples taken uniformly from specific capture data
 
 def model_data_block_to_xs_ys(data):
     # build x
@@ -34,7 +34,9 @@ class ParametricCaptureData(object):
         seed: int = 123,
     ):
         self.capture_run = capture_run
-        self.model_data_z = zarr.open(model_data_z_path_for(capture_run), mode="r")
+        self.model_data_z = zarr.open(
+            zarr_base_path_for(capture_run) / "model_data.z", mode="r"
+        )
         self.n_chunks = self.model_data_z.nchunks
         self.chunk_len = self.model_data_z.blocks[0].shape[0]
         self.rng = np.random.default_rng(seed=seed)

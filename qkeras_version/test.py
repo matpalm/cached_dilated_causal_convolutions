@@ -3,7 +3,6 @@ import pandas as pd
 import tensorflow as tf
 import seaborn as sns
 import matplotlib.pyplot as plt
-from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
 import tqdm
 import os
 import warnings
@@ -11,120 +10,111 @@ import json
 from pathlib import Path
 import tempfile
 
+from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
+
 print("tf", tf.__version__)
 
-from qkeras_version.qkeras_model import QKerasModelBuilder
+from qkeras_version.qkeras_model import create_dilated_model_from_config_and_latest_ckpt
 
 import argparse
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("--min-note", type=str, default="A2")
-parser.add_argument("--max-note", type=str, default="A4")
-parser.add_argument("--sample-rate-khz", type=float, default=192)
+parser.add_argument("--tri-freq", type=float)
 parser.add_argument(
-    "--fp-int",
-    type=int,
-    default=4,
-    help=" integer bits for FP config",
+    "--test-set",
+    type=str,
+    required=True,
+    help="subdirectory under test_cvs/ containing cv_values.csv",
 )
-parser.add_argument(
-    "--fp-frac",
-    type=int,
-    default=12,
-    help="fractional bits for FP config",
-)
-parser.add_argument("--in-d", type=int, default=4)
-parser.add_argument("--out-d", type=int, default=1)
-parser.add_argument("--filter-sizes", type=int, nargs="+", required=True)
-parser.add_argument("--relu-upper-bound", type=float, default=6)
-parser.add_argument("--load-weights", type=Path, required=True)
-parser.add_argument(
-    "--wave", type=str, default=None, help="single wave to test, if not set, test all"
-)
+parser.add_argument("--run", type=Path)
+parser.add_argument("--ckpt", type=Path)
 parser.add_argument("--test-seq-len", type=int, default=400)
 opts = parser.parse_args()
 print("opts", opts)
 
-data = Embed2DQuadratureData(
-    min_note=opts.min_note,
-    max_note=opts.max_note,
-    fp_int=opts.fp_int,
-    fp_frac=opts.fp_frac,
-    sample_rate_khz=opts.sample_rate_khz,
-    seed=123,
+
+def format_cv(v: float) -> str:
+    # Use compact fixed precision that is filename-friendly.
+    return f"{float(v):.4f}".rstrip("0").rstrip(".")
+
+
+test_set_dir = Path(__file__).parent / "test_cvs" / opts.test_set
+cv_csv_path = test_set_dir / "cv_values.csv"
+if not cv_csv_path.exists():
+    raise FileNotFoundError(f"cv_values.csv not found at {cv_csv_path}")
+
+
+def load_cv_rows(csv_path: Path):
+    df = pd.read_csv(csv_path)
+    expected = ["a_cv", "b_cv", "morph_cv"]
+    if all(c in df.columns for c in expected):
+        rows = df[expected].to_numpy(dtype=np.float32)
+    else:
+        if df.shape[1] < 3:
+            raise ValueError(
+                "csv must have columns a_cv,b_cv,morph_cv or at least 3 columns"
+            )
+        rows = df.iloc[:, :3].to_numpy(dtype=np.float32)
+    return [(float(a), float(b), float(m)) for a, b, m in rows]
+
+
+cv_rows = load_cv_rows(cv_csv_path)
+if len(cv_rows) == 0:
+    raise ValueError(f"{cv_csv_path} has no rows")
+
+for jpg in test_set_dir.glob("*.jpg"):
+    jpg.unlink()
+
+test_model, receptive_field_size = create_dilated_model_from_config_and_latest_ckpt(
+    opts.run
 )
 
-# all convolutions use K=4
-K = 4
-num_layers = len(opts.filter_sizes)
+# the model needs to warm up so we have to run this many through
+seq_len_plus_receptive_field = receptive_field_size + opts.test_seq_len
 
-# note: kernel size and implied dilation rate always assumed K
-RECEPTIVE_FIELD_SIZE = K**num_layers
-print("RECEPTIVE_FIELD_SIZE", RECEPTIVE_FIELD_SIZE)
-print("TEST_SEQ_LEN", opts.test_seq_len)
+sample_rate = 48_000.0
+amp = 0.53
+n = np.arange(seq_len_plus_receptive_field, dtype=np.float32)
+phase = np.mod(n * (opts.tri_freq / sample_rate), 1.0)
+tri = amp * (2.0 * np.abs(2.0 * phase - 1.0) - 1.0)
 
-# construct model
-builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
-test_model = builder.create_dilated_model(
-    opts.test_seq_len,
-    in_d=opts.in_d,
-    out_d=opts.out_d,
-    filter_sizes=opts.filter_sizes,
-    l2=None,
-    relu_upper_bound=opts.relu_upper_bound,
-)
-test_model.summary()
+x = np.empty((1, seq_len_plus_receptive_field, 4), dtype=np.float32)
+x[0, :, 0] = tri
+print("triangle[min,max]", float(tri.min()), float(tri.max()))
+print("num cv rows", len(cv_rows))
 
-if opts.load_weights.is_dir():
-    latest_weight_fname = sorted(os.listdir(opts.load_weights))[-1]
-    test_model.load_weights(opts.load_weights / latest_weight_fname)
-else:
-    test_model.load_weights(opts.load_weights)
+for i, (a_cv, b_cv, morph_cv) in enumerate(cv_rows):
+    x[0, :, 1] = np.float32(a_cv)
+    x[0, :, 2] = np.float32(b_cv)
+    x[0, :, 3] = np.float32(morph_cv)
 
-# load a test set using sine wave, we'll clobber the
-# embedding points so doesn't matter what this is..
-test_ds = data.tf_dataset(
-    batch_size=16,
-    seq_len=opts.test_seq_len,
-    num_samples=1,
-    emit_specific_wave=opts.wave,
-)
-for x, _y in test_ds:
-    x = np.array(x)
-    break
+    y_pred = test_model(x)
+    y_pred = np.asarray(y_pred[0, :, 0], dtype=np.float32)
 
-GRID_SIZE = 7
-assert GRID_SIZE%2 != 0
+    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+    ax.plot(n, tri, linewidth=1.5, label="input ch0")
+    ax.plot(n, y_pred, linewidth=1.5, label="y_pred")
+    ax.axvline(
+        receptive_field_size,
+        color="red",
+        linestyle="--",
+        linewidth=2,
+        label=f"rf={receptive_field_size}",
+    )
+    ax.set_ylabel("value")
+    ax.set_title(
+        f"triangle={opts.tri_freq:.2f}Hz, a_cv={a_cv}, b_cv={b_cv}, morph_cv={morph_cv}"
+    )
+    ax.set_xlabel("sample index")
+    ax.set_ylim(-1, 1)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="best")
 
-for i0, e0 in enumerate([-1]):  # np.linspace(-1, 1, GRID_SIZE)):
-
-    for i1, e1 in enumerate([-1]):  # np.linspace(-1, 1, GRID_SIZE)):
-
-        print("i", i0, i1, "=> e", e0, e1)
-        x[0, :, 2] = e0
-        x[0, :, 3] = e1
-
-        y_pred = test_model.predict(x)
-
-        # axis 0 ; just take first element ( single batch )
-        # axis 1 ; drop first receptive field items ( warm up )
-        # axis 2 ; just first element ( single dim output )
-        y_pred = y_pred[0, RECEPTIVE_FIELD_SIZE:, 0]
-
-        # save plot
-        df = pd.DataFrame()
-        df["n"] = range(len(y_pred))
-        df['y_pred'] = y_pred
-        with warnings.catch_warnings():
-            warnings.simplefilter(action='ignore', category=FutureWarning)
-            p = sns.lineplot(df, x='n', y='y_pred', linewidth=5)
-            p.set(xticklabels=[])
-            p.set(xlabel=None)
-            p.set(yticklabels=[])
-            p.set(ylabel=None)
-            p.tick_params(bottom=False, left=False)
-            p.set(ylim=(-2, 2))
-            plt_fname = f"foo_{i0:02d}_{i1:02d}.png"
-            print("saving plot to", plt_fname)
-            plt.savefig(plt_fname)
-            plt.clf()
+    fig.tight_layout()
+    plot_path = (
+        test_set_dir
+        / f"fixed_cv_{i:03d}_{format_cv(a_cv)}_{format_cv(b_cv)}_{format_cv(morph_cv)}.jpg"
+    )
+    fig.savefig(plot_path)
+    plt.close(fig)
+    print(f"[{i+1}/{len(cv_rows)}] saved plot", plot_path)

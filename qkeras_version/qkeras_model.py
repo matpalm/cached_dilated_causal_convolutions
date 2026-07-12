@@ -1,5 +1,7 @@
 import os
 from typing import List, Optional
+from pathlib import Path
+import json
 
 import tensorflow as tf
 from tensorflow.keras.layers import Input, Add
@@ -9,6 +11,24 @@ import qkeras
 from qkeras import quantized_bits, quantized_po2, QConv1D, QActivation
 
 K = 4
+
+
+def create_dilated_model_from_config_and_latest_ckpt(run: str):
+    run_dir_path = Path("runs") / run
+    with open(run_dir_path / "qkeras_model.fp_config.json", "r") as f:
+        fp_config = json.load(f)
+    builder = QKerasModelBuilder(n_int=fp_config["n_int"], n_frac=fp_config["n_frac"])
+    with open(run_dir_path / "model_config.json", "r") as f:
+        model_config = json.load(f)
+    model_config["seq_len"] = None  # drive shape by sample
+    model = builder.create_dilated_model(**model_config)
+    # model.summary()
+    ckpts = (run_dir_path / "weights" / "keras").iterdir()
+    latest_ckpt = list(sorted(ckpts))[-1]
+    print("using ckpt", latest_ckpt)
+    model.load_weights(str(latest_ckpt))
+    return model, builder.receptive_field_size()
+
 
 class QKerasModelBuilder(object):
 
@@ -20,6 +40,8 @@ class QKerasModelBuilder(object):
 
         print(f"FP N_INT={self.n_int} N_FRAC={self.n_frac}")
         self.n_word = self.n_int + self.n_frac
+
+        self.built = False
 
     # qkeras quantiser for all convolution kernels and biases
     def quantiser(self, po2: bool = False, double_width: bool = False):
@@ -290,5 +312,14 @@ class QKerasModelBuilder(object):
         # )
 
         print("layer_info", self.layer_info)
-
+        self.built = True
         return Model(inp, y_pred)
+
+    def receptive_field_size(self):
+        # TODO: does this work still for all configs?
+        if not self.built:
+            raise Exception("need to call create_dilated_model() first")
+        num_dilated_layers = sum(
+            1 for layer in self.layer_info if layer.get("type") == "dilation"
+        )
+        return K**num_dilated_layers
