@@ -77,8 +77,8 @@ def masked_multires_stft_loss(
     fft_sizes=(512, 1024, 2048),
     hop_sizes=(128, 256, 512),
     win_lengths=(512, 1024, 2048),
-    w_mag=0.4,
-    w_sc=0.1,
+    w_mag=0.325,
+    w_sc=0.675,
     reduce_mean: bool = True,
 ):
     """
@@ -191,8 +191,6 @@ def combined_masked_loss_terms(
     # so can remove w_time completely (?)
     stft_fn = masked_multires_stft_loss(
         receptive_field_size,
-        w_mag=0.8,
-        w_sc=0.2,
         reduce_mean=reduce_mean,
     )
 
