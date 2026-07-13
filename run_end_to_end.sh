@@ -8,12 +8,15 @@ export TF_USE_LEGACY_KERAS=1
 #export RUN=263_pc600_rnd_flip_no_skip
 #export RUN=264_pc600_smaller
 #export RUN=265_pc600_smaller  # 8_8_8
-export RUN=266_pc600_16x3
 #export RUN=267_pc600_16x4
 #export RUN=268_pc600_16x5
 #export RUN=269_pc600_24x4_ps1
+#export RUN=270_pc006_16x3_quad
+#export RUN=271_pc006_16x3_tri
+#export RUN=272_pc006_16x4_tri
+export RUN=273_pc006_16x4_quad
 
-export FILTERS="16 16 16"
+export FILTERS="16 16 16 16"
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
@@ -40,6 +43,7 @@ export SAMPLE_RATE_KHZ=48
 export BATCH_SIZE=32
 
 # --skip-project-dim 8 \
+# --quadrature-input
 
 pretrain() {
     # pre train at FP3.15 ( relu4 )
@@ -49,7 +53,7 @@ pretrain() {
         --sample-rate-khz $SAMPLE_RATE_KHZ \
         --train-seq-len-multiplier 2 \
         --capture-run 600 --keras-model 232_keras/i9 \
-        --fp-int 3 --fp-frac 15 \
+        --fp-int 3 --fp-frac 15 --quadrature-input \
         --filter-sizes $FILTERS --relu-upper-bound 4 \
         --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 5 --beta-stft-ramp 5 \
         --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
@@ -89,12 +93,12 @@ pdm_build() {
       | tee runs/$RUN/$SUB_RUN/parsed_top_tim
 }
 
-#pretrain
+pretrain
 #finetune 3 6
-finetune 3 8
+#finetune 3 8
 #pdm_build 3 15 pretrain &   # wont' work with psram activation constraints :/
 #pdm_build 3 6 finetune_3_6 &
-pdm_build 3 8 finetune_3_8 &
+#pdm_build 3 8 finetune_3_8 &
 wait
 
 #openFPGALoader -c dirtyJtag build/neural-waveshaper-r3/top.bit || true

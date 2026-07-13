@@ -6,7 +6,7 @@ import argparse
 from functools import cache
 
 from .plotting import plot, collage, plot_spectrogram
-from common.util import zarr_base_path_for
+from common.util import zarr_base_path_for, zarr_buffer_fields
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--egs", type=str, nargs="+", required=True, help="run_idx to plot")
@@ -32,16 +32,14 @@ for eg in opts.egs:
     idx = int(idx)
 
     plots = []
-    for z_name, ch_names in [
-        ("cv_buffers.z", ["a_cv", "b_cv", "morph", "v/oct"]),
-        ("capture_buffers.z", ["morph out", "a out", "b out", "tri out"]),
-        ("model_data.z", ["x_tri", "x_a_cv", "x_b_cv", "x_morph", "y_true"]),
-        (
-            "model_data_t.z",
-            ["x_tri", "x_a_cv", "x_b_cv", "x_morph", "y_true", "y_pred_teacher"],
-        ),
+    for z_name in [
+        "cv_buffers.z",
+        "capture_buffers.z",
+        "model_data.z",
+        "model_data_t.z",
     ]:
         z = open_zarr(run, z_name)
+        ch_names = zarr_buffer_fields(z_name)._fields
         if z:
             plots.append(
                 plot(

@@ -27,15 +27,47 @@ class CheckYPred(tf.keras.callbacks.Callback):
             self.y_true = y
             break  # just one batch
 
+        # bit dangerous, but we can imply quadrature vs not from x shape o_O
+        if x.shape[-1] == 4:
+            self.quadrature_data = False
+        elif x.shape[-1] == 5:
+            self.quadrature_data = True
+        else:
+            raise Exception(x.shape)
+
         # make an explicit version of core a_cv b_cv shapes
         # square, ramp, triangle and sine
         seq_len = len(self.x[0])
         self.x_shapes = np.stack(
             [
-                build_triangle_sample(seq_len, a_cv=-0.6, b_cv=-0.6, morph_cv=-1),
-                build_triangle_sample(seq_len, a_cv=-0.2, b_cv=-0.2, morph_cv=-1),
-                build_triangle_sample(seq_len, a_cv=0.2, b_cv=0.2, morph_cv=-1),
-                build_triangle_sample(seq_len, a_cv=0.6, b_cv=0.6, morph_cv=-1),
+                build_triangle_sample(
+                    seq_len,
+                    a_cv=-0.6,
+                    b_cv=-0.6,
+                    morph_cv=-1,
+                    quadrature_input=self.quadrature_data,
+                ),
+                build_triangle_sample(
+                    seq_len,
+                    a_cv=-0.2,
+                    b_cv=-0.2,
+                    morph_cv=-1,
+                    quadrature_input=self.quadrature_data,
+                ),
+                build_triangle_sample(
+                    seq_len,
+                    a_cv=0.2,
+                    b_cv=0.2,
+                    morph_cv=-1,
+                    quadrature_input=self.quadrature_data,
+                ),
+                build_triangle_sample(
+                    seq_len,
+                    a_cv=0.6,
+                    b_cv=0.6,
+                    morph_cv=-1,
+                    quadrature_input=self.quadrature_data,
+                ),
             ]
         )
 
@@ -48,17 +80,30 @@ class CheckYPred(tf.keras.callbacks.Callback):
         y_pred = np.asarray(y_pred, dtype=np.float32)
 
         df = pd.DataFrame()
-        df["triangle"] = x[:, 0]
-        df["a_cv"] = x[:, 1]
-        df["b_cv"] = x[:, 2]
-        df["morph_cv"] = x[:, 3]
+
+        if self.quadrature_data:
+            # quadrature
+            df["sin_q"] = x[:, 0]
+            df["cos_q"] = x[:, 1]
+            df["a_cv"] = x[:, 2]
+            df["b_cv"] = x[:, 3]
+            df["morph_cv"] = x[:, 4]
+            value_vars = ["sin_q", "cos_q", "a_cv", "b_cv", "morph_cv"]
+        else:
+            # triangle
+            df["tri"] = x[:, 0]
+            df["a_cv"] = x[:, 1]
+            df["b_cv"] = x[:, 2]
+            df["morph_cv"] = x[:, 3]
+            value_vars = ["tri", "a_cv", "b_cv", "morph_cv"]
+
         df["y_true"] = y_true[:, 0]
         df["y_pred"] = y_pred[:, 0]
         df["n"] = range(len(x))
         control_df = pd.melt(
             df,
             id_vars=["n"],
-            value_vars=["triangle", "a_cv", "b_cv", "morph_cv"],
+            value_vars=value_vars,
         )
         output_df = pd.melt(
             df,
@@ -73,7 +118,7 @@ class CheckYPred(tf.keras.callbacks.Callback):
                     1,
                     figsize=(20, 6),
                     sharex=True,
-                    gridspec_kw={"height_ratios": [2, 1]},
+                    gridspec_kw={"height_ratios": [1, 2]},
                 )
                 sns.lineplot(control_df, x="n", y="value", hue="variable", ax=axes[0])
                 axes[0].set_ylim((-1.1, 1.1))

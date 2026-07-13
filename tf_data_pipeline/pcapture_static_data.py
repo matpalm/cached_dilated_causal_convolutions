@@ -8,45 +8,10 @@ import pandas as pd
 from common.sample_db import SampleDB
 from common.util import zarr_base_path_for, zarr_buffer_fields
 
-IN_D = 4
-OUT_D = 1  # TODO: change to 2 for y_teacher_pred
 IGNORE_FADE_LEN = 500
 
 # generate samples based on materialised sampling probabilities / importance sampling
 # weights based on converged model loss. dataset includes y_teacher as possible output
-
-
-def model_data_block_to_xs_ys(data, emit_y_teacher_pred: bool, flip_a_b: bool = False):
-    """
-    Args:
-        data: chunk from zarr model_data_t.z
-        emit_y_teacher_pred: if true emit y_teacher_pred, else emit y_true
-        flip_a_b: if true change [tri, a_cv, b_cv, morph] to [tri, b_cv, a_cv, -morph]
-    """
-
-    # TODO: rather than flip 1/2 the time ( which will work in expectation ) there
-    #       is also the option to bake this in specifically as a consistency loss ?
-    #       e.g L = huber_stft(yt, f(x)) + huber_stft(yt, f(x')) + lambda.||f(x)-f(x')||
-
-    f = zarr_buffer_fields("model_data_t.z")
-
-    if flip_a_b:
-        # copy for mutate
-        xs = np.array(data[..., [f.x_tri, f.x_b_cv, f.x_a_cv, f.x_morph_cv]], copy=True)
-        xs[..., f.x_morph_cv] *= -1
-    else:
-        xs = data[..., [f.x_tri, f.x_a_cv, f.x_b_cv, f.x_morph_cv]]
-
-    # build y
-    #  - y_teacher_pred morph output ( from capture ) for NOW or
-    #  - y_true morph output ( from capture )
-    if emit_y_teacher_pred:
-        ys = data[..., f.y_pred_teacher : f.y_pred_teacher + 1]
-    else:
-        ys = data[..., f.y_true : f.y_true + 1]
-
-    return xs, ys
-
 
 class ParametricCaptureStaticData(object):
 
@@ -54,13 +19,10 @@ class ParametricCaptureStaticData(object):
         self,
         capture_run: str,
         keras_model: str,
+        quadrature_input: bool,
         seed: int = 123,
         uniform_sampling_floor: float = 0.2,
     ):
-
-        # TOOD: given the static data includes a y_teacher baked in it only
-        #       makes sense to use one model. so these losses should be
-        #       be written in add_y_pred and then read from capture_run model_data_t (?)
 
         db = SampleDB()
         loss_rows = db.losses_for(capture_run, keras_model)
@@ -73,10 +35,12 @@ class ParametricCaptureStaticData(object):
 
         self.capture_run = capture_run
         self.model_data_z = zarr.open(
-            zarr_base_path_for(capture_run) / "model_data_t.z", mode="r"
+            zarr_base_path_for(capture_run) / "model_data.z", mode="r"
         )
         self.n_chunks = self.model_data_z.nchunks
         self.seq_len = self.model_data_z.blocks[0].shape[0]
+
+        self.quadrature_input = quadrature_input
 
         print(
             "capture_run",
@@ -134,8 +98,8 @@ class ParametricCaptureStaticData(object):
         )
 
         # read in debug mapping for src_runs ( which gives the src_run of each index )
-        with open(zarr_base_path_for(capture_run) / "src_runs.json", "r") as f:
-            src_runs = json.load(f)
+        # with open(zarr_base_path_for(capture_run) / "src_runs.json", "r") as f:
+        #    src_runs = json.load(f)
         # write key arrays for debugging
         # df = pd.DataFrame(
         #     zip(src_runs, self.sampling_probabilies, self.static_importance_weights),
@@ -155,13 +119,66 @@ class ParametricCaptureStaticData(object):
     def num_examples(self):
         return self.n_chunks
 
+    def in_d(self):
+        return 5 if self.quadrature_input else 4
+
+    def out_d(self):
+        return 1
+
+    def model_data_block_to_xs_ys(
+        self,
+        data,
+        flip_a_b: bool = False,
+    ):
+        """
+        Args:
+            data: chunk from zarr model_data_t.z
+            emit_y_teacher_pred: if true emit y_teacher_pred, else emit y_true
+            flip_a_b: if true change [tri, a_cv, b_cv, morph] to [tri, b_cv, a_cv, -morph]
+            use_quadrature: if true emit data as (sin_q, cos_q, ...) otherwise (tri, ...)
+        """
+
+        # TODO: rather than flip 1/2 the time ( which will work in expectation ) there
+        #       is also the option to bake this in specifically as a consistency loss ?
+        #       e.g L = huber_stft(yt, f(x)) + huber_stft(yt, f(x')) + lambda.||f(x)-f(x')||
+
+        f = zarr_buffer_fields("model_data.z")
+
+        if self.quadrature_input:
+            if flip_a_b:
+                xs = np.array(
+                    data[..., [f.x_sin_q, f.x_cos_q, f.x_b_cv, f.x_a_cv, f.x_morph_cv]],
+                    copy=True,
+                )
+                xs[..., -1] *= -1
+            else:
+                xs = data[..., [f.x_sin_q, f.x_cos_q, f.x_a_cv, f.x_b_cv, f.x_morph_cv]]
+        else:
+            if flip_a_b:
+                xs = np.array(
+                    data[..., [f.x_tri, f.x_a_cv, f.x_b_cv, f.x_morph_cv]],
+                    copy=True,
+                )
+                xs[..., -1] *= -1
+            else:
+                xs = data[..., [f.x_tri, f.x_a_cv, f.x_b_cv, f.x_morph_cv]]
+
+        # build y
+        #  - y_teacher_pred morph output ( from capture ) for NOW or
+        #  - y_true morph output ( from capture )
+        # if emit_y_teacher_pred:
+        #     ys = data[..., f.y_pred_teacher : f.y_pred_teacher + 1]
+        # else:
+        ys = data[..., f.y_true : f.y_true + 1]
+
+        return xs, ys
+
     def tf_training_dataset(
         self,
         seq_len: int,
         num_batches: int,
         batch_size: int,
         emit_weights: bool,
-        emit_y_teacher_pred: bool,
         rnd_flip_a_b: bool = False,
     ):
         """
@@ -205,7 +222,8 @@ class ParametricCaptureStaticData(object):
                 # if configured, flip 50% of data
                 flip_a_b = rnd_flip_a_b and self.rng.uniform() < 0.5
                 # return with weight for training and either y_true or y_teacher_pred
-                xs_ys = model_data_block_to_xs_ys(data, emit_y_teacher_pred, flip_a_b)
+                #             #xs_ys = model_data_block_to_xs_ys(data, emit_y_teacher_pred, flip_a_b)
+                xs_ys = self.model_data_block_to_xs_ys(data, flip_a_b)
                 if emit_weights:
                     weight = self.static_importance_weights[idx]
                     yield *xs_ys, weight
@@ -213,8 +231,8 @@ class ParametricCaptureStaticData(object):
                     yield xs_ys
 
         output_signature = [
-            tf.TensorSpec(shape=(seq_len, IN_D), dtype=tf.float16),
-            tf.TensorSpec(shape=(seq_len, OUT_D), dtype=tf.float16),
+            tf.TensorSpec(shape=(seq_len, self.in_d()), dtype=tf.float16),
+            tf.TensorSpec(shape=(seq_len, self.out_d()), dtype=tf.float16),
         ]
         if emit_weights:
             output_signature.append(tf.TensorSpec(shape=(), dtype=tf.float32))
@@ -256,8 +274,8 @@ class ParametricCaptureStaticData(object):
                     yield model_data_block_to_xs_ys(data)
 
         output_signature = [
-            tf.TensorSpec(shape=(self.seq_len, IN_D), dtype=tf.float32),
-            tf.TensorSpec(shape=(self.seq_len, OUT_D), dtype=tf.float32),
+            tf.TensorSpec(shape=(self.seq_len, self.in_d()), dtype=tf.float32),
+            tf.TensorSpec(shape=(self.seq_len, self.out_d()), dtype=tf.float32),
         ]
         if return_sample_info:
             output_signature.append(tf.TensorSpec(shape=(), dtype=tf.string))

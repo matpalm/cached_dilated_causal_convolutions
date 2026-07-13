@@ -249,11 +249,13 @@ class QKerasModelBuilder(object):
                 }
             )
 
-            if skip_project_dim is not None:
+            # skips exclude the final layer; it is added directly as the
+            # residual base below, so collecting it here would double-count it.
+            if skip_project_dim is not None and layer_num < num_layers - 1:
                 collected_layers.append(y_pred)
 
         # build the input to the regressor
-        if skip_project_dim is not None:
+        if skip_project_dim is not None and collected_layers:
             # each layer gets its own learned 1x1 projection into skip space;
             # all projections are summed once, then requantised once.
             skip_sum = None
@@ -269,9 +271,11 @@ class QKerasModelBuilder(object):
                 else:
                     skip_sum = Add(name=f"skip_proj_add_{i}")([skip_sum, proj])
 
-            skip_sum = QActivation(
-                self.quant_relu(relu_upper_bound), name="skip_merge_qrelu"
-            )(skip_sum)
+            # requantise the summed skips once. use a linear quantiser (not relu)
+            # so negative skip contributions are preserved.
+            skip_sum = QActivation(self.quant_output(), name="skip_merge_quant")(
+                skip_sum
+            )
 
             # if projection dim != final layer width we need one extra
             # projection so we can channel add the residual

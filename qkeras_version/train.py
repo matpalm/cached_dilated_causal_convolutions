@@ -1,6 +1,7 @@
 import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 import pickle
 import json
@@ -56,8 +57,6 @@ if __name__ == "__main__":
         default=5,
         help="multiplier for receptive field to decide training sequence length.",
     )
-    parser.add_argument("--in-d", type=int, default=4)
-    parser.add_argument("--out-d", type=int, default=1)
     parser.add_argument(
         "--filter-sizes",
         type=int,
@@ -77,7 +76,8 @@ if __name__ == "__main__":
     parser.add_argument("--fp-int", type=int, default=4)
     parser.add_argument("--fp-frac", type=int, default=12)
     parser.add_argument("--quantise-output", action="store_true")
-    parser.add_argument("--emit-y-teacher-pred", action="store_true")
+    parser.add_argument("--quadrature-input", action="store_true")
+    # parser.add_argument("--emit-y-teacher-pred", action="store_true")
     parser.add_argument(
         "--init-weights",
         type=Path,
@@ -140,17 +140,40 @@ if __name__ == "__main__":
     )
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
 
+    data = ParametricCaptureStaticData(
+        capture_run=opts.capture_run,
+        keras_model=opts.keras_model,
+        quadrature_input=opts.quadrature_input,
+        seed=123,
+    )
+    train_ds = data.tf_training_dataset(
+        seq_len=TRAIN_SEQ_LEN,
+        num_batches=opts.num_train_egs // opts.batch_size,
+        batch_size=opts.batch_size,
+        emit_weights=True,
+        # emit_y_teacher_pred=opts.emit_y_teacher_pred,
+        rnd_flip_a_b=True,
+    )
+    validate_ds = data.tf_training_dataset(
+        seq_len=TRAIN_SEQ_LEN,
+        num_batches=opts.num_validate_egs // opts.batch_size,
+        batch_size=opts.batch_size,
+        emit_weights=False,
+        # emit_y_teacher_pred=opts.emit_y_teacher_pred,
+    )
+
     # construct model
     builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac, l2=opts.l2)
     model_config = {
         "seq_len": TRAIN_SEQ_LEN,
-        "in_d": opts.in_d,
-        "out_d": opts.out_d,
+        "in_d": data.in_d(),
+        "out_d": data.out_d(),
         "filter_sizes": opts.filter_sizes,
         # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
         "relu_upper_bound": opts.relu_upper_bound,
         "skip_project_dim": opts.skip_project_dim,
     }
+    print("model_config", model_config)
     train_model = builder.create_dilated_model(**model_config)
 
     with open(f"runs/{opts.run}/model_config.json", "w") as f:
@@ -167,27 +190,6 @@ if __name__ == "__main__":
         train_model.load_weights(init_weights_path)
     else:
         init_weights_path = None
-
-    data = ParametricCaptureStaticData(
-        capture_run=opts.capture_run,
-        keras_model=opts.keras_model,
-        seed=123,
-    )
-    train_ds = data.tf_training_dataset(
-        seq_len=TRAIN_SEQ_LEN,
-        num_batches=opts.num_train_egs // opts.batch_size,
-        batch_size=opts.batch_size,
-        emit_weights=True,
-        emit_y_teacher_pred=opts.emit_y_teacher_pred,
-        rnd_flip_a_b=True,
-    )
-    validate_ds = data.tf_training_dataset(
-        seq_len=TRAIN_SEQ_LEN,
-        num_batches=opts.num_validate_egs // opts.batch_size,
-        batch_size=opts.batch_size,
-        emit_weights=False,
-        emit_y_teacher_pred=opts.emit_y_teacher_pred,
-    )
 
     # data = ParametricCaptureData(
     #     capture_run=opts.capture_run,

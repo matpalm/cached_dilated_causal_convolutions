@@ -1,6 +1,6 @@
 from pathlib import Path
 from collections import namedtuple
-from lru_tools import cache
+from functools import cache
 
 def zarr_base_path_for(run: str, check_exists: bool = True):
     p = Path(__file__).parent.parent / "parametric_capture" / "runs" / run
@@ -28,11 +28,22 @@ def zarr_buffer_fields(zarr_name):
         case "capture_buffers.z":
             return _fields(["morph_out", "a_out", "b_out", "tri_out"])
         case "model_data.z":
-            return _fields(["x_tri", "x_a_cv", "x_b_cv", "x_morph_cv", "y_true"])
-        case "model_data_t.z":
             return _fields(
-                ["x_tri", "x_a_cv", "x_b_cv", "x_morph_cv", "y_true", "y_pred_teacher"]
+                [
+                    "x_tri",
+                    "x_sin_q",
+                    "x_cos_q",
+                    "x_a_cv",
+                    "x_b_cv",
+                    "x_morph_cv",
+                    "y_true",
+                ]
             )
+        case "model_data_t.z":
+            raise Exception("don't use _t anymore")
+            # return _fields(
+            #     ["x_tri", "x_a_cv", "x_b_cv", "x_morph_cv", "y_true", "y_pred_teacher"]
+            # )
         case _:
             raise Exception("TOOD: support zarr_name")
 
