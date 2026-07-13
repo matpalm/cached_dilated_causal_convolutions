@@ -21,7 +21,13 @@ def model_data_block_to_xs_ys(data, emit_y_teacher_pred: bool, flip_a_b: bool = 
     Args:
         data: chunk from zarr model_data_t.z
         emit_y_teacher_pred: if true emit y_teacher_pred, else emit y_true
+        flip_a_b: if true change [tri, a_cv, b_cv, morph] to [tri, b_cv, a_cv, -morph]
     """
+
+    # TODO: rather than flip 1/2 the time ( which will work in expectation ) there
+    #       is also the option to bake this in specifically as a consistency loss ?
+    #       e.g L = huber_stft(yt, f(x)) + huber_stft(yt, f(x')) + lambda.||f(x)-f(x')||
+
     if flip_a_b:
         #  - triangle / core wave ( from capture )
         #  - cv_value b_cv
@@ -62,7 +68,6 @@ class ParametricCaptureStaticData(object):
         db = SampleDB()
         loss_rows = db.losses_for(capture_run, keras_model)
         self.losses = np.array([l.loss for l in loss_rows], dtype=np.float64)
-        print("self.losses", self.losses)
         if len(self.losses) == 0:
             raise Exception(
                 f"no scores in db for run={capture_run} model={keras_model} ?"

@@ -14,9 +14,12 @@ export TF_USE_LEGACY_KERAS=1
 #export RUN=257_sobol
 #export RUN=259_pc600_tuned_is_weights
 #export RUN=260_pc600_candidate
-export RUN=261_pc600_candidate
+#export RUN=261_pc600_candidate
+#export RUN=262_pc600_rnd_flip
+#export RUN=263_pc600_rnd_flip_no_skip
+export RUN=264_pc600_smaller
 
-export FILTERS="16 16 16 16"
+export FILTERS="8 8 8"
 
 export RUN_ID=`echo $RUN | cut -d'_' -f1`
 export PSRAM_ACTIVATION_CACHE_INDICES="[-1]"
@@ -24,23 +27,26 @@ export BUILD=nw_${RUN_ID}_psram-1
 
 # smoke config
 # export TRAIN_EGS=1_000
-# export PRETRAIN_EPOCHS=1
-# export FINETUNE_EPOCHS=1
+# export PRETRAIN_EPOCHS=10
+# export FINETUNE_EPOCHS=5
+# export LR=1e-3
 
 # sanity config
-# export TRAIN_EGS=10_000
-# export PRETRAIN_EPOCHS=20
-# export FINETUNE_EPOCHS=10
+export TRAIN_EGS=10_000
+export PRETRAIN_EPOCHS=20
+export FINETUNE_EPOCHS=10
+export LR=1e-3
 
 # onight config
-export TRAIN_EGS=200_000
-export PRETRAIN_EPOCHS=30
-export FINETUNE_EPOCHS=60
+# export TRAIN_EGS=300_000
+# export PRETRAIN_EPOCHS=100
+# export FINETUNE_EPOCHS=60
+# export LR=0.0005
 
 export SAMPLE_RATE_KHZ=48
 export BATCH_SIZE=32
 
-# --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
+# --skip-project-dim 8 \
 
 pretrain() {
     # pre train at FP3.15 ( relu4 )
@@ -52,10 +58,9 @@ pretrain() {
         --capture-run 600 --keras-model 232_keras/i9 \
         --fp-int 3 --fp-frac 15 \
         --filter-sizes $FILTERS --relu-upper-bound 4 \
-        --skip-project-dim 8 \
-        --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 0.25 --beta-stft-ramp 0.25 \
+        --alpha-mse 1.0 --use-huber-loss --beta-stft 0.01 --beta-stft-warmup 5 --beta-stft-ramp 5 \
         --num-train-egs $TRAIN_EGS --epochs $PRETRAIN_EPOCHS --batch-size $BATCH_SIZE \
-        --learning-rate 1e-3 --l2 1e-4 \
+        --learning-rate $LR --l2 1e-4 \
         | tee runs/$RUN/pretrain/qkeras_version.train.out
 }
 
@@ -69,11 +74,10 @@ finetune() {
         --capture-run 600 --keras-model 232_keras/i9 \
         --fp-int 3 --fp-frac 6 \
         --filter-sizes $FILTERS --relu-upper-bound 4 \
-        --skip-project-dim 8 \
         --init-weights runs/$RUN/pretrain/weights/keras/ \
-        --alpha-mse 1.0 --use-huber-loss \
+        --alpha-mse 1.0 --use-huber-loss --beta-stft 0.00 \
         --num-train-egs $TRAIN_EGS --epochs $FINETUNE_EPOCHS --batch-size $BATCH_SIZE \
-        --learning-rate 1e-4 --l2 1e-4 \
+        --learning-rate 1e-3 --l2 1e-4 \
         | tee runs/$RUN/finetune/qkeras_version.train.out
 }
 
@@ -95,8 +99,13 @@ fxp_math_equiv_test() {
 }
 
 pretrain
-#finetune
+finetune
 #fxp_math_equiv_test finetune
+
+# to test amaranth network ( outside of tiliqua core top )
+# export RUN=263_pc600_rnd_flip_no_skip
+# export SUB_RUN=finetune
+# uv run python -m unittest amaranth_version.tests.test_qb_network -v
 
 # build both versions
 # what a load of hack o_O

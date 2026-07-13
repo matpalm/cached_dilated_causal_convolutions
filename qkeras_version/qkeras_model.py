@@ -178,7 +178,7 @@ class QKerasModelBuilder(object):
         # l2: float,
     ):
         y_pred = self.projection_layer("qconv_regressor_qb", num_targets)(inp)
-        self.layer_info.append({"type": "regressor", "num_targets": num_targets})
+        self.layer_info.append({"type": "qb", "id": "qconv_regressor_qb"})
 
         y_pred = QActivation(self.quant_output(), name="qout")(y_pred)
         self.layer_info.append(
