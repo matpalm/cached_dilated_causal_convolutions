@@ -6,7 +6,7 @@ import tensorflow as tf
 import pandas as pd
 
 from common.sample_db import SampleDB
-from common.util import zarr_base_path_for
+from common.util import zarr_base_path_for, zarr_buffer_fields
 
 IN_D = 4
 OUT_D = 1  # TODO: change to 2 for y_teacher_pred
@@ -28,26 +28,23 @@ def model_data_block_to_xs_ys(data, emit_y_teacher_pred: bool, flip_a_b: bool = 
     #       is also the option to bake this in specifically as a consistency loss ?
     #       e.g L = huber_stft(yt, f(x)) + huber_stft(yt, f(x')) + lambda.||f(x)-f(x')||
 
+    f = zarr_buffer_fields("model_data_t.z")
+
     if flip_a_b:
-        #  - triangle / core wave ( from capture )
-        #  - cv_value b_cv
-        #  - cv value a_cv
-        #  - cv_value -morph
-        xs = np.array(data[..., [0, 2, 1, 3]], copy=True)  # copy for mutate
-        xs[..., 3] *= -1
+        # copy for mutate
+        xs = np.array(data[..., [f.x_tri, f.x_b_cv, f.x_a_cv, f.x_morph_cv]], copy=True)
+        xs[..., f.x_morph_cv] *= -1
     else:
-        #  - triangle / core wave ( from capture )
-        #  - cv value a_cv
-        #  - cv_value b_cv
-        #  - cv_value morph
-        xs = data[..., [0, 1, 2, 3]]
+        xs = data[..., [f.x_tri, f.x_a_cv, f.x_b_cv, f.x_morph_cv]]
+
     # build y
     #  - y_teacher_pred morph output ( from capture ) for NOW or
     #  - y_true morph output ( from capture )
     if emit_y_teacher_pred:
-        ys = data[..., 5:6]
+        ys = data[..., f.y_pred_teacher : f.y_pred_teacher + 1]
     else:
-        ys = data[..., 4:5]
+        ys = data[..., f.y_true : f.y_true + 1]
+
     return xs, ys
 
 
@@ -140,11 +137,11 @@ class ParametricCaptureStaticData(object):
         with open(zarr_base_path_for(capture_run) / "src_runs.json", "r") as f:
             src_runs = json.load(f)
         # write key arrays for debugging
-        df = pd.DataFrame(
-            zip(src_runs, self.sampling_probabilies, self.static_importance_weights),
-            columns=["run", "sampling_probability", "static_importance_weight"],
-        )
-        df.to_csv("/tmp/weights.tsv", sep="\t", index=False)
+        # df = pd.DataFrame(
+        #     zip(src_runs, self.sampling_probabilies, self.static_importance_weights),
+        #     columns=["run", "sampling_probability", "static_importance_weight"],
+        # )
+        # df.to_csv("/tmp/weights.tsv", sep="\t", index=False)
 
         if (
             self.n_chunks

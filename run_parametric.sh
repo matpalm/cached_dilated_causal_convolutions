@@ -239,17 +239,10 @@ export UNIFORM_SET=500
 # uv run -m parametric_capture.generate_plots --run $R --num 20
 #uv run -m keras_version.score_captures --keras-run $FINAL_KERAS_RUN --capture-runs $UNIFORM_SET
 
-
 uv run -m common.sample_db --delete --run 600
 rm -rf parametric_capture/runs/600
 uv run -m keras_version.add_y_pred_teacher \
   --keras-run $FINAL_KERAS_RUN \
-  --src-runs 000 380 381 \
+  --src-runs $SOBOL_RUN $FINAL_IS_SET $UNIFORM_SET \
   --dest-run 600
 
-uv run -m common.sample_db --delete --run 601
-rm -rf parametric_capture/runs/601
-uv run -m keras_version.add_y_pred_teacher \
-  --keras-run $FINAL_KERAS_RUN \
-  --src-runs $SOBOL_RUN $FINAL_IS_SET $UNIFORM_SET \
-  --dest-run 601
