@@ -15,6 +15,7 @@ from tf_data_pipeline.quadrature_data import Embed2DQuadratureData, Waveform
 print("tf", tf.__version__)
 
 from qkeras_version.qkeras_model import create_dilated_model_from_config_and_latest_ckpt
+from common.synthetic_data import build_triangle_sample
 
 import argparse
 parser = argparse.ArgumentParser(
@@ -74,25 +75,18 @@ test_model, receptive_field_size = create_dilated_model_from_config_and_latest_c
 # the model needs to warm up so we have to run this many through
 seq_len_plus_receptive_field = receptive_field_size + opts.test_seq_len
 
-
-def build_base_x():
-    # TODO: refactor with verison in simulate.py
-    sample_rate = 48_000.0
-    amp = 0.53
-    n = np.arange(seq_len_plus_receptive_field, dtype=np.float32)
-    phase = np.mod(n * (opts.tri_freq / sample_rate), 1.0)
-    tri = amp * (2.0 * np.abs(2.0 * phase - 1.0) - 1.0)
-    x = np.empty((1, seq_len_plus_receptive_field, 4), dtype=np.float32)
-    x[0, :, 0] = tri
-    return x
-
-
-x = build_base_x()
+n = np.arange(seq_len_plus_receptive_field, dtype=np.float32)
 
 for i, (a_cv, b_cv, morph_cv) in enumerate(cv_rows):
-    x[0, :, 1] = np.float32(a_cv)
-    x[0, :, 2] = np.float32(b_cv)
-    x[0, :, 3] = np.float32(morph_cv)
+    sample = build_triangle_sample(
+        seq_len_plus_receptive_field,
+        a_cv,
+        b_cv,
+        morph_cv,
+        tri_freq=opts.tri_freq,
+    )
+    tri = sample[:, 0]
+    x = sample[None]  # (1, seq_len, 4)
 
     y_pred = test_model(x)
     y_pred = np.asarray(y_pred[0, :, 0], dtype=np.float32)

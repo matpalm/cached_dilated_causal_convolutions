@@ -141,14 +141,13 @@ if __name__ == "__main__":
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
 
     # construct model
-    builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
+    builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac, l2=opts.l2)
     model_config = {
         "seq_len": TRAIN_SEQ_LEN,
         "in_d": opts.in_d,
         "out_d": opts.out_d,
         "filter_sizes": opts.filter_sizes,
         # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
-        "l2": opts.l2,
         "relu_upper_bound": opts.relu_upper_bound,
         "skip_project_dim": opts.skip_project_dim,
     }
@@ -158,6 +157,8 @@ if __name__ == "__main__":
         json.dump(model_config, f)
 
     train_model.summary()
+
+    print("receptive_field_size", builder.receptive_field_size())
 
     if opts.init_weights and opts.init_weights.is_dir():
         init_weight_fname = sorted(os.listdir(opts.init_weights))[-1]

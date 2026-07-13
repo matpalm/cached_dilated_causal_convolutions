@@ -32,14 +32,22 @@ def create_dilated_model_from_config_and_latest_ckpt(run: str):
 
 class QKerasModelBuilder(object):
 
-    def __init__(self, n_int: int, n_frac: int):
+    def __init__(self, n_int: int, n_frac: int, l2: float):
+        """
+        Args:
+            n_int: bits for FP int
+            n_frac: bits for FP frac
+            l2: L@ penalty for all weights and biases
+        """
+
         self.layer_info = []
 
         self.n_int = n_int
         self.n_frac = n_frac
-
         print(f"FP N_INT={self.n_int} N_FRAC={self.n_frac}")
         self.n_word = self.n_int + self.n_frac
+
+        self.l2 = l2
 
         self.built = False
 
@@ -73,7 +81,6 @@ class QKerasModelBuilder(object):
         inp,
         layer_number: int,  # for dilation amount & naming
         out_filters: int,
-        l2: float,
         relu: bool,
         relu_upper_bound: float = None,
     ):
@@ -87,8 +94,8 @@ class QKerasModelBuilder(object):
             dilation_rate=K**layer_number,
             kernel_quantizer=self.quantiser(),
             bias_quantizer=self.quantiser(double_width=True),
-            kernel_regularizer=regularizers.L2(l2),
-            bias_regularizer=regularizers.L2(l2),
+            kernel_regularizer=regularizers.L2(self.l2),
+            bias_regularizer=regularizers.L2(self.l2),
         )(inp)
         self.layer_info.append({'type': 'qb', 'id': layer_id})
 
@@ -104,11 +111,11 @@ class QKerasModelBuilder(object):
         self,
         inp,
         layer_number: int,  # for dilation amount & naming
-        l2: float,
         out_filters: int,
         po2_filters: int,
         relu_upper_bound: float,
     ):
+        raise Exception("out of date")
         # start with a _qb conv layer to handle the dilation
         layer_id = f"qconv_{layer_number}_qb"
         y_pred = QConv1D(
@@ -119,8 +126,8 @@ class QKerasModelBuilder(object):
             dilation_rate=K**layer_number,
             kernel_quantizer=self.quantiser(),
             bias_quantizer=self.quantiser(double_width=True),
-            kernel_regularizer=regularizers.L2(l2),
-            bias_regularizer=regularizers.L2(l2),
+            kernel_regularizer=regularizers.L2(self.l2),
+            bias_regularizer=regularizers.L2(self.l2),
         )(inp)
         self.layer_info.append({"type": "qb", "id": layer_id})
 
@@ -169,13 +176,14 @@ class QKerasModelBuilder(object):
             kernel_size=1,
             kernel_quantizer=self.quantiser(),
             bias_quantizer=self.quantiser(double_width=True),
+            kernel_regularizer=regularizers.L2(self.l2),
+            bias_regularizer=regularizers.L2(self.l2),
         )
 
     def add_quantized_bits_regressor(
         self,
         inp,
         num_targets: int,
-        # l2: float,
     ):
         y_pred = self.projection_layer("qconv_regressor_qb", num_targets)(inp)
         self.layer_info.append({"type": "qb", "id": "qconv_regressor_qb"})
@@ -194,7 +202,6 @@ class QKerasModelBuilder(object):
         out_d: int,
         filter_sizes: List[int],
         # po2_filter_size: int,
-        l2: float,
         relu_upper_bound: float,
         skip_project_dim: int = None,
     ):
@@ -207,7 +214,6 @@ class QKerasModelBuilder(object):
             out_d: the feature dim of the output
             filter_sizes: output depth for each convolution layer. Number of
                 layers is inferred from len(filter_sizes).
-            l2: l2 penality for convolution kerne & bias
             skip_project_dim: if None, regress only on the final layer output.
                 if set use this as feature dim for 1x1 projections for skips.
                 note: if skip_project_dim != filter_sizes[-1] we need one extra 1x1
@@ -231,7 +237,6 @@ class QKerasModelBuilder(object):
                 y_pred,
                 layer_number=layer_num,
                 out_filters=filter_sizes[layer_num],
-                l2=l2,
                 relu=True,
                 relu_upper_bound=relu_upper_bound,
             )

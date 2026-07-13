@@ -107,6 +107,11 @@ class QbNetwork(wiring.Component):
     def conv_weights_biases_for(self, layer_idx: int):
         conv_name = self.conv_name_for_layer(layer_idx)
         w, b = self.qkeras_weights[conv_name]["weights"]
+        print(
+            f"conv_weights_biases_for layer_idx={layer_idx} conv_name={conv_name}"
+            f" w range ({w.min()}, {w.max()})"
+            f" b range ({b.min()}, {b.max()})"
+        )
         w = np.asarray(w)
         # the regressor is a kernel_size=1 conv, which we'll also use for later
         # for the skip conenctions. for now, just to make it work, pad the kernel

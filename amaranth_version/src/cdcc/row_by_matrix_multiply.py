@@ -56,7 +56,12 @@ class RowByMatrixMultiply(wiring.Component):
             weight_rows = bank_weights.T
             for o in range(self.OUT_D):
                 for i in range(self.IN_D):
-                    weight_init.append(parse_nnq(weight_rows[o][i], shape=NNQ))
+                    try:
+                        weight_init.append(parse_nnq(weight_rows[o][i], shape=NNQ))
+                    except ValueError as e:
+                        raise Exception(
+                            f"!!!!!!!! weight_init o={o} i={i} {weight_rows[o][i]}", e
+                        )
 
         self.weight_mem = Memory(
             shape=NNQ,

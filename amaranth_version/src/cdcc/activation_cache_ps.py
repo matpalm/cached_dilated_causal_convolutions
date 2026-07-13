@@ -418,7 +418,9 @@ class ActivationCachePS(wiring.Component):
 
         # TODO: this all kinda now fixes use for 16 bits :/
         NNQ_BITS = NNQ.width
-        assert NNQ_BITS <= 16, "huge assumption re: psram that NNW is 16bits :/"
+        assert (
+            NNQ_BITS <= 16
+        ), f"huge assumption re: psram that NNW <= 16bits but was {NNQ_BITS} :/"
         n = self.num_entries
         ring_mask = n - 1
         dim_bits = self.dim_bits

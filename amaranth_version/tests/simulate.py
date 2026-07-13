@@ -27,33 +27,7 @@ from cdcc.qb_network import QbNetwork
 
 from fake_psram import FakePSRAM
 
-
-def _build_triangle_sample(
-    seq_len,
-    a_cv,
-    b_cv,
-    morph_cv,
-    tri_freq=300.0,
-    sample_rate=48_000.0,
-):
-    """
-    Build a syntheticfake x (seq_len, 4)
-      0 triangle core wave at tri_freq
-      1 fixed a_cv
-      2 fixed b_cv
-      3 fixed morph_cv
-    """
-    n = np.arange(seq_len, dtype=np.float32)
-    phase = np.mod(n * (tri_freq / sample_rate), 1.0)
-    tri_amp = 0.53  # fixed from capture
-    tri = tri_amp * (2.0 * np.abs(2.0 * phase - 1.0) - 1.0)
-    x = np.empty((seq_len, 4), dtype=np.float32)
-    x[:, 0] = tri
-    x[:, 1] = np.float32(a_cv)
-    x[:, 2] = np.float32(b_cv)
-    x[:, 3] = np.float32(morph_cv)
-    return x
-
+from common.synthetic_data import build_triangle_sample
 
 def _wrap_with_psram(dut):
     """
@@ -147,7 +121,7 @@ def simulate(
     num_dilated_layers = dut.num_layers - 1
     receptive_field_size = K**num_dilated_layers
     seq_len_plus_rf = receptive_field_size + test_seq_len
-    samples = _build_triangle_sample(
+    samples = build_triangle_sample(
         seq_len=seq_len_plus_rf,
         a_cv=a_cv,
         b_cv=b_cv,

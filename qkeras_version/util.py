@@ -10,10 +10,12 @@ import random
 import tensorflow as tf
 import warnings
 
+from common.synthetic_data import build_triangle_sample
 
 def ensure_dir_exists(d):
     if not os.path.exists(d):
         os.makedirs(d)
+
 
 class CheckYPred(tf.keras.callbacks.Callback):
 
@@ -24,6 +26,18 @@ class CheckYPred(tf.keras.callbacks.Callback):
             self.x = x
             self.y_true = y
             break  # just one batch
+
+        # make an explicit version of core a_cv b_cv shapes
+        # square, ramp, triangle and sine
+        seq_len = len(self.x[0])
+        self.x_shapes = np.stack(
+            [
+                build_triangle_sample(seq_len, a_cv=-0.6, b_cv=-0.6, morph_cv=-1),
+                build_triangle_sample(seq_len, a_cv=-0.2, b_cv=-0.2, morph_cv=-1),
+                build_triangle_sample(seq_len, a_cv=0.2, b_cv=0.2, morph_cv=-1),
+                build_triangle_sample(seq_len, a_cv=0.6, b_cv=0.6, morph_cv=-1),
+            ]
+        )
 
     def _plot_as_numpy(self, x, y_true, y_pred):
         assert y_true.shape == y_pred.shape
@@ -40,7 +54,7 @@ class CheckYPred(tf.keras.callbacks.Callback):
         df["morph_cv"] = x[:, 3]
         df["y_true"] = y_true[:, 0]
         df["y_pred"] = y_pred[:, 0]
-        df['n'] = range(len(x))
+        df["n"] = range(len(x))
         control_df = pd.melt(
             df,
             id_vars=["n"],
@@ -62,10 +76,10 @@ class CheckYPred(tf.keras.callbacks.Callback):
                     gridspec_kw={"height_ratios": [2, 1]},
                 )
                 sns.lineplot(control_df, x="n", y="value", hue="variable", ax=axes[0])
-                axes[0].set_ylim((-2, 2))
+                axes[0].set_ylim((-1.1, 1.1))
                 axes[0].set_ylabel("control")
                 sns.lineplot(output_df, x="n", y="value", hue="variable", ax=axes[1])
-                axes[1].set_ylim((-2, 2))
+                axes[1].set_ylim((-1.1, 1.1))
                 axes[1].set_ylabel("output")
                 axes[1].set_xlabel("n")
                 fig.tight_layout()
@@ -77,6 +91,7 @@ class CheckYPred(tf.keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         with self.summary_writer.as_default():
+
             with tf.name_scope("validation") as scope:
                 y_pred = self.model(self.x)
 
@@ -85,18 +100,25 @@ class CheckYPred(tf.keras.callbacks.Callback):
                 y_pred = y_pred[:24]
                 plot_y_true = self.y_true[:24]
 
-                # never show more than 1000 samples in time
-                # and if trimming, pick the last
-                # plot_x = plot_x[:, -1000:]
-                # y_pred = y_pred[:, -1000:]
-                # plot_y_true = plot_y_true[:, -1000:]
-
                 imgs = []
                 for i in range(len(plot_x)):
                     imgs.append(
-                        self._plot_as_numpy(plot_x[i], plot_y_true[i], y_pred[i])
+                        self._plot_as_numpy(plot_x[i], self.y_true[i], y_pred[i])
                     )
                 imgs = np.stack(imgs)
                 tf.summary.image(
                     "check_ypred", imgs, max_outputs=len(plot_x), step=epoch
+                )
+
+            with tf.name_scope("shapes") as scope:
+                y_pred = self.model(self.x_shapes)
+                zeros_y_true = np.zeros_like(y_pred[0])
+                imgs = []
+                for i in range(len(self.x_shapes)):
+                    imgs.append(
+                        self._plot_as_numpy(self.x_shapes[i], zeros_y_true, y_pred[i])
+                    )
+                imgs = np.stack(imgs)
+                tf.summary.image(
+                    "check_ypred", imgs, max_outputs=len(self.x_shapes), step=epoch
                 )
