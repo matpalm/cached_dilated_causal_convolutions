@@ -33,10 +33,6 @@ class RowByMatrixMultiply(wiring.Component):
                 )
 
         self.IN_D, self.OUT_D = np_weights_1.shape
-        if (self.IN_D % 4 != 0) or ((self.OUT_D != 1) and (self.OUT_D % 4 != 0)):
-            raise Exception(
-                f"in_d={self.IN_D} and out_d={self.OUT_D} ; these must be multiples of 4; ( out_d can be 1 )"
-            )
 
         self.num_weights = self.IN_D * self.OUT_D
 

@@ -84,6 +84,11 @@ class QbNetwork(wiring.Component):
                 )
             self.activation_caches.append(cache)
 
+        # overall network in_d is the in_d of first conv
+        w, _b = self.conv_weights_biases_for(0)
+        _k, in_d, _out_d = w.shape
+        self.IN_D = in_d
+
         # in / out ports are fixed...
         ports = {
             "i": wiring.In(stream.Signature(data.ArrayLayout(NNQ, self.IN_D))),
@@ -126,7 +131,7 @@ class QbNetwork(wiring.Component):
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules["lsb"] = lsb = LeftShiftBuffer(in_out_d=4)
+        m.submodules["lsb"] = lsb = LeftShiftBuffer(in_out_d=self.IN_D)
 
         # build convolutions (no bus ports).
         convs = []
