@@ -57,7 +57,6 @@ def setup_beta_stft_var_and_update_callback(
                 ramp_epoch = epoch - self.warmup_epochs
                 value = self.target * min(ramp_epoch / (self.ramp_epochs - 1), 1.0)
             self.beta_var.assign(value)
-            print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
 
     ramp_callback = RampBetaStft(
         beta_var=beta_stft_var,
@@ -66,3 +65,21 @@ def setup_beta_stft_var_and_update_callback(
         ramp_epochs=beta_stft_ramp,
     )
     return ramp_callback, beta_stft_var
+
+
+class LogLrAndBetaStft(tf.keras.callbacks.Callback):
+    """put before tb callback"""
+
+    def __init__(self, beta_stft_var: tf.Variable):
+        self.beta_stft_var = beta_stft_var
+
+    def on_epoch_end(self, epoch, logs=None):
+        if logs is None:
+            return
+        lr = self.model.optimizer.learning_rate
+        if isinstance(lr, tf.keras.optimizers.schedules.LearningRateSchedule):
+            lr = lr(self.model.optimizer.iterations)
+        lr_f = float(tf.convert_to_tensor(lr).numpy())
+        beta_stft_f = float(self.beta_stft_var.numpy())
+        logs["learning_rate"] = lr_f
+        logs["beta_stft"] = beta_stft_f

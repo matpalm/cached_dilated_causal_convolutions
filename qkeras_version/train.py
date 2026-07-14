@@ -9,7 +9,7 @@ import contextlib
 from pathlib import Path
 
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import AdamW
 
 from tf_data_pipeline.pcapture_static_data import ParametricCaptureStaticData
 from tf_data_pipeline.pcapture_data import ParametricCaptureData
@@ -18,7 +18,10 @@ from qkeras.utils import model_save_quantized_weights
 from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import QKerasModelBuilder
 from common.losses import combined_masked_loss_terms
-from common.callbacks import setup_beta_stft_var_and_update_callback
+from common.callbacks import (
+    setup_beta_stft_var_and_update_callback,
+    LogLrAndBetaStft,
+)
 
 import warnings
 
@@ -45,12 +48,25 @@ if __name__ == "__main__":
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument(
+        "--lr-min-frac",
+        type=float,
+        default=0.0,
+        help="cosine decay floor as a fraction of --learning-rate (0 => decay to 0)",
+    )
+    parser.add_argument(
+        "--cosine-schedule",
+        action="store_true",
+        help="if set, use linear warmup + cosine decay; otherwise use a fixed learning rate",
+    )
+    parser.add_argument(
         "--receptive-field-size",
         type=int,
         default=None,
         help="override RFS. if not set, use K^len(filter_sizes)",
     )
-    parser.add_argument("--l2", type=float, default=0.0)
+    parser.add_argument(
+        "--l2", type=float, default=0.0, help="now used for weight decay in adamw"
+    )
     parser.add_argument(
         "--train-seq-len-multiplier",
         type=int,
@@ -70,14 +86,11 @@ if __name__ == "__main__":
         default=None,
         help="is set use wavenet style skip connections ( with this projection dim )",
     )
-    # parser.add_argument("--po2-filter-size", type=int, default=None)
     parser.add_argument("--num-train-egs", type=int, default=200_000)
     parser.add_argument("--num-validate-egs", type=int, default=100)
     parser.add_argument("--fp-int", type=int, default=4)
     parser.add_argument("--fp-frac", type=int, default=12)
-    parser.add_argument("--quantise-output", action="store_true")
     parser.add_argument("--quadrature-input", action="store_true")
-    # parser.add_argument("--emit-y-teacher-pred", action="store_true")
     parser.add_argument(
         "--init-weights",
         type=Path,
@@ -163,7 +176,7 @@ if __name__ == "__main__":
     )
 
     # construct model
-    builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac, l2=opts.l2)
+    builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac, l2=0.0)
     model_config = {
         "seq_len": TRAIN_SEQ_LEN,
         "in_d": data.in_d(),
@@ -209,11 +222,6 @@ if __name__ == "__main__":
     # construct some callbacks...
     callbacks = []
 
-    # tensorboard
-    tensorboard_dir = f"runs/{opts.run}/tb"
-    tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
-    callbacks.append(tensorboard_cb)
-
     # checkpointing raw keras weights
     callbacks.append(
         tf.keras.callbacks.ModelCheckpoint(
@@ -221,9 +229,6 @@ if __name__ == "__main__":
             save_weights_only=True,
         )
     )
-
-    # plotting examples of validation data ( in tensorboard )
-    callbacks.append(CheckYPred(tb_dir=tensorboard_dir, dataset=validate_ds))
 
     # exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
@@ -250,14 +255,44 @@ if __name__ == "__main__":
     if ramp_callback is not None:
         callbacks.append(ramp_callback)
 
-    # def lr_schedule(epoch, lr):
-    #     if epoch <= 40:
-    #         print(epoch, "1e-4")
-    #         return 1e-4
-    #     else:
-    #         print(epoch, "1e-5")
-    #         return 1e-5
-    # lr_cb = tf.keras.callbacks.LearningRateScheduler(lr_schedule)
+    callbacks.insert(0, LogLrAndBetaStft(beta_stft))
+
+    if opts.cosine_schedule:
+        lr_warmup_epochs = opts.beta_stft_warmup + opts.beta_stft_ramp
+        steps_per_epoch = max(1, opts.num_train_egs // opts.batch_size)
+        total_steps = opts.epochs * steps_per_epoch
+        warmup_steps = lr_warmup_epochs * steps_per_epoch
+        if warmup_steps > 0:
+            lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
+                initial_learning_rate=0.0,
+                decay_steps=max(1, total_steps - warmup_steps),
+                alpha=opts.lr_min_frac,
+                warmup_target=opts.learning_rate,
+                warmup_steps=warmup_steps,
+            )
+        else:
+            lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
+                initial_learning_rate=opts.learning_rate,
+                decay_steps=max(1, total_steps),
+                alpha=opts.lr_min_frac,
+            )
+        print(
+            "lr schedule: cosine decay"
+            f" lr={opts.learning_rate} warmup_epochs={lr_warmup_epochs}"
+            f" total_steps={total_steps} steps_per_epoch={steps_per_epoch}"
+            f" min_frac={opts.lr_min_frac}"
+        )
+    else:
+        lr_schedule = opts.learning_rate
+        print(f"lr schedule: fixed lr={opts.learning_rate}")
+
+    # tensorboard
+    tensorboard_dir = f"runs/{opts.run}/tb"
+    tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
+    callbacks.append(tensorboard_cb)
+
+    # plotting examples of validation data ( in tensorboard )
+    callbacks.append(CheckYPred(tb_dir=tensorboard_dir, dataset=validate_ds))
 
     # compile and train
     combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
@@ -266,10 +301,11 @@ if __name__ == "__main__":
         alpha_mse=opts.alpha_mse,
         beta_stft=beta_stft,
         reduce_mean=False,  # return (batch,) for importance weights
+        seq_len=TRAIN_SEQ_LEN,
     )
 
     train_model.compile(
-        Adam(opts.learning_rate),
+        AdamW(learning_rate=lr_schedule, weight_decay=opts.l2),
         loss=combined_loss_fn,
         metrics=[mse_loss_metric, stft_loss_metric],
     )

@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 
 import tensorflow as tf
-from tensorflow.keras.layers import Input, Add
+from tensorflow.keras.layers import Input, Add, Concatenate
 from tensorflow.keras.models import Model
 from tensorflow.keras import regularizers
 import qkeras
@@ -216,8 +216,10 @@ class QKerasModelBuilder(object):
                 layers is inferred from len(filter_sizes).
             skip_project_dim: if None, regress only on the final layer output.
                 if set use this as feature dim for 1x1 projections for skips.
-                note: if skip_project_dim != filter_sizes[-1] we need one extra 1x1
-                to match channel widths before the residual add.
+                the summed skip features are concatenated (not added) with the
+                final layer output, so the regressor sees them as independent
+                channels and skip_project_dim is not bottlenecked to
+                filter_sizes[-1].
         Returns:
             qkeras model
         """
@@ -271,27 +273,15 @@ class QKerasModelBuilder(object):
                 else:
                     skip_sum = Add(name=f"skip_proj_add_{i}")([skip_sum, proj])
 
-            # requantise the summed skips once. use a linear quantiser (not relu)
-            # so negative skip contributions are preserved.
+            # requantise the summed skips once.
             skip_sum = QActivation(self.quant_output(), name="skip_merge_quant")(
                 skip_sum
             )
 
-            # if projection dim != final layer width we need one extra
-            # projection so we can channel add the residual
-            if skip_project_dim != filter_sizes[-1]:
-                skip_sum = self.projection_layer("skip_out_proj", filter_sizes[-1])(
-                    skip_sum
-                )
-                self.layer_info.append(
-                    {"type": "skip_out_proj", "dim": filter_sizes[-1]}
-                )
-
-            # add as residual on top of the final layer output
-            merged = Add(name="skip_final_add")([y_pred, skip_sum])
-            merged = QActivation(
-                self.quant_relu(relu_upper_bound), name="skip_final_qrelu"
-            )(merged)
+            # concatenate skip features with the final layer output so the
+            # regressor reads them as independent channels.
+            merged = Concatenate(name="skip_final_concat", axis=-1)([y_pred, skip_sum])
+            self.layer_info.append({"type": "skip_concat", "dim": skip_project_dim})
             regressor_inp = merged
         else:
             regressor_inp = y_pred

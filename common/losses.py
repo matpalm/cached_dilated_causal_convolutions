@@ -74,12 +74,13 @@ def masked_mse(receptive_field_size: int = None, reduce_mean: bool = True):
 
 def masked_multires_stft_loss(
     receptive_field_size: int = None,
-    fft_sizes=(512, 1024, 2048),
-    hop_sizes=(128, 256, 512),
-    win_lengths=(512, 1024, 2048),
+    fft_sizes=(256, 128, 64),
+    hop_sizes=(64, 32, 16),
+    win_lengths=(256, 128, 64),
     w_mag=0.325,
     w_sc=0.675,
     reduce_mean: bool = True,
+    seq_len: int = None,
 ):
     """
     Calculates masked multi-resolution STFT loss
@@ -91,9 +92,38 @@ def masked_multires_stft_loss(
         win_lengths: STFT window lengths for each res
         w_mag: Weight for log-magnitude spectral term
         w_sc: Weight for spectral-convergence term
+        seq_len: if set we drop resolutions long than this training length
     """
 
     assert len(fft_sizes) == len(hop_sizes) == len(win_lengths)
+
+    # drop resolutions that can't fit the (post-mask) signal, otherwise the
+    # STFT collapses to a single padded frame and the "multi-res" is a no-op.
+    if seq_len is not None:
+        avail = seq_len - (receptive_field_size or 0)
+        kept = [
+            (f, h, w)
+            for f, h, w in zip(fft_sizes, hop_sizes, win_lengths)
+            if w <= avail
+        ]
+        if not kept:
+            # fall back to the largest power-of-two window that fits
+            win = 1
+            while win * 2 <= max(avail, 2):
+                win *= 2
+            kept = [(win, max(1, win // 4), win)]
+        fft_sizes, hop_sizes, win_lengths = (
+            tuple(f for f, _, _ in kept),
+            tuple(h for _, h, _ in kept),
+            tuple(w for _, _, w in kept),
+        )
+
+    print(
+        "masked_multires_stft_loss resolutions"
+        f" fft_sizes={tuple(fft_sizes)}"
+        f" hop_sizes={tuple(hop_sizes)}"
+        f" win_lengths={tuple(win_lengths)}"
+    )
 
     def _stft_mag(x, fft_size, hop, win):
         s = tf.signal.stft(
@@ -164,6 +194,7 @@ def combined_masked_loss(
     alpha_mse: float = 1.0,
     beta_stft: float = 0.2,
     reduce_mean: bool = True,
+    seq_len: int = None,
 ):
     combined_fn, _, _ = combined_masked_loss_terms(
         receptive_field_size,
@@ -171,6 +202,7 @@ def combined_masked_loss(
         alpha_mse=alpha_mse,
         beta_stft=beta_stft,
         reduce_mean=reduce_mean,
+        seq_len=seq_len,
     )
     return combined_fn
 
@@ -181,6 +213,7 @@ def combined_masked_loss_terms(
     alpha_mse: float = 1.0,
     beta_stft: float = 0.2,
     reduce_mean: bool = True,
+    seq_len: int = None,
 ):
     if use_huber_loss:
         core_loss_fn = masked_huber(receptive_field_size, reduce_mean=reduce_mean)
@@ -192,6 +225,7 @@ def combined_masked_loss_terms(
     stft_fn = masked_multires_stft_loss(
         receptive_field_size,
         reduce_mean=reduce_mean,
+        seq_len=seq_len,
     )
 
     @tf.function
