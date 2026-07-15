@@ -29,6 +29,8 @@ parser.add_argument(
 # parser.add_argument('--data-rescaling-factor', type=float, default=1.953125)
 parser.add_argument("--min-note", type=str, default="A2")
 parser.add_argument("--max-note", type=str, default="A4")
+parser.add_argument("--fp-int", type=int, default=4)
+parser.add_argument("--fp-frac", type=int, default=12)
 parser.add_argument('--load-weights', type=str)
 parser.add_argument('--layer-info', type=str)
 parser.add_argument('--test-x-dir', type=str, default=".")
@@ -74,6 +76,9 @@ data = Embed2DQuadratureData(
     min_note=opts.min_note,
     max_note=opts.max_note,
     sample_rate_khz=192,
+    fp_int=opts.fp_int,
+    fp_frac=opts.fp_frac,
+    quantise_y=False,
     seed=123,
 )
 

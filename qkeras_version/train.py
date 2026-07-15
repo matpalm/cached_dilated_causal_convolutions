@@ -1,6 +1,7 @@
 import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 import pickle
 import json
@@ -8,15 +9,19 @@ import contextlib
 from pathlib import Path
 
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import AdamW
 
-# from tf_data_pipeline.data import WaveToWaveData, Embed2DWaveFormData
-from tf_data_pipeline.quadrature_data import Embed2DQuadratureData
+from tf_data_pipeline.pcapture_static_data import ParametricCaptureStaticData
+from tf_data_pipeline.pcapture_data import ParametricCaptureData
 from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
 from .qkeras_model import QKerasModelBuilder
-from ..common.losses import combined_masked_loss_terms
+from common.losses import combined_masked_loss_terms
+from common.callbacks import (
+    setup_beta_stft_var_and_update_callback,
+    LogLrAndBetaStft,
+)
 
 import warnings
 
@@ -37,24 +42,37 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument("--run", type=str, required=True)
+    parser.add_argument("--capture-run", type=str, required=True)
+    parser.add_argument("--keras-model", type=str, required=True)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument(
+        "--lr-min-frac",
+        type=float,
+        default=0.0,
+        help="cosine decay floor as a fraction of --learning-rate (0 => decay to 0)",
+    )
+    parser.add_argument(
+        "--cosine-schedule",
+        action="store_true",
+        help="if set, use linear warmup + cosine decay; otherwise use a fixed learning rate",
+    )
     parser.add_argument(
         "--receptive-field-size",
         type=int,
         default=None,
         help="override RFS. if not set, use K^len(filter_sizes)",
     )
-    parser.add_argument("--l2", type=float, default=0.0)
+    parser.add_argument(
+        "--l2", type=float, default=0.0, help="now used for weight decay in adamw"
+    )
     parser.add_argument(
         "--train-seq-len-multiplier",
         type=int,
         default=5,
-        help="multiplier for receptive field to decide training sequence length."
+        help="multiplier for receptive field to decide training sequence length.",
     )
-    parser.add_argument("--in-d", type=int, default=4)
-    parser.add_argument("--out-d", type=int, default=1)
     parser.add_argument(
         "--filter-sizes",
         type=int,
@@ -62,28 +80,35 @@ if __name__ == "__main__":
         required=True,
         help="sfeature depths for each layer; last layer always 4",
     )
-    # parser.add_argument("--po2-filter-size", type=int, default=None)
+    parser.add_argument(
+        "--skip-project-dim",
+        type=int,
+        default=None,
+        help="is set use wavenet style skip connections ( with this projection dim )",
+    )
     parser.add_argument("--num-train-egs", type=int, default=200_000)
     parser.add_argument("--num-validate-egs", type=int, default=100)
     parser.add_argument("--fp-int", type=int, default=4)
     parser.add_argument("--fp-frac", type=int, default=12)
+    parser.add_argument("--quadrature-input", action="store_true")
     parser.add_argument(
         "--init-weights",
         type=Path,
         default=None,
-        help="path to keras weights used to initialize fine-tuning",
+        help="path to keras weights used to initialise fine-tuning",
     )
     parser.add_argument("--relu-upper-bound", type=float, default=6)
-    parser.add_argument("--min-note", type=str, default="A2")
-    parser.add_argument("--max-note", type=str, default="A4")
-    parser.add_argument("--harsh-waves", action="store_true")
-    parser.add_argument("--soft-clip", action="store_true")
     parser.add_argument("--sample-rate-khz", type=float, default=192)
     parser.add_argument(
         "--alpha-mse",
         type=float,
         default=1.0,
         help="weight for masked MSE in combined loss",
+    )
+    parser.add_argument(
+        "--use-huber-loss",
+        action="store_true",
+        help="if set use huber instead of MSE",
     )
     parser.add_argument(
         "--beta-stft",
@@ -93,25 +118,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--beta-stft-warmup",
-        type=float,
+        type=int,
         default=0,
-        help="keep beta_stft at 0 for this proportion of epochs at start",
+        help="keep beta_stft at 0 for this many epochs at start",
     )
     parser.add_argument(
         "--beta-stft-ramp",
-        type=float,
+        type=int,
         default=0,
-        help="linearly ramp beta_stft from 0 to target over this many proportion of epochs ( post warmup )",
-    )
-    parser.add_argument(
-        "--train-interp",
-        action="store_true",
-        help="whether to train with interpolated samples",
-    )
-    parser.add_argument(
-        "--double-interp",
-        action="store_true",
-        help="if set, and training with --train-interp, we interpolate e0 and e1 across sample",
+        help="linearly ramp beta_stft from 0 to target over this many epochs after warmup",
     )
     opts = parser.parse_args()
 
@@ -122,25 +137,6 @@ if __name__ == "__main__":
     with open(f"runs/{opts.run}/opts.json", "w") as f:
         str_opts = {k: str(v) for k, v in vars(opts).items()}
         json.dump(str_opts, f)
-
-    if (
-        opts.beta_stft_warmup < 0
-        or opts.beta_stft_warmup > 1
-        or opts.beta_stft_ramp < 0
-        or opts.beta_stft_ramp > 1
-    ):
-        raise Exception(
-            "--beta-stft-warmup & --beta-stft-ramp are propotions of --epochs must be (0, 1)"
-        )
-
-    data = Embed2DQuadratureData(
-        min_note=opts.min_note,
-        max_note=opts.max_note,
-        sample_rate_khz=opts.sample_rate_khz,
-        harsh=opts.harsh_waves,
-        soft_clip=opts.soft_clip,
-        seed=456,
-    )
 
     # all convolutions use K=4
     K = 4
@@ -157,19 +153,48 @@ if __name__ == "__main__":
     )
     print("TRAIN_SEQ_LEN", TRAIN_SEQ_LEN)
 
-    # construct model
-    builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac)
-    train_model = builder.create_dilated_model(
-        TRAIN_SEQ_LEN,
-        in_d=opts.in_d,
-        out_d=opts.out_d,
-        filter_sizes=opts.filter_sizes,
-        # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
-        l2=opts.l2,
-        relu_upper_bound=opts.relu_upper_bound,
+    data = ParametricCaptureStaticData(
+        capture_run=opts.capture_run,
+        keras_model=opts.keras_model,
+        quadrature_input=opts.quadrature_input,
+        seed=123,
+    )
+    train_ds = data.tf_training_dataset(
+        seq_len=TRAIN_SEQ_LEN,
+        num_batches=opts.num_train_egs // opts.batch_size,
+        batch_size=opts.batch_size,
+        emit_weights=True,
+        # emit_y_teacher_pred=opts.emit_y_teacher_pred,
+        rnd_flip_a_b=True,
+    )
+    validate_ds = data.tf_training_dataset(
+        seq_len=TRAIN_SEQ_LEN,
+        num_batches=opts.num_validate_egs // opts.batch_size,
+        batch_size=opts.batch_size,
+        emit_weights=False,
+        # emit_y_teacher_pred=opts.emit_y_teacher_pred,
     )
 
+    # construct model
+    builder = QKerasModelBuilder(n_int=opts.fp_int, n_frac=opts.fp_frac, l2=0.0)
+    model_config = {
+        "seq_len": TRAIN_SEQ_LEN,
+        "in_d": data.in_d(),
+        "out_d": data.out_d(),
+        "filter_sizes": opts.filter_sizes,
+        # po2_filter_size=opts.po2_filter_size,  # if None, don't use po2
+        "relu_upper_bound": opts.relu_upper_bound,
+        "skip_project_dim": opts.skip_project_dim,
+    }
+    print("model_config", model_config)
+    train_model = builder.create_dilated_model(**model_config)
+
+    with open(f"runs/{opts.run}/model_config.json", "w") as f:
+        json.dump(model_config, f)
+
     train_model.summary()
+
+    print("receptive_field_size", builder.receptive_field_size())
 
     if opts.init_weights and opts.init_weights.is_dir():
         init_weight_fname = sorted(os.listdir(opts.init_weights))[-1]
@@ -179,31 +204,23 @@ if __name__ == "__main__":
     else:
         init_weights_path = None
 
-    # make tf datasets
-    train_ds = data.tf_dataset(
-        batch_size=opts.batch_size,
-        seq_len=TRAIN_SEQ_LEN,
-        num_samples=opts.num_train_egs,
-        emit_endpt_samples=True,
-        emit_interpolated_samples=opts.train_interp,
-        emit_double_interpolated_samples=opts.double_interp,
-    )
-    validate_ds = data.tf_dataset(
-        batch_size=opts.batch_size,
-        seq_len=TRAIN_SEQ_LEN,
-        num_samples=opts.num_validate_egs,
-        emit_endpt_samples=True,
-        emit_interpolated_samples=opts.train_interp,
-        emit_double_interpolated_samples=opts.double_interp,
-    )
+    # data = ParametricCaptureData(
+    #     capture_run=opts.capture_run,
+    #     seed=123,
+    # )
+    # train_ds = data.tf_training_dataset(
+    #     seq_len=TRAIN_SEQ_LEN,
+    #     num_batches=opts.num_train_egs // opts.batch_size,
+    #     batch_size=opts.batch_size,
+    # )
+    # validate_ds = data.tf_training_dataset(
+    #     seq_len=TRAIN_SEQ_LEN,
+    #     num_batches=opts.num_validate_egs // opts.batch_size,
+    #     batch_size=opts.batch_size,
+    # )
 
     # construct some callbacks...
     callbacks = []
-
-    # tensorboard
-    tensorboard_dir = f"runs/{opts.run}/tb"
-    tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
-    callbacks.append(tensorboard_cb)
 
     # checkpointing raw keras weights
     callbacks.append(
@@ -212,9 +229,6 @@ if __name__ == "__main__":
             save_weights_only=True,
         )
     )
-
-    # plotting examples of validation data ( in tensorboard )
-    callbacks.append(CheckYPred(tb_dir=tensorboard_dir, dataset=validate_ds))
 
     # exporting qkeras quantised weights
     class SaveQuantisedWeights(tf.keras.callbacks.Callback):
@@ -230,82 +244,70 @@ if __name__ == "__main__":
             except FileNotFoundError:
                 pass
             os.symlink(f"e{epoch:02d}.pkl", latest_symlink_fname)
+
     callbacks.append(SaveQuantisedWeights())
 
     # If warm-up/ramp is requested, start from zero.
-    use_beta_schedule = opts.beta_stft_warmup > 0 or opts.beta_stft_ramp > 0
-    beta_stft_init = opts.beta_stft if not use_beta_schedule else 0.0
-    beta_stft = tf.Variable(beta_stft_init, trainable=False, dtype=tf.float32)
-    if use_beta_schedule:
 
-        class RampBetaStft(tf.keras.callbacks.Callback):
+    ramp_callback, beta_stft = setup_beta_stft_var_and_update_callback(
+        opts.epochs, opts.beta_stft_warmup, opts.beta_stft_ramp, opts.beta_stft
+    )
+    if ramp_callback is not None:
+        callbacks.append(ramp_callback)
 
-            def __init__(
-                self,
-                beta_var: tf.Variable,
-                target: float,
-                warmup_epochs: int,
-                ramp_epochs: int,
-            ):
-                self.beta_var = beta_var
-                self.target = float(target)
-                self.warmup_epochs = max(0, int(warmup_epochs))
-                self.ramp_epochs = max(1, int(ramp_epochs))
+    callbacks.insert(0, LogLrAndBetaStft(beta_stft))
 
-            def on_epoch_begin(self, epoch, logs=None):
-                # epoch is 0-indexed.
-                if epoch < self.warmup_epochs:
-                    value = 0.0
-                elif self.ramp_epochs == 1:
-                    value = self.target
-                else:
-                    ramp_epoch = epoch - self.warmup_epochs
-                    value = self.target * min(ramp_epoch / (self.ramp_epochs - 1), 1.0)
-                self.beta_var.assign(value)
-                print(f"epoch {epoch}: beta_stft={float(self.beta_var.numpy()):.6f}")
-
-        warmup_epochs = int(opts.beta_stft_warmup * opts.epochs)
-        ramp_epochs = int(opts.beta_stft_ramp * opts.epochs)
-        print(
-            f"derived warmup_epochs={warmup_epochs} ramp_epochs={ramp_epochs} ( epochs={opts.epochs} )"
-        )
-        callbacks.append(
-            RampBetaStft(
-                beta_var=beta_stft,
-                target=opts.beta_stft,
-                warmup_epochs=warmup_epochs,
-                ramp_epochs=ramp_epochs,
+    if opts.cosine_schedule:
+        lr_warmup_epochs = opts.beta_stft_warmup + opts.beta_stft_ramp
+        steps_per_epoch = max(1, opts.num_train_egs // opts.batch_size)
+        total_steps = opts.epochs * steps_per_epoch
+        warmup_steps = lr_warmup_epochs * steps_per_epoch
+        if warmup_steps > 0:
+            lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
+                initial_learning_rate=0.0,
+                decay_steps=max(1, total_steps - warmup_steps),
+                alpha=opts.lr_min_frac,
+                warmup_target=opts.learning_rate,
+                warmup_steps=warmup_steps,
             )
+        else:
+            lr_schedule = tf.keras.optimizers.schedules.CosineDecay(
+                initial_learning_rate=opts.learning_rate,
+                decay_steps=max(1, total_steps),
+                alpha=opts.lr_min_frac,
+            )
+        print(
+            "lr schedule: cosine decay"
+            f" lr={opts.learning_rate} warmup_epochs={lr_warmup_epochs}"
+            f" total_steps={total_steps} steps_per_epoch={steps_per_epoch}"
+            f" min_frac={opts.lr_min_frac}"
         )
+    else:
+        lr_schedule = opts.learning_rate
+        print(f"lr schedule: fixed lr={opts.learning_rate}")
 
-    # def lr_schedule(epoch, lr):
-    #     if epoch <= 40:
-    #         print(epoch, "1e-4")
-    #         return 1e-4
-    #     else:
-    #         print(epoch, "1e-5")
-    #         return 1e-5
-    # lr_cb = tf.keras.callbacks.LearningRateScheduler(lr_schedule)
+    # tensorboard
+    tensorboard_dir = f"runs/{opts.run}/tb"
+    tensorboard_cb = tf.keras.callbacks.TensorBoard(log_dir=tensorboard_dir)
+    callbacks.append(tensorboard_cb)
+
+    # plotting examples of validation data ( in tensorboard )
+    callbacks.append(CheckYPred(tb_dir=tensorboard_dir, dataset=validate_ds))
 
     # compile and train
     combined_loss_fn, mse_loss_metric, stft_loss_metric = combined_masked_loss_terms(
         RECEPTIVE_FIELD_SIZE,
-        use_huber=False,  # for now
+        use_huber_loss=opts.use_huber_loss,  # for now
         alpha_mse=opts.alpha_mse,
         beta_stft=beta_stft,
+        reduce_mean=False,  # return (batch,) for importance weights
+        seq_len=TRAIN_SEQ_LEN,
     )
 
     train_model.compile(
-        Adam(opts.learning_rate),
+        AdamW(learning_rate=lr_schedule, weight_decay=opts.l2),
         loss=combined_loss_fn,
         metrics=[mse_loss_metric, stft_loss_metric],
-    )
-    train_model.fit(
-        train_ds,
-        validation_data=None,  # just use validation for plots
-        callbacks=callbacks,
-        epochs=opts.epochs,
-        verbose=2,
     )
 
     with open(f"runs/{opts.run}/qkeras_model.summary.txt", "w") as f:
@@ -322,3 +324,11 @@ if __name__ == "__main__":
             },
             f,
         )
+
+    train_model.fit(
+        train_ds,
+        validation_data=None,  # just use validation for plots
+        callbacks=callbacks,
+        epochs=opts.epochs,
+        # verbose=2,
+    )

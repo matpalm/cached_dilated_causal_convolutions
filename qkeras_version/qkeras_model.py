@@ -1,8 +1,10 @@
 import os
-from typing import List
+from typing import List, Optional
+from pathlib import Path
+import json
 
 import tensorflow as tf
-from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Input, Add, Concatenate
 from tensorflow.keras.models import Model
 from tensorflow.keras import regularizers
 import qkeras
@@ -10,16 +12,44 @@ from qkeras import quantized_bits, quantized_po2, QConv1D, QActivation
 
 K = 4
 
+
+def create_dilated_model_from_config_and_latest_ckpt(run: str):
+    run_dir_path = Path("runs") / run
+    with open(run_dir_path / "qkeras_model.fp_config.json", "r") as f:
+        fp_config = json.load(f)
+    builder = QKerasModelBuilder(n_int=fp_config["n_int"], n_frac=fp_config["n_frac"])
+    with open(run_dir_path / "model_config.json", "r") as f:
+        model_config = json.load(f)
+    model_config["seq_len"] = None  # drive shape by sample
+    model = builder.create_dilated_model(**model_config)
+    # model.summary()
+    ckpts = (run_dir_path / "weights" / "keras").iterdir()
+    latest_ckpt = list(sorted(ckpts))[-1]
+    print("using ckpt", latest_ckpt)
+    model.load_weights(str(latest_ckpt))
+    return model, builder.receptive_field_size()
+
+
 class QKerasModelBuilder(object):
 
-    def __init__(self, n_int: int, n_frac: int):
+    def __init__(self, n_int: int, n_frac: int, l2: float):
+        """
+        Args:
+            n_int: bits for FP int
+            n_frac: bits for FP frac
+            l2: L@ penalty for all weights and biases
+        """
+
         self.layer_info = []
 
         self.n_int = n_int
         self.n_frac = n_frac
-
         print(f"FP N_INT={self.n_int} N_FRAC={self.n_frac}")
         self.n_word = self.n_int + self.n_frac
+
+        self.l2 = l2
+
+        self.built = False
 
     # qkeras quantiser for all convolution kernels and biases
     def quantiser(self, po2: bool = False, double_width: bool = False):
@@ -43,14 +73,16 @@ class QKerasModelBuilder(object):
         else:
             return f"quantized_relu({self.n_word},{self.n_int},relu_upper_bound={upper_bound})"
 
+    def quant_output(self):
+        return quantized_bits(bits=self.n_word, integer=self.n_int, alpha=1)
+
     def add_quantized_bits_conv_block(
         self,
         inp,
         layer_number: int,  # for dilation amount & naming
         out_filters: int,
-        l2: float,
         relu: bool,
-        relu_upper_bound: float,
+        relu_upper_bound: float = None,
     ):
 
         layer_id = f"qconv_{layer_number}_qb"
@@ -62,8 +94,8 @@ class QKerasModelBuilder(object):
             dilation_rate=K**layer_number,
             kernel_quantizer=self.quantiser(),
             bias_quantizer=self.quantiser(double_width=True),
-            kernel_regularizer=regularizers.L2(l2),
-            bias_regularizer=regularizers.L2(l2),
+            kernel_regularizer=regularizers.L2(self.l2),
+            bias_regularizer=regularizers.L2(self.l2),
         )(inp)
         self.layer_info.append({'type': 'qb', 'id': layer_id})
 
@@ -79,11 +111,11 @@ class QKerasModelBuilder(object):
         self,
         inp,
         layer_number: int,  # for dilation amount & naming
-        l2: float,
         out_filters: int,
         po2_filters: int,
         relu_upper_bound: float,
     ):
+        raise Exception("out of date")
         # start with a _qb conv layer to handle the dilation
         layer_id = f"qconv_{layer_number}_qb"
         y_pred = QConv1D(
@@ -94,8 +126,8 @@ class QKerasModelBuilder(object):
             dilation_rate=K**layer_number,
             kernel_quantizer=self.quantiser(),
             bias_quantizer=self.quantiser(double_width=True),
-            kernel_regularizer=regularizers.L2(l2),
-            bias_regularizer=regularizers.L2(l2),
+            kernel_regularizer=regularizers.L2(self.l2),
+            bias_regularizer=regularizers.L2(self.l2),
         )(inp)
         self.layer_info.append({"type": "qb", "id": layer_id})
 
@@ -137,6 +169,32 @@ class QKerasModelBuilder(object):
 
         return y_pred
 
+    def projection_layer(self, name: str, filters: int):
+        return QConv1D(
+            name=name,
+            filters=filters,
+            kernel_size=1,
+            kernel_quantizer=self.quantiser(),
+            bias_quantizer=self.quantiser(double_width=True),
+            kernel_regularizer=regularizers.L2(self.l2),
+            bias_regularizer=regularizers.L2(self.l2),
+        )
+
+    def add_quantized_bits_regressor(
+        self,
+        inp,
+        num_targets: int,
+    ):
+        y_pred = self.projection_layer("qconv_regressor_qb", num_targets)(inp)
+        self.layer_info.append({"type": "qb", "id": "qconv_regressor_qb"})
+
+        y_pred = QActivation(self.quant_output(), name="qout")(y_pred)
+        self.layer_info.append(
+            {"type": "qout", "n_int": self.n_int, "n_frac": self.n_frac}
+        )
+
+        return y_pred
+
     def create_dilated_model(
         self,
         seq_len: int,
@@ -144,8 +202,8 @@ class QKerasModelBuilder(object):
         out_d: int,
         filter_sizes: List[int],
         # po2_filter_size: int,
-        l2: float,
         relu_upper_bound: float,
+        skip_project_dim: int = None,
     ):
         """
         create a qkeras model with a stack of dilation 1d convolutions
@@ -156,7 +214,12 @@ class QKerasModelBuilder(object):
             out_d: the feature dim of the output
             filter_sizes: output depth for each convolution layer. Number of
                 layers is inferred from len(filter_sizes).
-            l2: l2 penality for convolution kerne & bias
+            skip_project_dim: if None, regress only on the final layer output.
+                if set use this as feature dim for 1x1 projections for skips.
+                the summed skip features are concatenated (not added) with the
+                final layer output, so the regressor sees them as independent
+                channels and skip_project_dim is not bottlenecked to
+                filter_sizes[-1].
         Returns:
             qkeras model
         """
@@ -164,39 +227,66 @@ class QKerasModelBuilder(object):
         if len(filter_sizes) == 0:
             raise ValueError("filter_sizes must contain at least one layer size")
 
-        # last layer always 4
-        filter_sizes.append(4)
-
         num_layers = len(filter_sizes)
         self.layer_info = []
 
         inp = Input((seq_len, in_d))
         y_pred = inp
+        collected_layers = []
 
         for layer_num in range(num_layers):
-
-            last_layer = layer_num == num_layers - 1
-            layer_filter_size = filter_sizes[layer_num]
-
             y_pred = self.add_quantized_bits_conv_block(
                 y_pred,
                 layer_number=layer_num,
-                out_filters=out_d if last_layer else layer_filter_size,
-                l2=l2,
-                relu=(not last_layer),
+                out_filters=filter_sizes[layer_num],
+                relu=True,
                 relu_upper_bound=relu_upper_bound,
             )
-
             # first layer dilates K, second K^2, etc
-            # no dilation after last layer
-            if not last_layer:
-                self.layer_info.append(
-                    {
-                        "type": "dilation",
-                        "amount": K ** (layer_num + 1),
-                        "depth": layer_filter_size,
-                    }
+            self.layer_info.append(
+                {
+                    "type": "dilation",
+                    "amount": K ** (layer_num + 1),
+                    "depth": filter_sizes[layer_num],
+                }
+            )
+
+            # skips exclude the final layer; it is added directly as the
+            # residual base below, so collecting it here would double-count it.
+            if skip_project_dim is not None and layer_num < num_layers - 1:
+                collected_layers.append(y_pred)
+
+        # build the input to the regressor
+        if skip_project_dim is not None and collected_layers:
+            # each layer gets its own learned 1x1 projection into skip space;
+            # all projections are summed once, then requantised once.
+            skip_sum = None
+            for i, layer_out in enumerate(collected_layers):
+                proj = self.projection_layer(f"skip_proj_{i}", skip_project_dim)(
+                    layer_out
                 )
+                self.layer_info.append(
+                    {"type": "skip_proj", "layer": i, "dim": skip_project_dim}
+                )
+                if skip_sum is None:
+                    skip_sum = proj
+                else:
+                    skip_sum = Add(name=f"skip_proj_add_{i}")([skip_sum, proj])
+
+            # requantise the summed skips once.
+            skip_sum = QActivation(self.quant_output(), name="skip_merge_quant")(
+                skip_sum
+            )
+
+            # concatenate skip features with the final layer output so the
+            # regressor reads them as independent channels.
+            merged = Concatenate(name="skip_final_concat", axis=-1)([y_pred, skip_sum])
+            self.layer_info.append({"type": "skip_concat", "dim": skip_project_dim})
+            regressor_inp = merged
+        else:
+            regressor_inp = y_pred
+
+        y_pred = self.add_quantized_bits_regressor(regressor_inp, num_targets=out_d)
 
         # TODO: rewire in po2 stuff later
         # if po2_filter_size is None:
@@ -221,5 +311,14 @@ class QKerasModelBuilder(object):
         # )
 
         print("layer_info", self.layer_info)
-
+        self.built = True
         return Model(inp, y_pred)
+
+    def receptive_field_size(self):
+        # TODO: does this work still for all configs?
+        if not self.built:
+            raise Exception("need to call create_dilated_model() first")
+        num_dilated_layers = sum(
+            1 for layer in self.layer_info if layer.get("type") == "dilation"
+        )
+        return K**num_dilated_layers

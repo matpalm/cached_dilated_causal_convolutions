@@ -58,7 +58,7 @@ class QbNetwork(wiring.Component):
         psram_base = 0
 
         for i in range(num_caches):
-            _, b = self.conv_weights_biases_for(f"qconv_{i}_qb")
+            _, b = self.conv_weights_biases_for(i)
             num_filters = len(b)
             use_psram = i in psram_indices
             kind = "PSRAM" if use_psram else "EBR"
@@ -84,6 +84,11 @@ class QbNetwork(wiring.Component):
                 )
             self.activation_caches.append(cache)
 
+        # overall network in_d is the in_d of first conv
+        w, _b = self.conv_weights_biases_for(0)
+        _k, in_d, _out_d = w.shape
+        self.IN_D = in_d
+
         # in / out ports are fixed...
         ports = {
             "i": wiring.In(stream.Signature(data.ArrayLayout(NNQ, self.IN_D))),
@@ -97,20 +102,42 @@ class QbNetwork(wiring.Component):
 
         super().__init__(ports)
 
-    def conv_weights_biases_for(self, conv_name: str):
+    def conv_name_for_layer(self, layer_idx: int) -> str:
+        # the final layer is the 1x1 projection, exported as "qconv_regressor_qb";
+        # every earlier ( K=4 ) layer is "qconv_{i}_qb".
+        if layer_idx == self.num_layers - 1:
+            return "qconv_regressor_qb"
+        return f"qconv_{layer_idx}_qb"
+
+    def conv_weights_biases_for(self, layer_idx: int):
+        conv_name = self.conv_name_for_layer(layer_idx)
         w, b = self.qkeras_weights[conv_name]["weights"]
+        print(
+            f"conv_weights_biases_for layer_idx={layer_idx} conv_name={conv_name}"
+            f" w range ({w.min()}, {w.max()})"
+            f" b range ({b.min()}, {b.max()})"
+        )
+        w = np.asarray(w)
+        # the regressor is a kernel_size=1 conv, which we'll also use for later
+        # for the skip conenctions. for now, just to make it work, pad the kernel
+        # to K=4 to make it work with the conv
+        # TODO: support K=1 for not just this but the skips too
+        if layer_idx == self.num_layers - 1 and w.shape[0] == 1 and K > 1:
+            padded = np.zeros((K,) + w.shape[1:], dtype=w.dtype)
+            padded[K - 1] = w[0]
+            w = padded
         return w, b
 
     def elaborate(self, platform):
         m = Module()
 
-        m.submodules["lsb"] = lsb = LeftShiftBuffer(in_out_d=4)
+        m.submodules["lsb"] = lsb = LeftShiftBuffer(in_out_d=self.IN_D)
 
         # build convolutions (no bus ports).
         convs = []
         for i in range(self.num_layers):
             last_layer = i == self.num_layers - 1
-            w, b = self.conv_weights_biases_for(f"qconv_{i}_qb")
+            w, b = self.conv_weights_biases_for(i)
             print(f"{i} CONV apply_relu={not last_layer} w {w.shape} b {b.shape}")
             # TODO: hardcoded upper bound here!
             # see https://github.com/matpalm/cached_dilated_causal_convolutions/issues/24

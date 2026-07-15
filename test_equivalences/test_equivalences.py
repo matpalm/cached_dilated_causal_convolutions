@@ -34,12 +34,7 @@ from amaranth.lib.wiring import In, Out
 from amaranth_soc import wishbone
 from amaranth.sim import Simulator
 
-
-# ---------------------------------------------------------------------------
-# FakePSRAM — inlined from tiliqua for self-contained test use.
-# Copyright (c) 2024 Seb Holzapfel <me@sebholzapfel.com>
-# SPDX-License-Identifier: CERN-OHL-S-2.0
-# ---------------------------------------------------------------------------
+raise Exception("insanely out of date; needs full rewrite re: --skip-dim etc")
 
 
 class _FakePSRAM(wiring.Component):
@@ -124,7 +119,8 @@ class _FakePSRAM(wiring.Component):
 
 
 # cd ~/dev/cached_dilated_causal_convolutions
-# python -m unittest discover test_equivalences/ -k TestDotProductEquivalence
+# uv run python -m unittest discover test_equivalences/ -k TestDotProductEquivalence
+
 
 class TestEquivalences(unittest.TestCase):
 
@@ -135,9 +131,10 @@ class TestEquivalences(unittest.TestCase):
         # make some random data
         fxp_util = util.FxpUtil()
         rng = np.random.default_rng(seed=1337)
+
         def rnd01(s):
             values = rng.random(size=s)  # (0, 1)
-            values = ( values * 2 ) - 1  # (-1, 1)
+            values = (values * 2) - 1  # (-1, 1)
             values = fxp_util.nparray_to_fixed_point_floats(values)  # snap to closed FP
             return values
 
@@ -175,8 +172,7 @@ class TestEquivalences(unittest.TestCase):
 
             amaranth_result = ctx.get(dut.o.payload).as_float()
 
-            self.assertAlmostEqual(
-                fxp_math_result, amaranth_result)
+            self.assertAlmostEqual(fxp_math_result, amaranth_result)
 
         sim = Simulator(dut)
         sim.add_clock(1e-6, domain="sync")
@@ -190,9 +186,10 @@ class TestEquivalences(unittest.TestCase):
         # make some random data
         fxp_util = util.FxpUtil()
         rng = np.random.default_rng(seed=1337)
+
         def rnd01(s):
             values = rng.random(size=s)  # (0, 1)
-            values = ( values * 2 ) - 1  # (-1, 1)
+            values = (values * 2) - 1  # (-1, 1)
             values = fxp_util.nparray_to_fixed_point_floats(values)  # snap to closed FP
             return values
 
@@ -387,11 +384,12 @@ class TestEquivalences(unittest.TestCase):
         with open(layer_info_fname, "r") as f:
             layer_info = json.load(f)
 
-        fxp_model = FxpModel(
-            weights_file=str(trained_weights),
-            layer_info=layer_info,
-            verbose=False,
-        )
+        # fxp_model is very out of date...
+        # fxp_model = FxpModel(
+        #     weights_file=str(trained_weights),
+        #     layer_info=layer_info,
+        #     verbose=False,
+        # )
 
         dut = QbNetwork.build(str(trained_weights))
 
@@ -405,7 +403,7 @@ class TestEquivalences(unittest.TestCase):
         m.submodules.dut = dut
 
         for i, cache in enumerate(dut.activation_caches):
-            # internal_addr_width bits → (1<<aw) 16-bit words → half as many 32-bit words
+            # internal_addr_width bits -> (1<<aw) 16-bit words -> half as many 32-bit words
             storage_words = (1 << cache.internal_addr_width) // 2
             psram = _FakePSRAM(
                 addr_width=22,
@@ -424,23 +422,23 @@ class TestEquivalences(unittest.TestCase):
         x = x.reshape(-1, x.shape[-1])
         self.assertEqual(x.shape[1], dut.IN_D)
 
-        y_pred_fxp_cache_fname = (
-            root_dir / "test_x_files" / test_wave / "test_network.y_pred_fxp.pkl"
-        )
-        if os.path.exists(y_pred_fxp_cache_fname):
-            print("using cached", y_pred_fxp_cache_fname)
-            with open(y_pred_fxp_cache_fname, "rb") as f:
-                y_pred_fxp = pickle.load(f)
-            if len(y_pred_fxp) != len(x):
-                raise Exception(
-                    f"cache invalid; |x|={len(x)} but cached |y_pred_fxp|={len(y_pred_fxp)}"
-                )
-        else:
-            y_pred_fxp = []
-            for sample in tqdm.tqdm(x, desc="fxpmath"):
-                y_pred_fxp.append(float(fxp_model.predict(sample)[0]))
-            with open(y_pred_fxp_cache_fname, "wb") as f:
-                pickle.dump(y_pred_fxp, f)
+        # y_pred_fxp_cache_fname = (
+        #     root_dir / "test_x_files" / test_wave / "test_network.y_pred_fxp.pkl"
+        # )
+        # if os.path.exists(y_pred_fxp_cache_fname):
+        #     print("using cached", y_pred_fxp_cache_fname)
+        #     with open(y_pred_fxp_cache_fname, "rb") as f:
+        #         y_pred_fxp = pickle.load(f)
+        #     if len(y_pred_fxp) != len(x):
+        #         raise Exception(
+        #             f"cache invalid; |x|={len(x)} but cached |y_pred_fxp|={len(y_pred_fxp)}"
+        #         )
+        # else:
+        #     y_pred_fxp = []
+        #     for sample in tqdm.tqdm(x, desc="fxpmath"):
+        #         y_pred_fxp.append(float(fxp_model.predict(sample)[0]))
+        #     with open(y_pred_fxp_cache_fname, "wb") as f:
+        #         pickle.dump(y_pred_fxp, f)
 
         y_pred_am = []
 

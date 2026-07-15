@@ -3,6 +3,8 @@ from enum import Enum
 import random
 import tensorflow as tf
 
+from qkeras import quantized_bits
+
 FREQS = {"A2": 110, "A3": 220, "A4": 440, "A5": 880, "A6": 1760}
 
 IN_D = 4
@@ -57,6 +59,9 @@ class Embed2DQuadratureData(object):
         min_note: str,
         max_note: str,
         sample_rate_khz: float,
+        fp_int: int = 4,
+        fp_frac: int = 12,
+        quantise_y: bool = False,
         harsh: bool = False,
         soft_clip: bool = False,
         seed: int = 123,
@@ -69,6 +74,10 @@ class Embed2DQuadratureData(object):
         self.harsh = harsh
         self.soft_clip = soft_clip
         self.rng = random.Random(seed)
+        self.y_quantiser = quantized_bits(
+            bits=fp_int + fp_frac, integer=fp_int, alpha=1
+        )
+        self.quantise_y = quantise_y
 
     def calculate_wave(
         self,
@@ -147,10 +156,18 @@ class Embed2DQuadratureData(object):
         else:
             result = np.clip(result, -1, 1)
 
+        # scale and quantise for output
+        phase_sin *= scale
+        phase_cos *= scale
+
+        wave = scale * result
+        if self.quantise_y:
+            wave = self.y_quantiser(wave)
+
         return {
-            "phase_sin": scale * phase_sin,
-            "phase_cos": scale * phase_cos,
-            "wave": scale * result,
+            "phase_sin": phase_sin,
+            "phase_cos": phase_cos,
+            "wave": wave,
             "interp": interp,
         }
 
@@ -222,6 +239,8 @@ class Embed2DQuadratureData(object):
 
         Args:
             batch_size: dim 0 of output
+            seq_len: second axis for batch
+            num_samples: total number of batches generated
             emit_endpt_samples: if true there's a chance of sampling ( uninterpolated ) endpts
             emit_interpolated_samples: if true there's a cchange of sampling an interpolate wave ( on edge )
             emit_double_interpolated_samples: if true then vary interpolation over seq_len for interp samples
@@ -304,6 +323,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--min-note", type=str, default="A4")
     parser.add_argument("--max-note", type=str, default="A4")
+    parser.add_argument("--fp-int", type=int, default=4)
+    parser.add_argument("--fp-frac", type=int, default=12)
     parser.add_argument("--starting-phase", type=float, default=0)
     parser.add_argument("--grid-size", type=int, default=7)
     parser.add_argument("--seq-len", type=int, default=1000)
@@ -339,6 +360,9 @@ if __name__ == "__main__":
         min_note=opts.min_note,
         max_note=opts.max_note,
         sample_rate_khz=192,
+        fp_int=opts.fp_int,
+        fp_frac=opts.fp_frac,
+        quantise_y=False,
         harsh=opts.harsh,
         soft_clip=opts.soft_clip,
         seed=123,

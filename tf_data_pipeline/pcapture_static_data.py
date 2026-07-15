@@ -1,0 +1,323 @@
+from pathlib import Path
+import zarr
+import numpy as np
+import json
+import tensorflow as tf
+import pandas as pd
+
+from common.sample_db import SampleDB
+from common.util import zarr_base_path_for, zarr_buffer_fields
+
+IGNORE_FADE_LEN = 500
+
+# generate samples based on materialised sampling probabilities / importance sampling
+# weights based on converged model loss. dataset includes y_teacher as possible output
+
+class ParametricCaptureStaticData(object):
+
+    def __init__(
+        self,
+        capture_run: str,
+        keras_model: str,
+        quadrature_input: bool,
+        seed: int = 123,
+        uniform_sampling_floor: float = 0.2,
+    ):
+
+        db = SampleDB()
+        loss_rows = db.losses_for(capture_run, keras_model)
+        self.losses = np.array([l.loss for l in loss_rows], dtype=np.float64)
+        if len(self.losses) == 0:
+            raise Exception(
+                f"no scores in db for run={capture_run} model={keras_model} ?"
+            )
+        del db
+
+        self.capture_run = capture_run
+        self.model_data_z = zarr.open(
+            zarr_base_path_for(capture_run) / "model_data.z", mode="r"
+        )
+        self.n_chunks = self.model_data_z.nchunks
+        self.seq_len = self.model_data_z.blocks[0].shape[0]
+
+        self.quadrature_input = quadrature_input
+
+        print(
+            "capture_run",
+            self.capture_run,
+            "n_chunks",
+            self.n_chunks,
+            "chunk_len",
+            self.seq_len,
+            "|losses|",
+            len(self.losses),
+        )
+
+        if len(self.losses) != self.n_chunks:
+            raise Exception(
+                "|losses| != n_chunks; either we have wrong losses or chunk_size of dest is wrong"
+            )
+
+        self.rng = np.random.default_rng(seed=seed)
+
+        if uniform_sampling_floor < 0.0 or uniform_sampling_floor > 1.0:
+            raise ValueError("uniform_sampling_floor must be in [0, 1]")
+
+        # compute static priorities
+        # TODO: try high_loss_skew in 0.4, 0.7 range
+        #  0.0 => uniform ( ignore loss )
+        #  1.0 => denotes skewing proportional to loss
+        alpha_high_loss_skew = 0.4
+        f64eps = np.finfo(np.float64).eps
+        static_priorities = self.losses**alpha_high_loss_skew + f64eps
+
+        # convert priorities to sampling probabilities by normalization, then
+        # mix in a uniform floor so hard-mined examples cannot dominate.
+        # p' = (1-lambda)*p + lambda*(1/N)
+        raw_sampling_probabilities = static_priorities / static_priorities.sum()
+        uniform_prob = np.full_like(raw_sampling_probabilities, 1.0 / self.n_chunks)
+        self.sampling_probabilies = (
+            1.0 - uniform_sampling_floor
+        ) * raw_sampling_probabilities + uniform_sampling_floor * uniform_prob
+
+        # since we are leaning heavily on converged ( ish ) loss of a large model
+        # we can try to just calculate importance weights purely on that loss
+        # i.e. regardless of where they came from; sobol, is_weights, uniform etc
+        # this might be super naive... we'll see...
+        # TODO: try bias_correction in 0.5, 1.0
+        #  0 => w_i=1 for all => keeps all bias from sampling prio
+        #  1 => full correction => weighting cancels out sampling prio
+        beta_bias_correction = 0.6
+        num_examples = len(self.sampling_probabilies)
+        unnormalised_static_importance_weights = (
+            1.0 / (num_examples * self.sampling_probabilies)
+        ) ** beta_bias_correction
+        self.static_importance_weights = (
+            unnormalised_static_importance_weights
+            / unnormalised_static_importance_weights.max()
+        )
+
+        # read in debug mapping for src_runs ( which gives the src_run of each index )
+        # with open(zarr_base_path_for(capture_run) / "src_runs.json", "r") as f:
+        #    src_runs = json.load(f)
+        # write key arrays for debugging
+        # df = pd.DataFrame(
+        #     zip(src_runs, self.sampling_probabilies, self.static_importance_weights),
+        #     columns=["run", "sampling_probability", "static_importance_weight"],
+        # )
+        # df.to_csv("/tmp/weights.tsv", sep="\t", index=False)
+
+        if (
+            self.n_chunks
+            != len(self.sampling_probabilies)
+            != len(self.static_importance_weights)
+        ):
+            raise Exception(
+                "mismatch between n_chunks, sampling_probabilies, static_importance_weights"
+            )
+
+    def num_examples(self):
+        return self.n_chunks
+
+    def in_d(self):
+        return 5 if self.quadrature_input else 4
+
+    def out_d(self):
+        return 1
+
+    def model_data_block_to_xs_ys(
+        self,
+        data,
+        flip_a_b: bool = False,
+    ):
+        """
+        Args:
+            data: chunk from zarr model_data_t.z
+            emit_y_teacher_pred: if true emit y_teacher_pred, else emit y_true
+            flip_a_b: if true change [tri, a_cv, b_cv, morph] to [tri, b_cv, a_cv, -morph]
+            use_quadrature: if true emit data as (sin_q, cos_q, ...) otherwise (tri, ...)
+        """
+
+        # TODO: rather than flip 1/2 the time ( which will work in expectation ) there
+        #       is also the option to bake this in specifically as a consistency loss ?
+        #       e.g L = huber_stft(yt, f(x)) + huber_stft(yt, f(x')) + lambda.||f(x)-f(x')||
+
+        f = zarr_buffer_fields("model_data.z")
+
+        if self.quadrature_input:
+            if flip_a_b:
+                xs = np.array(
+                    data[..., [f.x_sin_q, f.x_cos_q, f.x_b_cv, f.x_a_cv, f.x_morph_cv]],
+                    copy=True,
+                )
+                xs[..., -1] *= -1
+            else:
+                xs = data[..., [f.x_sin_q, f.x_cos_q, f.x_a_cv, f.x_b_cv, f.x_morph_cv]]
+        else:
+            if flip_a_b:
+                xs = np.array(
+                    data[..., [f.x_tri, f.x_a_cv, f.x_b_cv, f.x_morph_cv]],
+                    copy=True,
+                )
+                xs[..., -1] *= -1
+            else:
+                xs = data[..., [f.x_tri, f.x_a_cv, f.x_b_cv, f.x_morph_cv]]
+
+        # build y
+        #  - y_teacher_pred morph output ( from capture ) for NOW or
+        #  - y_true morph output ( from capture )
+        # if emit_y_teacher_pred:
+        #     ys = data[..., f.y_pred_teacher : f.y_pred_teacher + 1]
+        # else:
+        ys = data[..., f.y_true : f.y_true + 1]
+
+        return xs, ys
+
+    def tf_training_dataset(
+        self,
+        seq_len: int,
+        num_batches: int,
+        batch_size: int,
+        emit_weights: bool,
+        rnd_flip_a_b: bool = False,
+    ):
+        """
+        Generate num_samples samples of shape (batch_size, seq_len, 4)
+        sampling is done with statically derived importance sampling probabilities
+        and importance weights.
+
+        Args:
+            seq_len: second axis for batch
+            num_batches: total number of batches generated
+            batch_size: batch size
+            emit_weight: if set we return _weight as 3rd tuple element
+            emit_y_teacher_pred: if set we emit y_teacher_pred instead of y_true
+            rnd_flip_a_b: if set then 1/2 times we flip a_cv and b_cv and set -morph_cv
+        """
+
+        def sample_generator():
+            for _ in range(num_batches * batch_size):
+                # sample idx
+                idx = self.rng.choice(self.n_chunks, p=self.sampling_probabilies)
+                # sample offset/len
+                r_seq_from = self.rng.integers(
+                    low=IGNORE_FADE_LEN,
+                    high=self.seq_len - IGNORE_FADE_LEN - seq_len,
+                )
+                r_seq_to = r_seq_from + seq_len
+                # grab relevant pieces
+                try:
+                    block = self.model_data_z.blocks[idx]
+                    data = block[r_seq_from:r_seq_to]
+                except zarr.errors.BoundsCheckError as e:
+                    print(
+                        "self.capture_run",
+                        self.capture_run,
+                        "self.n_chunks",
+                        self.n_chunks,
+                        "idx",
+                        idx,
+                    )
+                    raise e
+                # if configured, flip 50% of data
+                flip_a_b = rnd_flip_a_b and self.rng.uniform() < 0.5
+                # return with weight for training and either y_true or y_teacher_pred
+                #             #xs_ys = model_data_block_to_xs_ys(data, emit_y_teacher_pred, flip_a_b)
+                xs_ys = self.model_data_block_to_xs_ys(data, flip_a_b)
+                if emit_weights:
+                    weight = self.static_importance_weights[idx]
+                    yield *xs_ys, weight
+                else:
+                    yield xs_ys
+
+        output_signature = [
+            tf.TensorSpec(shape=(seq_len, self.in_d()), dtype=tf.float16),
+            tf.TensorSpec(shape=(seq_len, self.out_d()), dtype=tf.float16),
+        ]
+        if emit_weights:
+            output_signature.append(tf.TensorSpec(shape=(), dtype=tf.float32))
+
+        ds = tf.data.Dataset.from_generator(
+            sample_generator, output_signature=tuple(output_signature)
+        )
+
+        ds = ds.batch(batch_size)
+        ds = ds.prefetch(tf.data.AUTOTUNE)
+
+        return ds
+
+    def tf_inference_dataset(
+        self,
+        batch_size: int = 1,
+        cache_fname: str = None,
+        return_sample_info: bool = False,
+    ):
+        """
+        Generate all samples, once, with full returned shape
+        x - (1, SAMPLE_LEN, 4)
+        y - (1, SAMPLE_LEN, 1)
+
+        Args:
+            seq_len: second axis for batch
+            num_batches: total number of batches generated
+            batch_size: batch size
+            return_sample_info: if True return (x, y, model_data_z, idx, static_weight) otherwise return normal (x, y)
+        """
+
+        def sample_generator():
+            for c in range(self.n_chunks):
+                data = self.model_data_z.blocks[c]
+                weight = self.static_importance_weights[idx]
+                if return_sample_info:
+                    yield *model_data_block_to_xs_ys(data), self.capture_run, c, weight
+                else:
+                    yield model_data_block_to_xs_ys(data)
+
+        output_signature = [
+            tf.TensorSpec(shape=(self.seq_len, self.in_d()), dtype=tf.float32),
+            tf.TensorSpec(shape=(self.seq_len, self.out_d()), dtype=tf.float32),
+        ]
+        if return_sample_info:
+            output_signature.append(tf.TensorSpec(shape=(), dtype=tf.string))
+            output_signature.append(tf.TensorSpec(shape=(), dtype=tf.int32))
+            output_signature.append(tf.TensorSpec(shape=(), dtype=tf.float32))
+
+        ds = tf.data.Dataset.from_generator(
+            sample_generator, output_signature=tuple(output_signature)
+        )
+
+        if cache_fname is not None:
+            ds = ds.cache(cache_fname)
+        if batch_size is not None:
+            ds = ds.batch(batch_size)
+            ds = ds.prefetch(tf.data.AUTOTUNE)
+        return ds
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--run", type=str, required=True)
+    parser.add_argument("--model", type=str, required=True)
+    parser.add_argument("--uniform-sampling-floor", type=float, default=0.2)
+    opts = parser.parse_args()
+    print("opts", opts)
+    pd = ParametricCaptureStaticData(
+        capture_run=opts.run,
+        keras_model=opts.model,
+        uniform_sampling_floor=opts.uniform_sampling_floor,
+    )
+
+    ds = pd.tf_training_dataset(seq_len=64, num_batches=4, batch_size=4)
+    for xs, ys, weights in ds:
+        print(xs.shape, ys.shape, weights)
+
+    # for x, y, idxs, weights in pd.tf_training_dataset(
+    #     seq_len=100, num_batches=5, batch_size=8
+    # ):
+    #     print("idxs", idxs)
+    #     print("weights", weights)
+    #     print("x", x.shape, "y", y.shape)
