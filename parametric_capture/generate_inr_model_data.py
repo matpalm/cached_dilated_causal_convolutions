@@ -108,3 +108,6 @@ for start in tqdm(list(range(0, total_entries, chunk_rows))):
     chunk[:, md_f.y_true] = filtered_morph.astype(np.float32)
 
     model_data_z[start:end] = chunk  # single write per chunk
+
+
+print("DONT FORGET TO CONVERT TO NUMPY IF REQUIRED")
