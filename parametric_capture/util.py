@@ -32,15 +32,15 @@ def min_max_scale(a):
     return (a - a.min()) / diff
 
 
-def zarr_to_columns(name: str):
-    match name:
-        case "cv_buffers.z":
-            return ["a_cv", "b_cv", "morph_cv", "v_oct"]
-        case "capture_buffers.z":
-            return ["morph_out", "a_out", "b_out", "tri"]
-        case "model_data.z":
-            return ["tri", "a_cv", "b_cv", "morph_cv", "morph_out"]
-        case "model_data_t.z":
-            return ["tri", "a_cv", "b_cv", "morph_cv", "y_true", "y_teacher_pred"]
-        case _:
-            raise Exception(f"unknown type [{name}]")
+# def zarr_to_columns(name: str):
+#     match name:
+#         case "cv_buffers.z":
+#             return ["a_cv", "b_cv", "morph_cv", "v_oct"]
+#         case "capture_buffers.z":
+#             return ["morph_out", "a_out", "b_out", "tri"]
+#         case "model_data.z":
+#             return ["tri", "a_cv", "b_cv", "morph_cv", "morph_out"]
+#         case "model_data_t.z":
+#             return ["tri", "a_cv", "b_cv", "morph_cv", "y_true", "y_teacher_pred"]
+#         case _:
+#             raise Exception(f"unknown type [{name}]")

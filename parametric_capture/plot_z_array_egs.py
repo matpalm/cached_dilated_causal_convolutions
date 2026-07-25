@@ -36,7 +36,7 @@ for eg in opts.egs:
         "cv_buffers.z",
         "capture_buffers.z",
         "model_data.z",
-        "model_data_t.z",
+        "inr_model_data.z",
     ]:
         z = open_zarr(run, z_name)
         ch_names = zarr_buffer_fields(z_name)._fields

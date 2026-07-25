@@ -1,6 +1,5 @@
 import numpy as np
 
-from common.util import zarr_buffer_fields
 from common.wave_conversion import tri_to_quadrature
 
 
@@ -17,7 +16,6 @@ def build_triangle_sample(
     Build a synthetic fake x (seq_len, 4)
     """
 
-    f = zarr_buffer_fields("model_data.z")
     n = np.arange(seq_len, dtype=np.float32)
     phase = np.mod(n * (tri_freq / sample_rate), 1.0)
     tri_amp = 0.53  # fixed from capture

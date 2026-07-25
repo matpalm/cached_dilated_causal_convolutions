@@ -7,7 +7,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import warnings
 
-from .util import zarr_to_columns
+from common.util import zarr_buffer_fields
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--zarr-dir", type=Path, required=True)
@@ -21,7 +21,9 @@ opts = parser.parse_args()
 
 z = zarr.open(opts.zarr_dir, "r")
 print(z.shape)
-column_names = zarr_to_columns(opts.zarr_dir.name)
+column_names = zarr_buffer_fields(opts.zarr_dir.name)._fields
+print("column_names", column_names)
+
 num_cols = len(column_names)
 values_by_col = [[] for _ in range(num_cols)]
 blocks = list(range(z.nchunks))

@@ -12,7 +12,6 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import AdamW
 
 from tf_data_pipeline.pcapture_static_data import ParametricCaptureStaticData
-from tf_data_pipeline.pcapture_data import ParametricCaptureData
 from qkeras.utils import model_save_quantized_weights
 
 from .util import ensure_dir_exists, CheckYPred
@@ -203,21 +202,6 @@ if __name__ == "__main__":
         train_model.load_weights(init_weights_path)
     else:
         init_weights_path = None
-
-    # data = ParametricCaptureData(
-    #     capture_run=opts.capture_run,
-    #     seed=123,
-    # )
-    # train_ds = data.tf_training_dataset(
-    #     seq_len=TRAIN_SEQ_LEN,
-    #     num_batches=opts.num_train_egs // opts.batch_size,
-    #     batch_size=opts.batch_size,
-    # )
-    # validate_ds = data.tf_training_dataset(
-    #     seq_len=TRAIN_SEQ_LEN,
-    #     num_batches=opts.num_validate_egs // opts.batch_size,
-    #     batch_size=opts.batch_size,
-    # )
 
     # construct some callbacks...
     callbacks = []

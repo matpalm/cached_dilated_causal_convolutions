@@ -53,7 +53,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--beta-stft",
         type=float,
-        default=0.1,
+        default=0.01,
         help="target STFT-loss weight after warm up and ramp",
     )
     parser.add_argument(

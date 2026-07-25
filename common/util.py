@@ -44,6 +44,16 @@ def zarr_buffer_fields(zarr_name):
             # return _fields(
             #     ["x_tri", "x_a_cv", "x_b_cv", "x_morph_cv", "y_true", "y_pred_teacher"]
             # )
+        case "inr_model_data.z":
+            return _fields(
+                [
+                    "x_phase",
+                    "x_a_cv",
+                    "x_b_cv",
+                    "x_morph_cv",
+                    "y_true",
+                ]
+            )
         case _:
             raise Exception("TOOD: support zarr_name")
 
